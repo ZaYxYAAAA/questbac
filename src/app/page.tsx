@@ -24,7 +24,7 @@ const SHORTCUTS = [
   { href: "/labo", emoji: "📈", title: "Labo de maths", text: "Courbes et figures à manipuler", gradient: "from-violet-600/30 to-indigo-600/10" },
   { href: "/prof", emoji: "🎓", title: "Prof IA", text: "Une fiche sur n'importe quelle notion", gradient: "from-cyan-600/30 to-sky-600/10" },
   { href: "/forge", emoji: "⚒️", title: "Forge", text: "Ton cours en photo → un QCM", gradient: "from-amber-600/30 to-orange-600/10" },
-  { href: "/classement?vue=rangs", emoji: "🏆", title: "Ligues & rangs", text: "De Bronze à Légende", gradient: "from-pink-600/30 to-rose-600/10" },
+  { href: "/amis", emoji: "👥", title: "Amis", text: "Invite-les, comparez vos scores", gradient: "from-pink-600/30 to-rose-600/10" },
 ];
 
 export default function HomePage() {

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import { Avatar } from "@/components/game/Avatar";
+import { FriendsBoard } from "@/components/game/FriendsBoard";
 import { PlayerTitle } from "@/components/game/PlayerTitle";
 import { RankBadge } from "@/components/game/RankBadge";
 import { RankLadder } from "@/components/game/RankLadder";
@@ -18,8 +19,8 @@ import { useGame } from "@/lib/store/game-store";
 
 const PODIUM = ["🥇", "🥈", "🥉"];
 
-type View = "ligue" | "classement" | "rangs";
-const VIEWS: View[] = ["ligue", "classement", "rangs"];
+type View = "ligue" | "amis" | "classement" | "rangs";
+const VIEWS: View[] = ["ligue", "amis", "classement", "rangs"];
 
 export default function LeaderboardPage() {
   const game = useGame();
@@ -84,7 +85,8 @@ export default function LeaderboardPage() {
           onChange={changeView}
           className="w-full flex-nowrap sm:w-auto [&>button]:flex-1 [&>button]:whitespace-nowrap [&>button]:px-2 sm:[&>button]:flex-none sm:[&>button]:px-3"
           options={[
-            { value: "ligue", label: "Ligue hebdo" },
+            { value: "ligue", label: "Ligue" },
+            { value: "amis", label: "Amis" },
             { value: "classement", label: "Classement" },
             { value: "rangs", label: "Ligues & rangs" },
           ]}
@@ -92,6 +94,7 @@ export default function LeaderboardPage() {
       </div>
 
       {view === "ligue" && <WeeklyLeague />}
+      {view === "amis" && <FriendsBoard player={player} />}
       {view === "rangs" && <RankLadder entries={globalEntries} />}
       {view === "classement" && (
         <>

@@ -4,8 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useRef } from "react";
 import clsx from "clsx";
-import { FlaskConical, GraduationCap, Hammer, Home, Map as MapIcon, Skull, Trophy, User } from "lucide-react";
+import { FlaskConical, GraduationCap, Hammer, Home, Map as MapIcon, Skull, Trophy, User, Users } from "lucide-react";
 import { Onboarding } from "@/components/layout/Onboarding";
+import { PendingInvite } from "@/components/layout/PendingInvite";
 import { SaveIndicator } from "@/components/layout/SaveIndicator";
 import { Avatar } from "@/components/game/Avatar";
 import { PromotionCelebration } from "@/components/game/PromotionCelebration";
@@ -25,6 +26,7 @@ const NAV = [
   { href: "/prof", label: "Prof IA", icon: GraduationCap },
   { href: "/forge", label: "Forge", icon: Hammer },
   { href: "/classement", label: "Classement", icon: Trophy },
+  { href: "/amis", label: "Amis", icon: Users },
   { href: "/profil", label: "Profil", icon: User },
 ];
 
@@ -144,6 +146,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
         ))}
       </nav>
+      <PendingInvite />
       <Toaster />
       <PromotionCelebration />
     </div>

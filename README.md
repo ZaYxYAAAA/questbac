@@ -126,3 +126,12 @@ pourront tourner telles quelles côté serveur.
 3. **Répétition espacée** : reprogrammer automatiquement les questions ratées.
 4. **Production** : limiteur de débit partagé (Redis), quotas par compte, suivi des coûts IA,
    PWA hors-ligne.
+
+## Jouer avec des amis
+
+- Chaque joueur connecté a un **code d'ami** (`QB-XXXXXX`) sur la page **Amis**.
+- **Inviter** partage un lien `/invite/QB-XXXXXX` : la personne qui l'ouvre devient ton amie
+  dès qu'elle est connectée (même si elle crée son compte à ce moment-là).
+- On peut aussi saisir le code d'un ami. Connaître le code suffit : pas de demande à accepter.
+- L'onglet **Classement → Amis** compare la semaine (XP) et le rang (RP) entre amis.
+- Données serveur : `friends:<id>` (liste symétrique, 100 amis max) et l'index `friendcodes`.

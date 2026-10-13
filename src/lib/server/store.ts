@@ -22,6 +22,10 @@ export interface KvStore {
   del(key: string): Promise<void>;
   hset(hash: string, field: string, value: unknown): Promise<void>;
   hgetall<T>(hash: string): Promise<Record<string, T>>;
+  /** Plusieurs champs d'un hash (null pour un champ absent), dans l'ordre demandé. */
+  hmget<T>(hash: string, fields: string[]): Promise<(T | null)[]>;
+  /** Plusieurs clés d'un coup (null pour une clé absente), dans l'ordre demandé. */
+  mget<T>(keys: string[]): Promise<(T | null)[]>;
 }
 
 export function redisConfig(env: Record<string, string | undefined> = process.env) {
@@ -67,6 +71,16 @@ export function redisStore(url: string, token: string): KvStore {
       }
       return out;
     },
+    hmget: async <T>(hash: string, fields: string[]) => {
+      if (fields.length === 0) return [];
+      const raw = (await cmd<unknown[] | null>("HMGET", hash, ...fields)) ?? [];
+      return fields.map((_, i) => parse<T>(raw[i]));
+    },
+    mget: async <T>(keys: string[]) => {
+      if (keys.length === 0) return [];
+      const raw = (await cmd<unknown[] | null>("MGET", ...keys)) ?? [];
+      return keys.map((_, i) => parse<T>(raw[i]));
+    },
   };
 }
 
@@ -111,6 +125,11 @@ export function fileStore(dir: string, kind: StorageKind = "file"): KvStore {
         await write(`hash:${hash}`, all);
       }),
     hgetall: async <T>(hash: string) => (await read<Record<string, T>>(`hash:${hash}`)) ?? {},
+    hmget: async <T>(hash: string, fields: string[]) => {
+      const all = (await read<Record<string, T>>(`hash:${hash}`)) ?? {};
+      return fields.map((f) => (Object.hasOwn(all, f) ? all[f] : null));
+    },
+    mget: <T>(keys: string[]) => Promise.all(keys.map((k) => read<T>(k))),
   };
 }
 
