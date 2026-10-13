@@ -1,6 +1,6 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
-import { questionKey } from "@/lib/content/generated";
+import { factKey } from "@/lib/content/generated";
 import { rankedQuestions } from "@/lib/content/ranked-questions";
 import {
   type GroupEntry,
@@ -58,7 +58,7 @@ import { getStore } from "./store";
  */
 
 const HASH = "ranked";
-const SEEN_KEPT = 300;
+const SEEN_KEPT = 2000;
 /** Au-delà, une manche abandonnée est close d'office. */
 const MATCH_MAX_MS = 20 * 60_000;
 
@@ -294,7 +294,7 @@ export async function startMatch(uid: string, pseudo: string, subject: RankedSub
   }
   const id = newId();
   const step = currentRank(profile.subjects[subject], now)?.step ?? 0;
-  const questions = rankedQuestions(subject, level, `${uid}:${id}`, new Set(profile.seen ?? []));
+  const questions = rankedQuestions(subject, level, `${uid}:${id}`, profile.seen ?? []);
   const match: StoredMatch = {
     id,
     uid,
@@ -311,7 +311,7 @@ export async function startMatch(uid: string, pseudo: string, subject: RankedSub
     presence: { exits: 0, lastBeat: now.getTime() },
   };
   await saveMatch(match);
-  profile = { ...profile, active: id, seen: [...(profile.seen ?? []), ...questions.map(questionKey)].slice(-SEEN_KEPT) };
+  profile = { ...profile, active: id, seen: [...(profile.seen ?? []).filter((k) => !questions.some((q) => factKey(q) === k)), ...questions.map(factKey)].slice(-SEEN_KEPT) };
   await putProfile(uid, profile);
   return { id, subject, ...servedQuestion(match) };
 }

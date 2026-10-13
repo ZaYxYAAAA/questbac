@@ -1,5 +1,5 @@
 /** Générateurs de questions — Histoire-Géographie (Seconde, Première, Terminale). */
-import { type Generator, type Pair, claims, int, mcq, numeric, pairs, pick, sample, tf } from "./kit";
+import { type Generator, type Pair, claims, int, mcq, numeric, pairs, pick, sample, tf, withFact } from "./kit";
 
 type Event = readonly [string, number];
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -11,26 +11,28 @@ const year = (y: number) => (y < 0 ? `${-y} av. J.-C.` : String(y));
  */
 export function chrono(events: readonly Event[]): Generator[] {
   const uniqueYears = events.filter(([, y]) => events.filter(([, z]) => z === y).length === 1);
+  const oneByYear = events.filter((x, i) => events.findIndex((z) => z[1] === x[1]) === i);
   return [
     (r) => {
       const [e, y] = pick(r, events);
-      return mcq(r, `En quelle année : **${e}** ?`, year(y), [y - int(r, 1, 4), y + int(r, 1, 4), y + pick(r, [-15, -10, 10, 12, 20]), y - pick(r, [5, 6, 7, 8])].map(year),
-        `${e} : ${year(y)}.`, () => year(y + int(r, -25, 25)));
+      return withFact(mcq(r, `En quelle année : **${e}** ?`, year(y), [y - int(r, 1, 4), y + int(r, 1, 4), y + pick(r, [-15, -10, 10, 12, 20]), y - pick(r, [5, 6, 7, 8])].map(year),
+        `${e} : ${year(y)}.`, () => year(y + int(r, -25, 25))), e);
     },
     (r) => {
       const [e, y] = pick(r, uniqueYears.length >= 4 ? uniqueYears : events);
-      return mcq(r, `Que s'est-il passé en **${year(y)}** ?`, e, events.filter(([, z]) => Math.abs(z - y) >= 1).map(([x]) => x), `${year(y)} : ${e}.`);
+      return withFact(mcq(r, `Que s'est-il passé en **${year(y)}** ?`, e, events.filter(([, z]) => Math.abs(z - y) >= 1).map(([x]) => x), `${year(y)} : ${e}.`), e);
     },
     (r) => {
-      const four = sample(r, uniqueYears.length >= 4 ? uniqueYears : events, 4).filter((x, i, all) => all.findIndex((z) => z[1] === x[1]) === i);
+      // Un seul événement par année, pour qu'il y ait toujours un plus ancien sans ambiguïté.
+      const four = sample(r, oneByYear, 4);
       const first = four.reduce((m, x) => (x[1] < m[1] ? x : m));
-      return mcq(r, `Lequel de ces événements est le **plus ancien** ?`, first[0], four.map(([x]) => x), [...four].sort((a, b) => a[1] - b[1]).map(([x, y]) => `${x} (${year(y)})`).join(" · "));
+      return withFact(mcq(r, `Lequel de ces événements est le **plus ancien** ?`, first[0], four.map(([x]) => x), [...four].sort((a, b) => a[1] - b[1]).map(([x, y]) => `${x} (${year(y)})`).join(" · ")), first[0]);
     },
     (r) => {
       const [e, y] = pick(r, events);
       const right = r() < 0.5;
       const shown = right ? y : y + pick(r, [-20, -10, -5, -3, -2, -1, 1, 2, 3, 5, 10, 20]);
-      return tf(`${e} : ${year(shown)}.`, right, `${e} : ${year(y)}.`);
+      return withFact(tf(`${e} : ${year(shown)}.`, right, `${e} : ${year(y)}.`), e);
     },
   ];
 }

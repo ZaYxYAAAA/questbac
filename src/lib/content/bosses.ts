@@ -1,6 +1,6 @@
 import type { Boss, Level, Question } from "@/lib/types";
 import { CHAPTERS } from "./curriculum";
-import { chapterQuestions } from "./generated";
+import { type Seen, chapterQuestions } from "./generated";
 
 export const BOSSES: Boss[] = [
   {
@@ -160,8 +160,8 @@ export function bossChapters(boss: Boss, playerLevel: Level) {
 }
 
 /** Réserve de questions d'un combat : banque fixe + questions générées (nouvelles à chaque combat). */
-export function bossQuestionPool(boss: Boss, playerLevel: Level): Question[] {
+export function bossQuestionPool(boss: Boss, playerLevel: Level, avoid?: Seen): Question[] {
   const chapters = bossChapters(boss, playerLevel);
   const perChapter = Math.max(4, Math.ceil(40 / Math.max(1, chapters.length)));
-  return chapters.flatMap((c) => chapterQuestions(c.id, perChapter));
+  return chapters.flatMap((c) => chapterQuestions(c.id, perChapter, Math.random, avoid));
 }

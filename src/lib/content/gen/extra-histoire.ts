@@ -1,0 +1,227 @@
+/**
+ * Histoire-géographie — repères, notions et acteurs supplémentaires, alignés
+ * sur les programmes de Seconde, Première et Terminale.
+ */
+import { chrono } from "./histoire";
+import { type Claim, type Generator, type Pair, claims, pairs } from "./kit";
+
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const terms = (items: readonly Pair[]) =>
+  pairs(items, { ask: (a) => `Que désigne « ${a} » ?`, reverse: (b) => `Quel terme désigne : ${b} ?`, claim: (a, b) => `« ${cap(a)} » désigne ${b}.`, explain: (a, b) => `${cap(a)} : ${b}.` });
+const people = (items: readonly Pair[]) =>
+  pairs(items, { ask: (a) => `Qui était ${a} ?`, reverse: (b) => `Qui était ${b} ?`, claim: (a, b) => `${a} était ${b}.`, explain: (a, b) => `${a} : ${b}.` });
+
+type Ev = readonly [string, number];
+const bank = (ev: readonly Ev[], t: readonly Pair[], p: readonly Pair[] = [], c: readonly Claim[] = []): Generator[] => [
+  ...(ev.length ? chrono(ev) : []),
+  ...(t.length ? terms(t) : []),
+  ...(p.length ? people(p) : []),
+  ...(c.length ? [claims(c)] : []),
+];
+
+export const EXTRA_HISTOIRE: Record<string, Generator[]> = {
+  // ───────────── Seconde ─────────────
+  "hg-2-antiquite": bank(
+    [["Première olympiade (jeux d'Olympie)", -776], ["Réformes de Solon à Athènes", -594], ["Victoire grecque de Salamine sur les Perses", -480], ["Construction du Parthénon (début)", -447],
+     ["Conquêtes d'Alexandre le Grand (début)", -334], ["Fin de la deuxième guerre punique (victoire de Zama)", -202], ["Destruction de Carthage", -146], ["Mort de l'empereur Auguste", 14],
+     ["Éruption du Vésuve et destruction de Pompéi", 79], ["Le christianisme devient religion officielle de l'Empire (Théodose)", 380]],
+    [["ecclésia", "l'assemblée des citoyens à Athènes"], ["boulè", "le conseil des 500 qui prépare les lois à Athènes"], ["ostracisme", "le vote d'exil d'un citoyen jugé dangereux à Athènes"],
+     ["métèque", "un étranger libre résidant à Athènes, sans droits politiques"], ["princeps", "le titre d'Auguste, « premier des citoyens »"], ["romanisation", "la diffusion du mode de vie romain dans l'Empire"],
+     ["limes", "la frontière fortifiée de l'Empire romain"], ["citoyenneté romaine", "un statut donnant des droits civils et politiques dans le monde romain"]],
+    [["Périclès", "le stratège qui domine la vie politique d'Athènes au Ve siècle av. J.-C."], ["Clisthène", "le réformateur qui fonde la démocratie athénienne en 508 av. J.-C."], ["Caracalla", "l'empereur qui accorde la citoyenneté à tous les hommes libres de l'Empire en 212"], ["Constantin", "l'empereur qui accorde la liberté de culte aux chrétiens en 313"]],
+    [["Les femmes étaient citoyennes à part entière dans l'Athènes classique.", false, "Seuls les hommes libres nés de parents athéniens étaient citoyens."], ["L'Empire romain a facilité la circulation par un vaste réseau de routes.", true, "Les voies romaines relient l'Empire."]],
+  ),
+  "hg-2-moyen-age": bank(
+    [["Hégire : départ de Mahomet de La Mecque pour Médine", 622], ["Prise de Jérusalem par les armées arabes", 638], ["Bataille de Poitiers", 732], ["Fondation de Bagdad, capitale abbasside", 762],
+     ["Couronnement de Charlemagne empereur", 800], ["Prise de Jérusalem par les croisés", 1099], ["Reprise de Jérusalem par Saladin", 1187], ["Sac de Constantinople par la quatrième croisade", 1204],
+     ["Prise de Constantinople par les Ottomans", 1453], ["Fin de la Reconquista : prise de Grenade", 1492]],
+    [["califat", "le territoire gouverné par un calife, successeur du Prophète"], ["basileus", "le titre de l'empereur byzantin"], ["croisade", "une expédition militaire chrétienne vers la Terre sainte"],
+     ["Reconquista", "la reconquête chrétienne de la péninsule Ibérique"], ["dhimmi", "un non-musulman protégé en terre d'Islam contre un impôt"], ["schisme", "la séparation de deux Églises, comme en 1054"],
+     ["Venise", "une république marchande qui domine le commerce méditerranéen"], ["al-Andalus", "la partie de la péninsule Ibérique sous domination musulmane"]],
+    [["Saladin", "le sultan qui reprend Jérusalem aux croisés en 1187"], ["Urbain II", "le pape qui appelle à la première croisade en 1095"], ["Justinien", "l'empereur byzantin qui fait construire Sainte-Sophie"], ["Haroun al-Rachid", "un célèbre calife abbasside de Bagdad"]],
+    [["Le schisme de 1054 sépare l'Église d'Orient et l'Église d'Occident.", true, "Orthodoxes et catholiques."], ["Les échanges entre chrétiens et musulmans étaient impossibles au Moyen Âge.", false, "Commerce, traductions et savoirs circulent (Tolède, Sicile…)."]],
+  ),
+  "hg-2-renaissance": bank(
+    [["Invention de l'imprimerie à caractères mobiles par Gutenberg (vers)", 1450], ["Arrivée de Christophe Colomb aux Amériques", 1492], ["Arrivée de Vasco de Gama en Inde", 1498], ["Les 95 thèses de Luther", 1517],
+     ["Premier tour du monde (expédition de Magellan, départ)", 1519], ["Prise de Tenochtitlan par Cortés", 1521], ["Ordonnance de Villers-Cotterêts : le français langue des actes officiels", 1539],
+     ["Début du concile de Trente", 1545], ["Massacre de la Saint-Barthélemy", 1572], ["Édit de Nantes", 1598]],
+    [["humanisme", "un mouvement intellectuel qui place l'homme au centre et redécouvre les textes antiques"], ["Réforme", "le mouvement religieux qui conteste l'Église catholique au XVIe siècle"],
+     ["indulgence", "une remise de peine pour les péchés accordée par l'Église"], ["mécène", "un riche protecteur des artistes"], ["perspective", "la technique qui donne l'illusion de la profondeur en peinture"],
+     ["Contre-Réforme", "la réponse de l'Église catholique à la Réforme"], ["traite atlantique", "le commerce d'esclaves africains vers les Amériques"], ["conquistador", "un conquérant espagnol du Nouveau Monde"]],
+    [["Érasme", "un humaniste hollandais, auteur de l'Éloge de la folie"], ["Calvin", "le réformateur protestant installé à Genève"], ["Léonard de Vinci", "un artiste et ingénieur italien de la Renaissance"], ["Laurent de Médicis", "un célèbre mécène florentin"]],
+    [["Luther traduit la Bible en allemand pour la rendre accessible.", true, "Accès direct aux Écritures."], ["L'édit de Nantes interdit le protestantisme en France.", false, "Il lui accorde la liberté de culte (1598)."]],
+  ),
+  "hg-2-lumieres": bank(
+    [["Publication des Lettres philosophiques de Voltaire", 1734], ["De l'esprit des lois de Montesquieu", 1748], ["Premier volume de l'Encyclopédie", 1751], ["Du contrat social de Rousseau", 1762],
+     ["Indépendance des États-Unis : déclaration", 1776], ["Constitution des États-Unis", 1787], ["Abolition des privilèges (nuit du 4 août)", 1789], ["Proclamation de la République en France", 1792],
+     ["Abolition de l'esclavage par la Convention", 1794], ["Indépendance d'Haïti", 1804]],
+    [["Lumières", "le mouvement intellectuel du XVIIIe siècle qui défend la raison et la liberté"], ["despotisme éclairé", "un pouvoir absolu inspiré par certaines idées des Lumières"],
+     ["salon", "un lieu de sociabilité où l'on débat des idées nouvelles"], ["souveraineté nationale", "le principe selon lequel le pouvoir appartient à la nation"],
+     ["monarchie constitutionnelle", "un régime où le pouvoir du roi est limité par une constitution"], ["tolérance", "le respect des opinions et des religions d'autrui"],
+     ["séparation des pouvoirs", "la distinction entre pouvoirs législatif, exécutif et judiciaire"], ["philosophe", "au XVIIIe siècle, un intellectuel engagé qui critique l'ordre établi"]],
+    [["Diderot", "le directeur de l'Encyclopédie"], ["Toussaint Louverture", "le chef de la révolte des esclaves de Saint-Domingue"], ["George Washington", "le premier président des États-Unis"], ["Olympe de Gouges", "l'autrice de la Déclaration des droits de la femme et de la citoyenne"]],
+    [["La Déclaration des droits de l'homme et du citoyen date de 1789.", true, "Votée le 26 août 1789."], ["Les Lumières défendent la monarchie absolue de droit divin.", false, "Elles la critiquent au nom de la raison."]],
+  ),
+  "hg-2-etat-moderne": bank(
+    [["Début du règne de François Ier", 1515], ["Concordat de Bologne", 1516], ["Avènement d'Henri IV", 1589], ["Assassinat d'Henri IV", 1610], ["Début de la Fronde", 1648],
+     ["Exécution du roi Charles Ier d'Angleterre", 1649], ["Début du règne personnel de Louis XIV", 1661], ["Révocation de l'édit de Nantes", 1685], ["Glorieuse Révolution en Angleterre", 1688], ["Bill of Rights", 1689]],
+    [["absolutisme", "un régime où le roi concentre tous les pouvoirs"], ["droit divin", "l'idée que le pouvoir du roi vient de Dieu"], ["intendant", "un représentant du roi dans les provinces"],
+     ["parlementarisme", "un régime où le Parlement limite le pouvoir du roi"], ["Fronde", "la révolte des nobles et des parlements contre le pouvoir royal (1648-1653)"],
+     ["colbertisme", "la politique économique qui favorise les manufactures et le commerce"], ["Habeas corpus", "la loi anglaise de 1679 contre les détentions arbitraires"], ["courtisan", "un noble qui vit à la cour du roi"]],
+    [["Richelieu", "le principal ministre de Louis XIII"], ["Colbert", "le contrôleur général des finances de Louis XIV"], ["Mazarin", "le ministre qui gouverne pendant la minorité de Louis XIV"], ["Cromwell", "le chef de la République anglaise au XVIIe siècle"]],
+    [["Louis XIV installe la cour à Versailles en 1682.", true, "Domestication de la noblesse."], ["Au XVIIe siècle, l'Angleterre évolue vers l'absolutisme, la France vers le parlementarisme.", false, "C'est l'inverse."]],
+  ),
+  "hg-2-afrique-australe": bank(
+    [],
+    [["apartheid", "la politique de ségrégation raciale en Afrique du Sud (1948-1991)"], ["bantoustan", "un territoire réservé aux Noirs sous l'apartheid"], ["townships", "des quartiers périphériques réservés aux populations noires"],
+     ["SADC", "la Communauté de développement d'Afrique australe"], ["corridor de développement", "un axe de transport qui relie un espace intérieur à un port"],
+     ["rente minière", "les revenus tirés de l'exploitation des mines"], ["stress hydrique", "une situation où l'eau disponible ne couvre pas les besoins"], ["transition démographique", "le passage d'une forte natalité et mortalité à une faible natalité et mortalité"]],
+    [["Nelson Mandela", "le leader de la lutte contre l'apartheid, président de l'Afrique du Sud en 1994"], ["Desmond Tutu", "l'archevêque sud-africain, prix Nobel de la paix 1984"], ["Frederik de Klerk", "le dernier président de l'apartheid, qui libère Mandela en 1990"], ["Steve Biko", "un militant de la Conscience noire mort en détention en 1977"], ["Robert Mugabe", "le dirigeant du Zimbabwe de 1980 à 2017"]],
+    [["Le Lesotho est un État enclavé dans l'Afrique du Sud.", true, "Comme l'Eswatini, en partie."], ["L'Afrique australe dispose de très peu de ressources minières.", false, "Elle est riche en or, platine, diamants, charbon…"],
+     ["Johannesburg est le principal centre économique de l'Afrique du Sud.", true, "Dans la province du Gauteng."], ["Les chutes Victoria se situent sur le Zambèze.", true, "Entre la Zambie et le Zimbabwe."]],
+  ),
+  "hg-2-mobilites": bank(
+    [],
+    [["réfugié", "une personne contrainte de fuir son pays pour échapper à des persécutions"], ["migration économique", "un déplacement motivé par la recherche d'un travail ou d'un meilleur revenu"],
+     ["diaspora", "une population dispersée hors de son pays d'origine mais qui garde des liens avec lui"], ["remises", "l'argent envoyé par les migrants à leur famille restée au pays"],
+     ["tourisme", "un déplacement d'au moins une nuit hors de son domicile pour les loisirs"], ["hub", "un aéroport ou port qui concentre et redistribue les flux"],
+     ["déplacé interne", "une personne forcée de fuir mais restée dans son propre pays"], ["front pionnier touristique", "un espace nouvellement aménagé pour le tourisme"]],
+    [],
+    [["La France est l'un des pays les plus visités au monde.", true, "Première destination touristique internationale."], ["La plupart des migrations internationales se font du Sud vers le Nord.", false, "Les migrations Sud-Sud sont aussi importantes."],
+     ["Les remises des migrants dépassent l'aide publique au développement reçue par de nombreux pays.", true, "Selon la Banque mondiale."], ["Le HCR est l'agence de l'ONU chargée des réfugiés.", true, "Haut-Commissariat aux réfugiés."]],
+  ),
+  // ───────────── Première ─────────────
+  "hg-1-revolution": bank(
+    [["Ouverture des États généraux", 1789], ["Fuite du roi à Varennes", 1791], ["Bataille de Valmy", 1792], ["Exécution de Louis XVI", 1793], ["Chute de Robespierre (9 Thermidor)", 1794],
+     ["Coup d'État du 18 Brumaire", 1799], ["Code civil", 1804], ["Sacre de Napoléon Ier", 1804], ["Bataille d'Austerlitz", 1805], ["Bataille de Waterloo", 1815]],
+    [["Tiers état", "l'ordre qui regroupe tous ceux qui ne sont ni nobles ni clercs"], ["sans-culottes", "les révolutionnaires parisiens issus du peuple"], ["Terreur", "la période de répression révolutionnaire de 1793-1794"],
+     ["Constitution civile du clergé", "la loi de 1790 qui fait des prêtres des fonctionnaires élus"], ["Consulat", "le régime de Bonaparte de 1799 à 1804"], ["Concordat", "l'accord de 1801 entre Bonaparte et le pape"],
+     ["Blocus continental", "l'interdiction de commercer avec le Royaume-Uni imposée par Napoléon"], ["Directoire", "le régime de 1795 à 1799 dirigé par cinq directeurs"]],
+    [["Robespierre", "un chef montagnard, figure de la Terreur"], ["Danton", "un révolutionnaire guillotiné en 1794"], ["Marie-Antoinette", "la reine de France exécutée en 1793"], ["Sieyès", "l'auteur de « Qu'est-ce que le Tiers état ? »"]],
+    [["Le Code civil consacre l'égalité devant la loi.", true, "Il garde aussi l'infériorité juridique des femmes."], ["Napoléon rétablit l'esclavage dans les colonies en 1802.", true, "Après son abolition de 1794."]],
+  ),
+  "hg-1-nationalites": bank(
+    [["Printemps des peuples (révolutions en Europe)", 1848], ["Abolition définitive de l'esclavage en France", 1848], ["Coup d'État de Louis-Napoléon Bonaparte", 1851], ["Proclamation du Second Empire", 1852],
+     ["Unité italienne : proclamation du royaume d'Italie", 1861], ["Bataille de Sadowa : la Prusse bat l'Autriche", 1866], ["Rome devient capitale de l'Italie", 1871], ["Proclamation de l'Empire allemand à Versailles", 1871],
+     ["Défaite de Sedan", 1870], ["Expédition des Mille de Garibaldi", 1860]],
+    [["nationalité", "un groupe humain qui a conscience de former une nation"], ["Risorgimento", "le mouvement de l'unification italienne"], ["Zollverein", "l'union douanière des États allemands"],
+     ["suffrage universel masculin", "le droit de vote accordé à tous les hommes adultes"], ["bonapartisme", "un régime autoritaire appuyé sur le plébiscite"], ["plébiscite", "un vote par lequel le peuple approuve un dirigeant ou une décision"],
+     ["Alsace-Moselle", "les territoires annexés par l'Allemagne en 1871"], ["Commune de Paris", "l'insurrection parisienne de 1871"]],
+    [["Bismarck", "le chancelier qui réalise l'unité allemande"], ["Cavour", "le ministre piémontais artisan de l'unité italienne"], ["Garibaldi", "le chef de l'expédition des Mille"], ["Napoléon III", "l'empereur des Français de 1852 à 1870"]],
+    [["L'unité allemande est réalisée « par le fer et par le sang ».", true, "Formule de Bismarck."], ["En 1848, la France adopte le suffrage universel féminin.", false, "Il est masculin ; les femmes votent en 1945."]],
+  ),
+  "hg-1-industrie": bank(
+    [["Brevet de la machine à vapeur améliorée de James Watt", 1769], ["Première ligne de chemin de fer de voyageurs (Liverpool-Manchester)", 1830], ["Exposition universelle de Londres (Crystal Palace)", 1851],
+     ["Ouverture du canal de Suez", 1869], ["Loi autorisant les syndicats en France", 1884], ["Ampoule électrique de Thomas Edison", 1879], ["Création de la CGT", 1895], ["Encyclique Rerum novarum", 1891],
+     ["Loi sur le repos hebdomadaire en France", 1906], ["Fordisme : chaîne d'assemblage de la Ford T", 1913]],
+    [["révolution industrielle", "le passage d'une économie agricole à une économie industrielle"], ["prolétariat", "la classe des ouvriers qui ne possèdent que leur force de travail"], ["bourgeoisie", "la classe des propriétaires des moyens de production"],
+     ["exode rural", "le départ des habitants des campagnes vers les villes"], ["capitalisme", "un système fondé sur la propriété privée et la recherche du profit"], ["socialisme", "une doctrine qui veut abolir l'exploitation et collectiviser les moyens de production"],
+     ["syndicat", "une association qui défend les intérêts des travailleurs"], ["taylorisme", "l'organisation scientifique du travail"]],
+    [["Karl Marx", "l'auteur du Manifeste du parti communiste (1848)"], ["Jules Ferry", "le ministre des lois scolaires des années 1880"], ["Eugène Schneider", "un grand patron de la sidérurgie au Creusot"], ["Friedrich Engels", "le compagnon de Marx, qui décrit la condition ouvrière en Angleterre"]],
+    [["La première révolution industrielle repose sur le charbon et la machine à vapeur.", true, "Textile, métallurgie, chemin de fer."], ["La seconde révolution industrielle repose sur l'électricité et le pétrole.", true, "Fin XIXe siècle."]],
+  ),
+  "hg-1-troisieme-republique": bank(
+    [["Proclamation de la République (4 septembre)", 1870], ["Lois constitutionnelles de la IIIe République", 1875], ["Liberté de la presse", 1881], ["Liberté de réunion", 1881],
+     ["Lois Ferry : école gratuite", 1881], ["Lois Ferry : école laïque et obligatoire", 1882], ["Rétablissement du divorce", 1884], ["Début de l'affaire Dreyfus", 1894], ["« J'accuse… ! » de Zola", 1898], ["Liberté d'association", 1901]],
+    [["laïcité", "la séparation des Églises et de l'État et la neutralité de l'État"], ["radical", "un républicain attaché à la laïcité et aux réformes"], ["boulangisme", "un mouvement nationaliste autour du général Boulanger"],
+     ["dreyfusard", "un partisan de l'innocence de Dreyfus"], ["hussards noirs", "les instituteurs de la IIIe République"], ["Marianne", "l'allégorie de la République"],
+     ["14 juillet", "la fête nationale française depuis 1880"], ["antisémitisme", "l'hostilité envers les Juifs"]],
+    [["Alfred Dreyfus", "un officier juif accusé à tort de trahison"], ["Léon Gambetta", "un républicain qui proclame la République en 1870"], ["Jean Jaurès", "un leader socialiste assassiné en 1914"], ["Émile Zola", "l'écrivain qui publie « J'accuse… ! » en 1898"]],
+    [["La IIIe République accorde le droit de vote aux femmes.", false, "Les Françaises votent pour la première fois en 1945."], ["La loi de séparation des Églises et de l'État date de 1905.", true, "Loi du 9 décembre 1905."]],
+  ),
+  "hg-1-ww1": bank(
+    [["Assassinat de l'archiduc François-Ferdinand à Sarajevo", 1914], ["Bataille de la Marne", 1914], ["Génocide des Arméniens", 1915], ["Débarquement des Dardanelles", 1915], ["Bataille de la Somme", 1916],
+     ["Entrée en guerre des États-Unis", 1917], ["Révolution russe", 1917], ["Mutineries dans l'armée française", 1917], ["Armistice du 11 novembre", 1918], ["Traité de Versailles", 1919]],
+    [["guerre totale", "une guerre qui mobilise toutes les ressources humaines, économiques et morales d'un pays"], ["Union sacrée", "l'union des partis politiques français face à l'ennemi en 1914"], ["poilu", "le surnom du soldat français"],
+     ["guerre de position", "une guerre où les armées s'enterrent dans des tranchées"], ["Triple-Entente", "l'alliance France, Royaume-Uni, Russie"], ["Triple-Alliance", "l'alliance Allemagne, Autriche-Hongrie, Italie"],
+     ["économie de guerre", "la réorganisation de l'économie pour l'effort militaire"], ["SDN", "la Société des Nations, créée en 1919"]],
+    [["Georges Clemenceau", "le président du Conseil surnommé « le Tigre »"], ["Philippe Pétain", "le général vainqueur de Verdun"], ["Ferdinand Foch", "le généralissime des armées alliées en 1918"], ["Woodrow Wilson", "le président américain des 14 points"]],
+    [["La bataille de Verdun a lieu en 1916.", true, "De février à décembre 1916."], ["La Première Guerre mondiale a fait environ 1 million de morts.", false, "Environ 10 millions de soldats tués."]],
+  ),
+  "hg-1-metropoles": bank(
+    [],
+    [["métropole", "une grande ville qui concentre population, activités et fonctions de commandement"], ["métropolisation", "la concentration des hommes et des activités dans les grandes villes"],
+     ["périurbanisation", "l'extension de l'urbanisation dans les espaces ruraux autour des villes"], ["étalement urbain", "l'extension des surfaces urbanisées en périphérie"], ["gentrification", "l'arrivée de populations aisées dans des quartiers populaires"],
+     ["mégapole", "une ville de plus de 10 millions d'habitants"], ["CBD", "le quartier central des affaires"], ["ville mondiale", "une métropole qui exerce des fonctions de commandement à l'échelle mondiale"]],
+    [],
+    [["Tokyo est l'agglomération la plus peuplée du monde.", true, "Environ 37 millions d'habitants."], ["Plus de la moitié de l'humanité vit en ville.", true, "Depuis 2007 environ."],
+     ["Lagos est une grande métropole du Nigeria.", true, "Plus de 15 millions d'habitants."], ["Les métropoles ne connaissent aucune inégalité sociale.", false, "Ségrégation, bidonvilles, quartiers fermés…"],
+     ["Paris est la seule métropole française de rang mondial.", true, "Les autres métropoles sont surtout nationales ou européennes."], ["La Défense est le principal quartier d'affaires de la région parisienne.", true, "Un CBD européen."]],
+  ),
+  // ───────────── Terminale ─────────────
+  "hg-t-totalitarismes": bank(
+    [["Krach de Wall Street", 1929], ["Marche sur Rome de Mussolini", 1922], ["Hitler devient chancelier", 1933], ["Lois de Nuremberg", 1935], ["Victoire du Front populaire", 1936], ["Début de la guerre d'Espagne", 1936],
+     ["Grandes purges en URSS (début)", 1936], ["Nuit de Cristal", 1938], ["Accords de Munich", 1938], ["Pacte germano-soviétique", 1939]],
+    [["totalitarisme", "un régime qui contrôle toutes les dimensions de la vie des individus"], ["Goulag", "le système des camps de travail forcé en URSS"], ["New Deal", "la politique de relance de Roosevelt"],
+     ["collectivisation", "la mise en commun forcée des terres en URSS"], ["culte de la personnalité", "la glorification d'un chef présenté comme infaillible"], ["Gestapo", "la police politique nazie"],
+     ["Front populaire", "la coalition de gauche au pouvoir en France en 1936"], ["propagande", "l'ensemble des moyens pour imposer des idées à la population"]],
+    [["Staline", "le dirigeant de l'URSS de 1924 à 1953"], ["Mussolini", "le fondateur du fascisme italien"], ["Léon Blum", "le chef du gouvernement du Front populaire"], ["Franklin D. Roosevelt", "le président américain du New Deal"]],
+    [["Les accords Matignon de 1936 accordent deux semaines de congés payés.", true, "Et la semaine de 40 heures."], ["Hitler arrive au pouvoir par un coup d'État armé.", false, "Il est nommé chancelier légalement en janvier 1933."]],
+  ),
+  "hg-t-ww2": bank(
+    [["Invasion de la Pologne", 1939], ["Appel du 18 juin du général de Gaulle", 1940], ["Opération Barbarossa", 1941], ["Attaque de Pearl Harbor", 1941], ["Conférence de Wannsee", 1942],
+     ["Rafle du Vél' d'Hiv", 1942], ["Bataille de Stalingrad (fin)", 1943], ["Débarquement en Normandie", 1944], ["Libération de Paris", 1944], ["Bombardement atomique d'Hiroshima", 1945]],
+    [["Shoah", "le génocide des Juifs d'Europe par les nazis"], ["collaboration", "la coopération de Vichy avec l'occupant allemand"], ["Résistance", "l'ensemble des actions contre l'occupant et le régime de Vichy"],
+     ["STO", "le Service du travail obligatoire en Allemagne"], ["Einsatzgruppen", "les unités mobiles de tuerie nazies à l'Est"], ["camp d'extermination", "un camp conçu pour tuer, comme Auschwitz-Birkenau ou Treblinka"],
+     ["France libre", "les forces françaises ralliées au général de Gaulle"], ["CNR", "le Conseil national de la Résistance"]],
+    [["Jean Moulin", "l'unificateur de la Résistance intérieure"], ["Winston Churchill", "le Premier ministre britannique pendant la guerre"], ["Philippe Pétain", "le chef de l'État français à Vichy"], ["Simone Veil", "une déportée à Auschwitz, plus tard ministre"]],
+    [["La guerre en Europe s'achève le 8 mai 1945.", true, "Capitulation allemande."], ["La conférence de Yalta a lieu en 1945.", true, "Février 1945."]],
+  ),
+  "hg-t-guerre-froide": bank(
+    [["Doctrine Truman", 1947], ["Plan Marshall", 1947], ["Blocus de Berlin", 1948], ["Création de l'OTAN", 1949], ["Guerre de Corée (début)", 1950], ["Pacte de Varsovie", 1955],
+     ["Insurrection de Budapest", 1956], ["Construction du mur de Berlin", 1961], ["Crise des missiles de Cuba", 1962], ["Chute du mur de Berlin", 1989]],
+    [["guerre froide", "l'affrontement indirect entre États-Unis et URSS (1947-1991)"], ["rideau de fer", "la frontière qui coupe l'Europe en deux blocs"], ["endiguement", "la politique américaine visant à contenir le communisme"],
+     ["détente", "une période d'apaisement entre les deux Grands"], ["équilibre de la terreur", "la dissuasion nucléaire réciproque"], ["démocratie populaire", "un régime communiste d'Europe de l'Est"],
+     ["guerre par procuration", "un conflit où les Grands s'affrontent via des alliés"], ["perestroïka", "la politique de réformes de Gorbatchev"]],
+    [["Mikhaïl Gorbatchev", "le dernier dirigeant de l'URSS"], ["John F. Kennedy", "le président américain lors de la crise de Cuba"], ["Nikita Khrouchtchev", "le dirigeant soviétique lors de la crise de Cuba"], ["Ronald Reagan", "le président américain des années 1980"]],
+    [["L'URSS disparaît en décembre 1991.", true, "Fin de la guerre froide."], ["Les États-Unis et l'URSS se sont affrontés directement en guerre ouverte.", false, "Ils s'affrontent indirectement."]],
+  ),
+  "hg-t-decolonisation": bank(
+    [["Indépendance de l'Inde et du Pakistan", 1947], ["Défaite française de Diên Biên Phu", 1954], ["Toussaint rouge : début de la guerre d'Algérie", 1954], ["Conférence de Bandung", 1955],
+     ["Crise de Suez", 1956], ["Indépendance du Ghana", 1957], ["Année des indépendances africaines", 1960], ["Accords d'Évian", 1962], ["Indépendance de l'Algérie", 1962], ["Conférence de Belgrade : non-alignés", 1961]],
+    [["décolonisation", "le processus par lequel les colonies accèdent à l'indépendance"], ["Tiers-Monde", "l'ensemble des pays pauvres, ni alignés à l'Ouest ni à l'Est"], ["non-alignement", "le refus de choisir entre les deux blocs"],
+     ["FLN", "le Front de libération nationale algérien"], ["harkis", "les Algériens ayant combattu aux côtés de la France"], ["pieds-noirs", "les Français d'Algérie"],
+     ["néocolonialisme", "une domination économique qui persiste après l'indépendance"], ["Commonwealth", "l'association des anciennes colonies britanniques"]],
+    [["Gandhi", "le leader de la lutte non violente pour l'indépendance de l'Inde"], ["Hô Chi Minh", "le leader de l'indépendance du Vietnam"], ["Nasser", "le président égyptien qui nationalise le canal de Suez"], ["Nehru", "le premier Premier ministre de l'Inde indépendante"]],
+    [["L'indépendance de l'Algérie se fait sans guerre.", false, "Guerre de 1954 à 1962."], ["La conférence de Bandung réunit des pays d'Asie et d'Afrique.", true, "Avril 1955, en Indonésie."]],
+  ),
+  "hg-t-ve-republique": bank(
+    [["Constitution de la Ve République", 1958], ["Élection du président au suffrage universel direct (référendum)", 1962], ["Mai 68", 1968], ["Démission du général de Gaulle", 1969],
+     ["Majorité à 18 ans", 1974], ["Loi Veil sur l'IVG", 1975], ["Élection de François Mitterrand", 1981], ["Abolition de la peine de mort", 1981], ["Première cohabitation", 1986], ["Quinquennat adopté par référendum", 2000]],
+    [["cohabitation", "la coexistence d'un président et d'une majorité parlementaire opposée"], ["référendum", "un vote direct des citoyens sur une question"], ["article 49.3", "l'engagement de la responsabilité du gouvernement sur un texte"],
+     ["Conseil constitutionnel", "l'institution qui vérifie la conformité des lois à la Constitution"], ["alternance", "le passage du pouvoir d'un camp politique à l'autre"], ["décentralisation", "le transfert de compétences de l'État aux collectivités locales"],
+     ["régime semi-présidentiel", "un régime qui associe un président fort et un gouvernement responsable devant le Parlement"], ["quinquennat", "un mandat de cinq ans"]],
+    [["Charles de Gaulle", "le premier président de la Ve République"], ["Georges Pompidou", "le président de 1969 à 1974"], ["Valéry Giscard d'Estaing", "le président de 1974 à 1981"], ["Jacques Chirac", "le président de 1995 à 2007"]],
+    [["La loi sur la parité en politique date de 2000.", true, "Égal accès aux mandats."], ["Le président de la Ve République est élu par les députés.", false, "Au suffrage universel direct depuis 1962."]],
+  ),
+  "hg-t-europe": bank(
+    [["Déclaration Schuman", 1950], ["CECA", 1951], ["Traités de Rome : CEE", 1957], ["Traité de l'Élysée franco-allemand", 1963], ["Adhésion du Royaume-Uni à la CEE", 1973], ["Première élection du Parlement européen au suffrage universel", 1979],
+     ["Acte unique européen", 1986], ["Traité de Maastricht", 1992], ["Mise en circulation de l'euro", 2002], ["Élargissement à 10 nouveaux pays", 2004]],
+    [["Union européenne", "l'organisation politique et économique de 27 États européens"], ["espace Schengen", "l'espace de libre circulation des personnes"], ["zone euro", "les pays qui utilisent l'euro"],
+     ["Commission européenne", "l'institution qui propose les lois et veille à leur application"], ["Parlement européen", "l'assemblée élue par les citoyens de l'UE"], ["Brexit", "la sortie du Royaume-Uni de l'UE (2020)"],
+     ["euroscepticisme", "la méfiance envers la construction européenne"], ["BCE", "la Banque centrale européenne"]],
+    [["Jean Monnet", "un « père de l'Europe », inspirateur de la CECA"], ["Robert Schuman", "le ministre français de la déclaration du 9 mai 1950"], ["Jacques Delors", "le président de la Commission de 1985 à 1995"], ["Konrad Adenauer", "le chancelier ouest-allemand qui signe le traité de l'Élysée"]],
+    [["La CECA réunit six pays fondateurs.", true, "France, RFA, Italie, Belgique, Pays-Bas, Luxembourg."], ["Tous les membres de l'UE utilisent l'euro.", false, "Certains, comme la Pologne ou la Suède, gardent leur monnaie."]],
+  ),
+  "hg-t-monde-1990": bank(
+    [["Guerre du Golfe", 1991], ["Éclatement de la Yougoslavie (début des guerres)", 1991], ["Génocide des Tutsi au Rwanda", 1994], ["Création de l'OMC", 1995], ["Attentats du 11 septembre", 2001],
+     ["Guerre d'Afghanistan (intervention américaine)", 2001], ["Guerre d'Irak", 2003], ["Crise financière mondiale", 2008], ["Printemps arabes", 2011], ["Annexion de la Crimée par la Russie", 2014]],
+    [["hyperpuissance", "une puissance qui domine dans tous les domaines (les États-Unis après 1991)"], ["multilatéralisme", "la gestion des relations internationales à plusieurs États"], ["terrorisme", "l'usage de la violence contre des civils à des fins politiques"],
+     ["mondialisation", "l'intégration croissante des économies et des sociétés à l'échelle mondiale"], ["puissance émergente", "un pays dont le poids économique et politique augmente rapidement"], ["BRICS", "le groupe Brésil, Russie, Inde, Chine, Afrique du Sud"],
+     ["CPI", "la Cour pénale internationale"], ["soft power", "la capacité d'influence par la culture et l'attractivité"]],
+    [],
+    [["La Chine est devenue la deuxième économie mondiale.", true, "Depuis 2010 environ."], ["Après 1991, le monde est durablement sans aucun conflit.", false, "Nombreux conflits (Balkans, Rwanda, Irak, Syrie…)."]],
+  ),
+  "hg-t-mers": bank(
+    [],
+    [["ZEE", "une zone économique exclusive de 200 milles marins"], ["détroit", "un passage maritime resserré entre deux terres"], ["conteneurisation", "le transport des marchandises dans des conteneurs standardisés"],
+     ["littoralisation", "la concentration des hommes et des activités sur les littoraux"], ["façade maritime", "un littoral qui concentre de grands ports"], ["pavillon de complaisance", "l'immatriculation d'un navire dans un pays aux règles peu contraignantes"],
+     ["haute mer", "l'espace maritime au-delà des ZEE, qui n'appartient à aucun État"], ["route maritime", "un axe régulier de navigation commerciale"]],
+    [],
+    [["La France possède la deuxième ZEE du monde.", true, "Grâce à ses outre-mer."], ["Shanghai est l'un des premiers ports du monde.", true, "Premier port à conteneurs."], ["Le détroit de Malacca relie l'océan Indien au Pacifique.", true, "Entre la Malaisie et l'Indonésie."],
+     ["Environ 80 % du commerce mondial en volume passe par la mer.", true, "Le transport maritime domine."], ["Le canal de Panama relie l'Atlantique au Pacifique.", true, "Ouvert en 1914."], ["Rotterdam est le premier port d'Europe.", true, "Sur la Northern Range."],
+     ["Le canal de Suez relie la Méditerranée à l'océan Indien via la mer Rouge.", true, "Ouvert en 1869."], ["La piraterie maritime a totalement disparu.", false, "Elle persiste (golfe de Guinée, Somalie…)."],
+     ["La convention de Montego Bay (1982) définit le droit de la mer.", true, "ZEE, eaux territoriales…"], ["Le détroit d'Ormuz est stratégique pour le transport du pétrole.", true, "Golfe Persique."]],
+  ),
+};
+

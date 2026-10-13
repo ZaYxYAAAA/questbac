@@ -1,14 +1,16 @@
 "use client";
 
 import type { Question } from "@/lib/types";
-import { questionKey } from "@/lib/content/generated";
+import { factKey } from "@/lib/content/generated";
 
 /**
- * Mémoire des questions déjà posées (par chapitre, sur cet appareil) pour ne
- * pas reposer le même énoncé : les 500 dernières clés de chaque chapitre.
+ * Mémoire des informations déjà testées sur cet appareil, de la plus ancienne à
+ * la plus récente, tous chapitres confondus : une notion vue en mission n'est
+ * pas reposée en « Mélange », même sous une autre forme (inverse, vrai/faux).
  */
 const STORAGE_KEY = "questbac-seen";
-const MAX_PER_SCOPE = 500;
+const GLOBAL = "*";
+const MAX_KEYS = 3000;
 
 type SeenMap = Record<string, string[]>;
 
@@ -22,16 +24,22 @@ function read(): SeenMap {
   }
 }
 
-export function seenFor(scope: string): Set<string> {
-  return new Set(read()[scope] ?? []);
+/** Liste globale (les anciennes listes par chapitre y sont fusionnées). */
+function globalList(all: SeenMap): string[] {
+  if (all[GLOBAL]) return all[GLOBAL];
+  return [...new Set(Object.values(all).flat())].slice(-MAX_KEYS);
 }
 
-export function rememberSeen(scope: string, questions: Pick<Question, "prompt">[]) {
+/** Informations déjà vues, de la plus ancienne à la plus récente (`_scope` gardé pour compatibilité). */
+export function seenFor(_scope?: string): string[] {
+  return globalList(read());
+}
+
+export function rememberSeen(_scope: string, questions: Pick<Question, "prompt" | "fact">[]) {
   try {
-    const all = read();
-    const keys = [...(all[scope] ?? []), ...questions.map(questionKey)];
-    all[scope] = [...new Set(keys)].slice(-MAX_PER_SCOPE);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    const fresh = questions.map(factKey);
+    const kept = globalList(read()).filter((k) => !fresh.includes(k));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ [GLOBAL]: [...kept, ...fresh].slice(-MAX_KEYS) }));
   } catch {
     // stockage indisponible (navigation privée) : on ignore
   }

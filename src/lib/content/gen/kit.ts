@@ -4,11 +4,14 @@
  * Un générateur reçoit un hasard `r` et renvoie une question sans identifiant.
  */
 import type { Difficulty, McqQuestion, NumericQuestion, TrueFalseQuestion } from "@/lib/types";
-import { shuffle } from "@/lib/game/quests";
+import { hashString, shuffle } from "@/lib/game/quests";
 
 export type Rand = () => number;
 export type Draft = Omit<McqQuestion, "id"> | Omit<NumericQuestion, "id"> | Omit<TrueFalseQuestion, "id">;
 export type Generator = (r: Rand) => Draft;
+
+/** Rattache une question à l'information qu'elle teste (mêmes parties = même information). */
+export const withFact = (d: Draft, ...parts: string[]): Draft => ({ ...d, fact: hashString(parts.join("|")).toString(36) });
 
 // ───────────── Tirages ─────────────
 
@@ -163,24 +166,24 @@ export function pairs(items: readonly Pair[], o: PairOptions): Generator[] {
   const gens: Generator[] = [
     (r) => {
       const [a, b] = pick(r, items);
-      return mcq(r, o.ask(a), b, items.filter(([x, y]) => x !== a && y !== b).map(([, y]) => y), explain(a, b));
+      return withFact(mcq(r, o.ask(a), b, items.filter(([x, y]) => x !== a && y !== b).map(([, y]) => y), explain(a, b)), a, b);
     },
   ];
   if (o.reverse) {
     const reverse = o.reverse;
     gens.push((r) => {
       const [a, b] = pick(r, items);
-      return mcq(r, reverse(b), a, items.filter(([x, y]) => y !== b && x !== a).map(([x]) => x), explain(a, b));
+      return withFact(mcq(r, reverse(b), a, items.filter(([x, y]) => y !== b && x !== a).map(([x]) => x), explain(a, b)), a, b);
     });
   }
   if (o.claim) {
     const claim = o.claim;
     gens.push((r) => {
       const [a, b] = pick(r, items);
-      if (r() < 0.5) return tf(claim(a, b), true, explain(a, b));
+      if (r() < 0.5) return withFact(tf(claim(a, b), true, explain(a, b)), a, b);
       const others = items.filter(([x, y]) => x !== a && y !== b);
       const [, wrong] = pick(r, others);
-      return tf(claim(a, wrong), false, explain(a, b));
+      return withFact(tf(claim(a, wrong), false, explain(a, b)), a, b);
     });
   }
   return gens;
@@ -192,7 +195,7 @@ export type Card = readonly [string, string, readonly string[], string];
 /** Un générateur qui tire une carte de cours (ordre des choix mélangé). */
 export const cards = (items: readonly Card[]): Generator => (r) => {
   const [q, a, w, e] = pick(r, items);
-  return mcq(r, q, a, [...w], e);
+  return withFact(mcq(r, q, a, [...w], e), q);
 };
 
 /** Affirmation de cours : [énoncé, vrai ?, explication]. */
@@ -200,5 +203,5 @@ export type Claim = readonly [string, boolean, string];
 
 export const claims = (items: readonly Claim[]): Generator => (r) => {
   const [q, a, e] = pick(r, items);
-  return tf(q, a, e);
+  return withFact(tf(q, a, e), q);
 };

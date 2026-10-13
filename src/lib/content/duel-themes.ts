@@ -452,7 +452,10 @@ export function generateDuelQuestions(theme: DuelTheme, count: number, r: Rand):
   for (let guard = 0; out.length < count && guard < count * 20; guard++) {
     if (bag.length === 0) bag = shuffle(theme.generators, r);
     const q = bag.pop()!(r);
-    if (prompts.has(q.prompt)) continue;
+    // Pas deux fois la même information, même posée autrement.
+    const key = q.fact ?? q.prompt;
+    if (prompts.has(key) || prompts.has(q.prompt)) continue;
+    prompts.add(key);
     prompts.add(q.prompt);
     out.push({ ...q, id: `${theme.id}-${out.length + 1}` } as Question);
   }

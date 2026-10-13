@@ -168,10 +168,15 @@ pourront tourner telles quelles côté serveur.
   `histoire2`, `sciences2`, `humanites2`, `maths-2026`). Chaque chapitre a plusieurs **générateurs** :
   calculs aux valeurs tirées au hasard, ou tables de connaissances déclinées en question directe,
   question inverse et vrai/faux.
-- `src/lib/content/generated.ts` tire les questions en faisant tourner les générateurs, sans doublon,
-  et évite les énoncés déjà vus (mémoire locale `questbac-seen`, 500 derniers par chapitre).
+- Chaque question porte une empreinte `fact` : la même pour la question directe, la question
+  inverse et le vrai/faux sur une même information. `src/lib/content/generated.ts` tire les
+  questions sans jamais répéter une information dans une partie, écarte celles déjà vues
+  (mémoire locale `questbac-seen`, 3 000 dernières, tous chapitres confondus ; côté serveur pour
+  le classé) et, quand un chapitre est épuisé, réautorise d'abord les plus anciennes.
+- Banques supplémentaires : `gen/extra-*.ts` (philo, histoire-géo, français, SVT, SES, langues),
+  fusionnées aux chapitres. Chaque chapitre compte au moins 35 informations différentes.
 - Les boss et le mode « Mélange de tout le niveau » utilisent ces générateurs.
-- Test : 10 missions de 10 questions par chapitre donnent 100 énoncés tous différents.
+- Tests : aucune information répétée dans une mission, ni sur 4 missions de 8 questions d'affilée.
 
 ## Notifications push
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { isCorrect } from "@/lib/game/session";
 import { seededRandom } from "@/lib/game/quests";
 import { CHAPTERS } from "./curriculum";
-import { CHAPTER_GENERATORS, chapterQuestions, generatorsForTopic, questionKey } from "./generated";
+import { CHAPTER_GENERATORS, chapterQuestions, factKey, generatorsForTopic } from "./generated";
 
 const BAD = /NaN|undefined|Infinity|\[object/;
 
@@ -34,18 +34,25 @@ describe("questions générées", () => {
         }
       });
     }
-  });
+  }, 60_000);
 
-  it("ne répètent pas une question sur 100 tirages d'un chapitre", () => {
+  it("ne reposent pas une information (même sous une autre forme) avant d'avoir épuisé le chapitre", () => {
     const short: string[] = [];
     for (const id of Object.keys(CHAPTER_GENERATORS)) {
-      const seen = new Set<string>();
+      const seen: string[] = [];
       const r = seededRandom(7);
-      // 10 missions de 10 questions, en évitant ce qui a déjà été vu.
-      for (let m = 0; m < 10; m++) for (const q of chapterQuestions(id, 10, r, seen)) seen.add(questionKey(q));
-      if (seen.size < 100) short.push(`${id} (${seen.size})`);
+      // 4 missions de 8 questions d'affilée : 32 informations toutes différentes.
+      for (let m = 0; m < 4; m++) for (const q of chapterQuestions(id, 8, r, seen)) seen.push(factKey(q));
+      if (new Set(seen).size < 32) short.push(`${id} (${new Set(seen).size})`);
     }
     expect(short).toEqual([]);
+  });
+
+  it("ne posent jamais deux fois la même information dans une mission", () => {
+    for (const id of Object.keys(CHAPTER_GENERATORS)) {
+      const qs = chapterQuestions(id, 10, seededRandom(11));
+      expect(new Set(qs.map(factKey)).size, id).toBe(qs.length);
+    }
   });
 
   it("trouvent des générateurs pour un sujet libre", () => {

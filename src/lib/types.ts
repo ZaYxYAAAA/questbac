@@ -20,6 +20,11 @@ interface QuestionBase {
   prompt: string; // Markdown + LaTeX ($...$)
   explanation: string;
   difficulty?: Difficulty;
+  /**
+   * Empreinte de l'information testée : la même pour la question directe, la
+   * question inverse et le vrai/faux sur une même notion (pas de répétition déguisée).
+   */
+  fact?: string;
 }
 
 export interface McqQuestion extends QuestionBase {

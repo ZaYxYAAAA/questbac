@@ -8,6 +8,7 @@ import { BossFight } from "@/components/game/BossFight";
 import { RewardScreen } from "@/components/game/RewardScreen";
 import { Button, LinkButton } from "@/components/ui/Button";
 import { bossById, bossQuestionPool } from "@/lib/content/bosses";
+import { seenFor } from "@/lib/store/seen-questions";
 import { bossStatus } from "@/lib/game/selectors";
 import type { RewardSummary } from "@/lib/game/state";
 import { useGame } from "@/lib/store/game-store";
@@ -22,7 +23,7 @@ export function BossArena({ bossId }: { bossId: string }) {
   const level = game.profile!.level;
   const effectiveLevel = boss.level === "all" ? level : boss.level;
   const status = bossStatus(game, boss, effectiveLevel);
-  const pool = useMemo(() => bossQuestionPool(boss, effectiveLevel), [boss, effectiveLevel]);
+  const pool = useMemo(() => bossQuestionPool(boss, effectiveLevel, seenFor()), [boss, effectiveLevel]);
   const [phase, setPhase] = useState<Phase>({ kind: "intro" });
 
   if (phase.kind === "fight") {
