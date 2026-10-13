@@ -37,6 +37,8 @@ export function QuizRunner({
   /** Dernière question déjà répondue (ou expirée) : évite un double enregistrement. */
   const answeredIndex = useRef(-1);
   const [timedOut, setTimedOut] = useState(false);
+  /** Nombre de réponses données : force le rendu des pastilles de progression. */
+  const [, setAnswered] = useState(0);
   const [remaining, setRemaining] = useState(secondsPerQuestion ?? 0);
 
   const q = questions[index];
@@ -55,6 +57,7 @@ export function QuizRunner({
         clearInterval(id);
         answeredIndex.current = index;
         answers.current.push({ questionId: questions[index].id, correct: false, timeMs: limit, given: "" });
+        setAnswered((n) => n + 1);
         setCombo(0);
         setTimedOut(true);
       }
@@ -66,6 +69,7 @@ export function QuizRunner({
     if (answeredIndex.current === index) return;
     answeredIndex.current = index;
     answers.current.push({ questionId: q.id, correct, timeMs: Date.now() - questionStart.current, given });
+    setAnswered((n) => n + 1);
     if (correct) {
       const gained = xpForAnswer(q.difficulty ?? 1, combo);
       setXp((x) => x + gained);
@@ -105,7 +109,24 @@ export function QuizRunner({
             <span className="truncate font-semibold text-slate-200">{title}{subtitle && <span className="text-slate-500"> · {subtitle}</span>}</span>
             <span>{index + 1} / {questions.length}</span>
           </div>
-          <ProgressBar value={(index + (answers.current.length > index ? 1 : 0)) / questions.length} />
+          {questions.length <= 20 ? (
+            <div className="flex gap-1" aria-label={`Question ${index + 1} sur ${questions.length}`}>
+              {questions.map((_, i) => {
+                const a = answers.current[i];
+                return (
+                  <span
+                    key={i}
+                    className={clsx(
+                      "h-2 flex-1 rounded-full transition-colors",
+                      a ? (a.correct ? "bg-emerald-400" : "bg-rose-500") : i === index ? "bg-violet-400" : "bg-slate-800",
+                    )}
+                  />
+                );
+              })}
+            </div>
+          ) : (
+            <ProgressBar value={(index + (answers.current.length > index ? 1 : 0)) / questions.length} />
+          )}
         </div>
       </div>
 
@@ -146,6 +167,7 @@ export function QuizRunner({
         <QuestionCard
           timedOut={timedOut}
           key={q.id + index}
+          number={index + 1}
           question={q}
           onAnswered={onAnswered}
           onNext={onNext}
@@ -154,7 +176,7 @@ export function QuizRunner({
       </div>
 
       <p className="text-center text-xs text-slate-500">
-        {correctCount} bonne{correctCount > 1 ? "s" : ""} réponse{correctCount > 1 ? "s" : ""} · Raccourcis : touches 1-4, V/F, Entrée
+        {correctCount} bonne{correctCount > 1 ? "s" : ""} réponse{correctCount > 1 ? "s" : ""}<span className="hidden sm:inline"> · Raccourcis clavier : 1-4 ou A-D, V/F, Entrée</span>
       </p>
     </div>
   );

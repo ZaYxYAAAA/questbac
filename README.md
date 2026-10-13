@@ -28,7 +28,7 @@ missions IA sont remplacées par du contenu d'exemple (badge « Mode démo » da
 | Module | Ce qu'il fait |
 |---|---|
 | 🗺️ **Carte** | ~100 chapitres alignés sur les programmes (8 matières × 3 niveaux), chemin de progression, étoiles |
-| 🎯 **Missions** | Quiz QCM / vrai-faux / réponse numérique (accepte `3,5`, `7/2`, `20 g/L`), combos jusqu'à ×2, explications, raccourcis clavier |
+| 🎯 **Missions** | Questions **générées à chaque partie** pour les 106 chapitres (valeurs tirées au hasard en sciences, grandes banques de connaissances ailleurs), sans retomber sur une question déjà vue ; QCM / vrai-faux / réponse numérique, combos, explications |
 | 💀 **Boss** | 17 boss (un par matière/niveau) : PV, 3 cœurs, chrono, coups critiques, phase « enragé », déblocage par chapitres |
 | 🏆 **Progression** | XP & niveaux, rangs Bronze → Légende avec divisions, séries de jours, 19 succès, 3 quêtes du jour + coffre |
 | 📊 **Classement** | Vrais joueurs uniquement : ligue de la semaine, amis, hebdomadaire, global (RP) et par classe |
@@ -160,3 +160,14 @@ pourront tourner telles quelles côté serveur.
   reléguées : 1 (6–9 joueurs), 3 (10+).
 - Les derniers scores connus du groupe sont gardés dans la sauvegarde (`league.rivals`) pour
   calculer le résultat final au changement de semaine, même hors ligne.
+
+## Questions générées
+
+- `src/lib/content/gen/` : un fichier par matière (maths 2nde / 1re / Tle, physique-chimie, SVT,
+  histoire-géo, lettres et philo, SES et anglais). Chaque chapitre a plusieurs **générateurs** :
+  calculs aux valeurs tirées au hasard, ou tables de connaissances déclinées en question directe,
+  question inverse et vrai/faux.
+- `src/lib/content/generated.ts` tire les questions en faisant tourner les générateurs, sans doublon,
+  et évite les énoncés déjà vus (mémoire locale `questbac-seen`, 500 derniers par chapitre).
+- Les boss, le mode « Mélange de tout le niveau » et la Forge en mode démo utilisent ces générateurs.
+- Test : 10 missions de 10 questions par chapitre donnent 100 énoncés tous différents.

@@ -3,21 +3,22 @@
 import Link from "next/link";
 import { useState } from "react";
 import clsx from "clsx";
-import { ChevronLeft, FlaskConical, Loader2, Play, Sparkles } from "lucide-react";
+import { ChevronLeft, FlaskConical, Infinity as InfinityIcon, Loader2, Play, Shuffle, Sparkles } from "lucide-react";
 import { AiBadge } from "@/components/game/AiBadge";
 import { QuizRunner } from "@/components/game/QuizRunner";
 import { RewardScreen } from "@/components/game/RewardScreen";
 import { Button } from "@/components/ui/Button";
-import { generateMission } from "@/lib/ai/client-api";
+import { generateMission, useAiStatus } from "@/lib/ai/client-api";
 import { levelLabel, subjectMeta } from "@/lib/content/curriculum";
-import { questionsForChapter } from "@/lib/content/questions";
+import { chapterQuestions, mixQuestions } from "@/lib/content/generated";
 import { prepareQuestions } from "@/lib/game/session";
 import type { RewardSummary } from "@/lib/game/state";
 import { useGame } from "@/lib/store/game-store";
+import { rememberSeen, seenFor } from "@/lib/store/seen-questions";
 import { announce } from "@/lib/store/toast-store";
 import type { Chapter, Question } from "@/lib/types";
 
-type Phase = { kind: "intro" } | { kind: "playing"; questions: Question[]; ai: boolean } | { kind: "done"; summary: RewardSummary; correct: number; total: number };
+type Phase = { kind: "intro" } | { kind: "playing"; questions: Question[]; label: string } | { kind: "done"; summary: RewardSummary; correct: number; total: number };
 
 export function MissionPlayer({ chapter }: { chapter: Chapter }) {
   const recordSession = useGame((s) => s.recordSession);
@@ -26,11 +27,22 @@ export function MissionPlayer({ chapter }: { chapter: Chapter }) {
   const [count, setCount] = useState(6);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const local = questionsForChapter(chapter.id);
+  const ai = useAiStatus();
   const meta = subjectMeta(chapter.subject);
   const exitHref = `/matieres/${chapter.subject}?niveau=${chapter.level}`;
+  const mixScope = `mix:${chapter.subject}:${chapter.level}`;
 
-  const startLocal = () => setPhase({ kind: "playing", questions: prepareQuestions(local, Math.min(count, local.length)), ai: false });
+  // Questions générées : jamais deux fois le même énoncé tant qu'il en reste de nouveaux.
+  const startLocal = () => {
+    const questions = prepareQuestions(chapterQuestions(chapter.id, count, Math.random, seenFor(chapter.id)));
+    rememberSeen(chapter.id, questions);
+    setPhase({ kind: "playing", questions, label: meta.name });
+  };
+  const startMix = () => {
+    const questions = prepareQuestions(mixQuestions(chapter.subject, chapter.level, count, Math.random, seenFor(mixScope)));
+    rememberSeen(mixScope, questions);
+    setPhase({ kind: "playing", questions, label: `Mélange ${meta.name}` });
+  };
 
   const startAi = async () => {
     setLoading(true);
@@ -44,7 +56,7 @@ export function MissionPlayer({ chapter }: { chapter: Chapter }) {
         count,
         difficulty: "mixte",
       });
-      setPhase({ kind: "playing", questions: prepareQuestions(mission.questions), ai: true });
+      setPhase({ kind: "playing", questions: prepareQuestions(mission.questions), label: "Mission IA" });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Impossible de générer la mission.");
     } finally {
@@ -57,7 +69,7 @@ export function MissionPlayer({ chapter }: { chapter: Chapter }) {
       <QuizRunner
         questions={phase.questions}
         title={chapter.title}
-        subtitle={phase.ai ? "Mission IA" : meta.name}
+        subtitle={phase.label}
         exitHref={exitHref}
         onComplete={(result, answerXp) => {
           const summary = recordSession({ kind: "chapter", chapterId: chapter.id, subject: chapter.subject, result, answerXp });
@@ -133,14 +145,24 @@ export function MissionPlayer({ chapter }: { chapter: Chapter }) {
         </ul>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Button onClick={startLocal} disabled={local.length === 0} className="py-3">
-            <Play size={16} /> {local.length ? `Lancer (${Math.min(count, local.length)} questions)` : "Pas de questions locales"}
+          <Button onClick={startLocal} className="py-3.5 text-base">
+            <Play size={18} /> Lancer ({count} questions)
           </Button>
-          <Button variant="secondary" onClick={startAi} disabled={loading} className="py-3">
-            {loading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-            {loading ? "Le Prof IA prépare tes questions…" : "Nouvelles questions IA"}
-          </Button>
+          {ai?.ai ? (
+            <Button variant="secondary" onClick={startAi} disabled={loading} className="py-3.5">
+              {loading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+              {loading ? "Le Prof IA prépare tes questions…" : "Questions du Prof IA"}
+            </Button>
+          ) : (
+            <Button variant="secondary" onClick={startMix} className="py-3.5">
+              <Shuffle size={16} /> Mélange de tout le niveau
+            </Button>
+          )}
         </div>
+        <p className="flex items-center gap-2 rounded-xl bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
+          <InfinityIcon size={16} className="shrink-0 text-emerald-300" />
+          Questions générées à chaque partie : valeurs, exemples et pièges changent, et tu ne retombes pas sur une question déjà vue.
+        </p>
         <div className="flex items-center justify-between gap-2">
           <AiBadge />
           {chapter.lab && (

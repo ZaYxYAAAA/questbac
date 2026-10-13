@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { ArrowRight, Check, Clock, X } from "lucide-react";
+import { ArrowRight, Check, Clock, Lightbulb, X } from "lucide-react";
 import { Markdown } from "@/components/ui/Markdown";
 import { type GivenAnswer, isCorrect } from "@/lib/game/session";
 import type { Question } from "@/lib/types";
@@ -15,6 +15,7 @@ export function QuestionCard({
   onNext,
   timedOut = false,
   nextLabel = "Continuer",
+  number,
 }: {
   question: Question;
   /** Appelé une seule fois quand l'élève valide. */
@@ -23,11 +24,14 @@ export function QuestionCard({
   /** Le parent signale que le temps est écoulé (mode boss). */
   timedOut?: boolean;
   nextLabel?: string;
+  /** Numéro affiché dans l'en-tête de la carte. */
+  number?: number;
 }) {
   const [status, setStatus] = useState<Status>("answering");
   const [given, setGiven] = useState<GivenAnswer | null>(null);
   const [numeric, setNumeric] = useState("");
   const nextRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (timedOut && status === "answering") setStatus("timeout");
@@ -45,13 +49,14 @@ export function QuestionCard({
     onAnswered(ok, answer);
   };
 
-  // Raccourcis clavier : 1-4 pour les QCM, V/F pour vrai-faux, Entrée pour continuer
+  // Raccourcis clavier : 1-4 ou A-D pour les QCM, V/F pour vrai-faux, Entrée pour continuer
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.tagName === "INPUT") return;
       if (status !== "answering") return;
       if (question.type === "mcq") {
-        const i = parseInt(e.key, 10) - 1;
+        const n = parseInt(e.key, 10) - 1;
+        const i = Number.isNaN(n) ? "abcd".indexOf(e.key.toLowerCase()) : n;
         if (i >= 0 && i < question.choices.length) submit(i);
       } else if (question.type === "truefalse") {
         if (e.key.toLowerCase() === "v") submit(true);
@@ -66,15 +71,27 @@ export function QuestionCard({
 
   const choiceClass = (isAnswer: boolean, isGiven: boolean) =>
     clsx(
-      "group flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition",
+      "group flex min-h-14 w-full items-center gap-3 rounded-2xl border-2 px-3.5 py-3 text-left text-base transition active:scale-[0.98]",
       !revealed && "border-white/10 bg-slate-800/70 hover:-translate-y-0.5 hover:border-violet-400 hover:bg-slate-800",
-      revealed && isAnswer && "border-emerald-400 bg-emerald-500/15",
+      revealed && isAnswer && "border-emerald-400 bg-emerald-500/15 qb-correct",
       revealed && isGiven && !isAnswer && "border-rose-400 bg-rose-500/15 qb-shake",
       revealed && !isAnswer && !isGiven && "border-white/5 bg-slate-800/40 opacity-60",
     );
 
+  const typeLabel = question.type === "mcq" ? "QCM" : question.type === "truefalse" ? "Vrai ou faux" : "Réponse libre";
+  const level = question.difficulty ?? 1;
+  const insert = (text: string) => {
+    setNumeric((v) => v + text);
+    inputRef.current?.focus();
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="qb-slide-in space-y-4">
+      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
+        {number !== undefined && <span className="rounded-full bg-violet-600/30 px-2.5 py-1 text-violet-200">Question {number}</span>}
+        <span className="rounded-full bg-slate-800 px-2.5 py-1 text-slate-300">{typeLabel}</span>
+        <span className="ml-auto text-amber-300" title={`Difficulté ${level} sur 3`}>{"★".repeat(level)}<span className="text-slate-700">{"★".repeat(3 - level)}</span></span>
+      </div>
       <div className="text-lg leading-relaxed text-white sm:text-xl">
         <Markdown>{question.prompt}</Markdown>
       </div>
@@ -83,8 +100,13 @@ export function QuestionCard({
         <div className="grid gap-2.5 sm:grid-cols-2">
           {question.choices.map((choice, i) => (
             <button key={i} type="button" disabled={revealed} onClick={() => submit(i)} className={choiceClass(i === question.answer, given === i)}>
-              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-slate-950/60 text-xs font-bold text-slate-400 group-hover:text-violet-300">
-                {i + 1}
+              <span
+                className={clsx(
+                  "grid h-8 w-8 shrink-0 place-items-center rounded-xl text-sm font-black",
+                  revealed && i === question.answer ? "bg-emerald-500 text-slate-950" : revealed && given === i ? "bg-rose-500 text-white" : "bg-slate-950/60 text-slate-400 group-hover:bg-violet-600 group-hover:text-white",
+                )}
+              >
+                {"ABCD"[i] ?? i + 1}
               </span>
               <span className="min-w-0 flex-1 text-slate-100"><Markdown compact>{choice}</Markdown></span>
               {revealed && i === question.answer && <Check className="shrink-0 text-emerald-400" size={20} />}
@@ -97,7 +119,7 @@ export function QuestionCard({
       {question.type === "truefalse" && (
         <div className="grid grid-cols-2 gap-3">
           {[true, false].map((v) => (
-            <button key={String(v)} type="button" disabled={revealed} onClick={() => submit(v)} className={clsx(choiceClass(v === question.answer, given === v), "justify-center py-4 text-lg font-bold")}>
+            <button key={String(v)} type="button" disabled={revealed} onClick={() => submit(v)} className={clsx(choiceClass(v === question.answer, given === v), "min-h-16 justify-center py-4 text-lg font-bold")}>
               {v ? "✅ Vrai" : "❌ Faux"}
             </button>
           ))}
@@ -114,12 +136,13 @@ export function QuestionCard({
         >
           <div className="relative flex-1">
             <input
+              ref={inputRef}
               autoFocus
               value={numeric}
               disabled={revealed}
               onChange={(e) => setNumeric(e.target.value)}
               inputMode="decimal"
-              placeholder="Ta réponse (ex. 3,5 ou 7/2)"
+              placeholder="Ta réponse…"
               className={clsx(
                 "w-full rounded-xl border bg-slate-950 px-4 py-3 font-mono text-lg text-white outline-none transition",
                 status === "correct" ? "border-emerald-400" : status === "wrong" || status === "timeout" ? "border-rose-400" : "border-white/15 focus:border-violet-400",
@@ -133,6 +156,18 @@ export function QuestionCard({
             </button>
           )}
         </form>
+      )}
+      {question.type === "numeric" && !revealed && (
+        <div className="flex gap-2" aria-label="Symboles utiles">
+          {[["−", "-"], [",", ","], ["/", "/"]].map(([label, text]) => (
+            <button key={label} type="button" onClick={() => insert(text)} className="h-10 min-w-12 rounded-xl border border-white/10 bg-slate-800 px-3 font-mono text-lg font-bold text-slate-200 active:scale-95">
+              {label}
+            </button>
+          ))}
+          <button type="button" onClick={() => setNumeric((v) => v.slice(0, -1))} className="h-10 rounded-xl border border-white/10 bg-slate-800 px-3 text-sm font-semibold text-slate-300 active:scale-95">
+            ⌫
+          </button>
+        </div>
       )}
 
       {revealed && (
@@ -149,18 +184,27 @@ export function QuestionCard({
           </div>
           {status !== "correct" && question.type === "numeric" && (
             <p className="mb-1 text-sm text-slate-200">
-              Réponse attendue : <b className="font-mono">{String(question.answer).replace(".", ",")}</b> {question.unit}
+              Réponse attendue : <b className="font-mono">{String(Math.round(question.answer * 10000) / 10000).replace(".", ",")}</b> {question.unit}
             </p>
+          )}
+          {status !== "correct" && question.type === "mcq" && (
+            <div className="mb-1 flex items-baseline gap-1.5 text-sm text-slate-200">
+              <span className="shrink-0">Bonne réponse : <b>{"ABCD"[question.answer]}</b> —</span>
+              <span className="min-w-0"><Markdown compact>{question.choices[question.answer]}</Markdown></span>
+            </div>
           )}
           {status !== "correct" && question.type === "truefalse" && (
             <p className="mb-1 text-sm text-slate-200">La bonne réponse était : <b>{question.answer ? "Vrai" : "Faux"}</b></p>
           )}
-          <div className="text-sm text-slate-300"><Markdown compact>{question.explanation}</Markdown></div>
+          <div className="flex gap-2 rounded-xl bg-slate-950/40 p-2.5 text-sm text-slate-300">
+            <Lightbulb size={16} className="mt-0.5 shrink-0 text-amber-300" />
+            <div className="min-w-0"><Markdown compact>{question.explanation}</Markdown></div>
+          </div>
           <button
             ref={nextRef}
             type="button"
             onClick={onNext}
-            className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-900 hover:bg-violet-100"
+            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-base font-bold text-slate-900 hover:bg-violet-100 sm:w-auto sm:py-2 sm:text-sm"
           >
             {nextLabel} <ArrowRight size={16} />
           </button>

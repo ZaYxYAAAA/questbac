@@ -2,10 +2,9 @@
  * Contenu de démonstration renvoyé quand aucune clé API n'est configurée,
  * pour que toute l'application reste explorable hors-ligne.
  */
-import { CHAPTERS, levelLabel, subjectMeta } from "@/lib/content/curriculum";
-import { questionsForChapter } from "@/lib/content/questions";
-import { prepareQuestions } from "@/lib/game/session";
-import type { Level, Question, SubjectId } from "@/lib/types";
+import { levelLabel, subjectMeta } from "@/lib/content/curriculum";
+import { generateFrom, generatorsForTopic } from "@/lib/content/generated";
+import type { Level, SubjectId } from "@/lib/types";
 
 const NOTICE =
   "> 🧪 **Mode démo** — le Prof IA n'est pas encore connecté. Ajoute `ANTHROPIC_API_KEY` dans `.env.local` pour obtenir une vraie fiche sur ce sujet.";
@@ -85,15 +84,12 @@ Résoudre $2x^2 - 3x + 1 = 0$.
 `;
 
 export function demoMission(level: Level, subject: SubjectId, count: number, topic?: string) {
-  const pool: Question[] = CHAPTERS.filter((c) => c.subject === subject && c.level === level).flatMap((c) =>
-    questionsForChapter(c.id),
-  );
-  const fallback = pool.length ? pool : CHAPTERS.filter((c) => c.subject === subject).flatMap((c) => questionsForChapter(c.id));
-  const questions = prepareQuestions(fallback, Math.min(count, fallback.length)).map((q, i) => ({ ...q, id: `demo-${Date.now()}-${i}` }));
+  const { generators, extra } = generatorsForTopic(subject, level, topic);
+  const questions = generateFrom(generators, count, Math.random, new Set(), "demo", extra);
   return {
     title: topic ? `Démo · ${topic.slice(0, 40)}` : `Démo · ${subjectMeta(subject).name}`,
-    summary: "Mission de démonstration construite à partir de la banque de questions locale.",
-    fiche: `# Mission de démonstration\n\n${NOTICE.replace("une vraie fiche sur ce sujet", "des questions et une fiche tirées de ton propre cours")}\n\nLes questions ci-dessous proviennent de la banque locale de QuestBac (${subjectMeta(subject).name}, ${levelLabel(level)}).`,
+    summary: "Mission de démonstration : questions générées sur les chapitres les plus proches du sujet.",
+    fiche: `# Mission de démonstration\n\n${NOTICE.replace("une vraie fiche sur ce sujet", "des questions et une fiche tirées de ton propre cours")}\n\nLes questions ci-dessous sont générées par QuestBac à partir des chapitres de ${subjectMeta(subject).name} (${levelLabel(level)}) les plus proches de ton sujet : elles changent à chaque fois.`,
     questions,
   };
 }

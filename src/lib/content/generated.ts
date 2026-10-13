@@ -4,7 +4,7 @@
  * Le tirage évite les énoncés déjà posés (`avoid`) pour ne pas se répéter.
  */
 import type { Level, Question, SubjectId } from "@/lib/types";
-import { shuffle } from "@/lib/game/quests";
+import { hashString, shuffle } from "@/lib/game/quests";
 import { CHAPTERS, chapterById } from "./curriculum";
 import type { Generator, Rand } from "./gen/kit";
 import { HISTOIRE } from "./gen/histoire";
@@ -30,8 +30,8 @@ export const CHAPTER_GENERATORS: Record<string, Generator[]> = {
 
 export const hasGenerators = (chapterId: string) => (CHAPTER_GENERATORS[chapterId]?.length ?? 0) > 0;
 
-/** Clé d'unicité d'une question : son énoncé (mêmes valeurs = même question). */
-export const questionKey = (q: Pick<Question, "prompt">) => q.prompt.trim();
+/** Clé d'unicité d'une question : empreinte de son énoncé (mêmes valeurs = même question). */
+export const questionKey = (q: Pick<Question, "prompt">) => hashString(q.prompt.trim()).toString(36);
 
 /**
  * Tire `count` questions : les générateurs tournent (types de questions
@@ -77,6 +77,12 @@ const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-�
  * Générateurs pour un sujet libre (Forge, mode démo) : chapitres de la
  * matière et du niveau dont le titre ressemble au sujet, sinon tous.
  */
+/** Questions d'un mélange de chapitres (même matière et même niveau). */
+export function mixQuestions(subject: SubjectId, level: Level, count: number, r: Rand = Math.random, avoid?: ReadonlySet<string>): Question[] {
+  const { generators, extra } = generatorsForTopic(subject, level);
+  return generateFrom(generators, count, r, avoid, `mix-${subject}`, extra);
+}
+
 export function generatorsForTopic(subject: SubjectId, level: Level, topic = "", chapterId?: string): { generators: Generator[]; extra: Question[] } {
   const direct = chapterId ? chapterById(chapterId) : undefined;
   if (direct) return { generators: CHAPTER_GENERATORS[direct.id] ?? [], extra: questionsForChapter(direct.id) };

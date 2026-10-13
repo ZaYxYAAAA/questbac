@@ -7,6 +7,7 @@ import { ChevronLeft, FileText, FlaskConical, Lock, Play, Sparkles, Swords } fro
 import { Tabs } from "@/components/ui/Tabs";
 import { bossesForLevel } from "@/lib/content/bosses";
 import { LEVELS, chaptersFor, subjectMeta } from "@/lib/content/curriculum";
+import { hasGenerators } from "@/lib/content/generated";
 import { hasLocalQuestions } from "@/lib/content/questions";
 import { bossStatus, chapterStars } from "@/lib/game/selectors";
 import { useGame } from "@/lib/store/game-store";
@@ -47,7 +48,7 @@ export function SubjectMap({ subject, initialLevel }: { subject: SubjectId; init
       <ol className="relative space-y-3 before:absolute before:bottom-6 before:left-7 before:top-6 before:w-0.5 before:bg-gradient-to-b before:from-violet-500/60 before:to-slate-800">
         {chapters.map((c, i) => {
           const stars = chapterStars(game, c.id);
-          const local = hasLocalQuestions(c.id);
+          const local = hasGenerators(c.id) || hasLocalQuestions(c.id);
           return (
             <li key={c.id} className="relative flex gap-4">
               <div

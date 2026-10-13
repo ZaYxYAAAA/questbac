@@ -1,5 +1,6 @@
 import { bossChapters } from "@/lib/content/bosses";
 import { chaptersFor } from "@/lib/content/curriculum";
+import { hasGenerators } from "@/lib/content/generated";
 import { hasLocalQuestions } from "@/lib/content/questions";
 import type { Boss, Level, SubjectId } from "@/lib/types";
 import { dayKey } from "./progression";
@@ -33,7 +34,7 @@ export function recommendedChapters(d: GameData, level: Level, count = 3) {
   const subjects: SubjectId[] = ["maths", "physique", "svt", "histoire", "francais", "philo", "ses", "anglais"];
   return subjects
     .flatMap((s) => chaptersFor(s, level))
-    .filter((c) => hasLocalQuestions(c.id))
+    .filter((c) => hasGenerators(c.id) || hasLocalQuestions(c.id))
     .map((c) => ({ chapter: c, stars: chapterStars(d, c.id), last: d.chapters[c.id]?.lastPlayed ?? 0 }))
     .sort((a, b) => a.stars - b.stars || a.last - b.last)
     .slice(0, count)
