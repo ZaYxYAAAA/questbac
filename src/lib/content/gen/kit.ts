@@ -77,6 +77,7 @@ export const frText = (t: string) =>
     .replace(/\b([Dd])e le\b/g, "$1u")
     .replace(/\b([Dd])e les\b/g, "$1es")
     .replace(/\b([Dd])e des\b/g, "$1e")
+    .replace(/\b([Dd])e ([aeiouyéèêAEIOUYÉ])/g, "$1'$2")
     .replace(/\b([Àà]) le\b/g, (_, a) => (a === "À" ? "Au" : "au"))
     .replace(/\b([Àà]) les\b/g, (_, a) => (a === "À" ? "Aux" : "aux"));
 

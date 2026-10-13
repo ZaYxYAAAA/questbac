@@ -482,6 +482,10 @@ const lentilles: Generator[] = [
       ? numeric(`Vergence d'une lentille de distance focale $${tex(fcm)}$ cm (en dioptries) ?`, C, `$C = \\dfrac{1}{f'}$ avec $f'$ en mètres : $\\dfrac{1}{${tex(fcm / 100)}}$.`, "δ")
       : numeric(`Distance focale d'une lentille de $${C}$ δ (en cm) ?`, fcm, `$f' = \\dfrac{1}{C} = ${tex(1 / C)}$ m.`, "cm", 0.01);
   },
+  (r) => {
+    const AB = pick(r, [1, 2, 3, 4, 5]), g = pick(r, [-3, -2, -1, -0.5, 2, 3]);
+    return numeric(`Objet de $${AB}$ cm, grandissement $\\gamma = ${tex(g)}$. Taille algébrique de l'image $\\overline{A'B'}$ (cm) ?`, g * AB, `$\\overline{A'B'} = \\gamma \\times \\overline{AB} = ${tex(g)} \\times ${AB}$.`, "cm", 0.01);
+  },
   claims([
     ["Un objet placé au-delà du foyer d'une lentille convergente donne une image réelle et renversée.", true, "L'image se forme de l'autre côté de la lentille."],
     ["Un objet placé entre le foyer et la lentille donne une image réelle.", false, "L'image est virtuelle et droite : c'est la loupe."],
