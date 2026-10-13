@@ -52,3 +52,13 @@ export function xpHistory(d: GameData, days = 7, now = new Date()) {
   }
   return out;
 }
+
+/** Chapitre à reprendre : le dernier joué pas encore à 3 étoiles, sinon la première mission conseillée. */
+export function continueChapter(d: GameData, level: Level) {
+  const subjects: SubjectId[] = ["maths", "physique", "svt", "histoire", "francais", "philo", "ses", "anglais", "espagnol"];
+  const last = subjects
+    .flatMap((s) => chaptersFor(s, level))
+    .filter((c) => (d.chapters[c.id]?.lastPlayed ?? 0) > 0 && chapterStars(d, c.id) < 3)
+    .sort((a, b) => (d.chapters[b.id]?.lastPlayed ?? 0) - (d.chapters[a.id]?.lastPlayed ?? 0))[0];
+  return last ?? recommendedChapters(d, level, 1)[0];
+}

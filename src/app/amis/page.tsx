@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { NewsFeed } from "@/components/game/NewsFeed";
 import { type FormEvent, useEffect, useState } from "react";
 import { Copy, Share2, UserMinus, UserPlus } from "lucide-react";
 import { Avatar } from "@/components/game/Avatar";
@@ -69,7 +70,7 @@ export default function FriendsPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <h1 className="text-3xl font-black text-white">👥 Amis</h1>
-        <p className="text-slate-400">Invite tes amis et affrontez-vous dans le classement (onglet « Amis »).</p>
+        <p className="text-slate-400">Invite tes amis, défie-les en duel et suis leurs exploits.</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -129,6 +130,8 @@ export default function FriendsPage() {
           </div>
         ))}
       </section>
+
+      <NewsFeed />
     </div>
   );
 }

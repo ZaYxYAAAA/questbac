@@ -2,13 +2,11 @@
 
 import Link from "next/link";
 import clsx from "clsx";
-import { ArrowRight, CheckCircle2, Gift, Lock, Swords } from "lucide-react";
-import { XpBarChart } from "@/components/game/Charts";
+import { ArrowRight, CheckCircle2, Gift, Lock, Play, Swords } from "lucide-react";
 import { Avatar } from "@/components/game/Avatar";
 import { DailyChest } from "@/components/game/DailyChest";
 import { NotificationsCard } from "@/components/layout/NotificationsCard";
 import { LeagueCard, LeagueResultBanner } from "@/components/game/LeagueCard";
-import { NewsFeed } from "@/components/game/NewsFeed";
 import { PlayerTitle } from "@/components/game/PlayerTitle";
 import { RankBadge } from "@/components/game/RankBadge";
 import { Card, SectionTitle } from "@/components/ui/Card";
@@ -18,15 +16,8 @@ import { levelLabel, subjectMeta } from "@/lib/content/curriculum";
 import { levelFromXp, rankFromRp } from "@/lib/game/progression";
 import { CHEST_XP, dailyQuests } from "@/lib/game/quests";
 import { playerFrame } from "@/lib/game/ranks";
-import { bossStatus, chapterStars, recommendedChapters, xpHistory } from "@/lib/game/selectors";
+import { bossStatus, chapterStars, continueChapter, recommendedChapters } from "@/lib/game/selectors";
 import { useGame } from "@/lib/store/game-store";
-
-const SHORTCUTS = [
-  { href: "/labo", emoji: "📈", title: "Labo de maths", text: "Courbes et figures à manipuler", gradient: "from-violet-600/30 to-indigo-600/10" },
-  { href: "/prof", emoji: "🎓", title: "Prof IA", text: "Une fiche sur n'importe quelle notion", gradient: "from-cyan-600/30 to-sky-600/10" },
-  { href: "/forge", emoji: "⚒️", title: "Forge", text: "Ton cours en photo → un QCM", gradient: "from-amber-600/30 to-orange-600/10" },
-  { href: "/amis", emoji: "👥", title: "Amis", text: "Invite-les, comparez vos scores", gradient: "from-pink-600/30 to-rose-600/10" },
-];
 
 export default function HomePage() {
   const game = useGame();
@@ -34,13 +25,14 @@ export default function HomePage() {
   const level = levelFromXp(game.xp);
   const rank = rankFromRp(game.rp);
   const quests = dailyQuests(game.quests.day);
-  const recos = recommendedChapters(game, profile.level);
+  const next = continueChapter(game, profile.level);
+  const otherRecos = recommendedChapters(game, profile.level, 3).filter((c) => c.id !== next?.id).slice(0, 2);
   const bosses = bossesForLevel(profile.level).map((b) => ({ boss: b, status: bossStatus(game, b, profile.level) }));
   const nextBoss = bosses.find((b) => b.status.unlocked && !b.status.defeated) ?? bosses.find((b) => !b.status.unlocked) ?? bosses[0];
 
   return (
     <div className="space-y-6">
-      {/* Bandeau joueur */}
+      {/* Bandeau joueur : rang classé et niveau d'entraînement côte à côte */}
       <section className="qb-glow relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-violet-700/40 via-slate-900 to-slate-950 p-5 sm:p-7">
         {profile.photo ? (
           // eslint-disable-next-line @next/next/no-img-element -- décor flouté
@@ -48,34 +40,56 @@ export default function HomePage() {
         ) : (
           <div aria-hidden className="absolute -right-10 -top-10 text-[10rem] opacity-10">{profile.avatar}</div>
         )}
-        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center">
-          <Link href="/profil" aria-label="Mon profil" className="self-start rounded-full sm:self-center">
-            <Avatar emoji={profile.avatar} photo={profile.photo} name={profile.pseudo} size="xl" rp={game.rp} frame={playerFrame(profile, game.peakRp)} />
+        <div className="relative flex items-center gap-4">
+          <Link href="/profil" aria-label="Mon profil" className="shrink-0 rounded-full">
+            <Avatar emoji={profile.avatar} photo={profile.photo} name={profile.pseudo} size="lg" rp={game.rp} frame={playerFrame(profile, game.peakRp)} />
           </Link>
-          <div className="flex-1 space-y-2">
+          <div className="min-w-0">
+            <h1 className="truncate text-2xl font-black text-white sm:text-3xl">Salut {profile.pseudo} !</h1>
+            <PlayerTitle titleId={profile.titleId} peakRp={game.peakRp} />
             <p className="text-sm text-violet-200">{levelLabel(profile.level)} · Série de {game.streak.count} jour{game.streak.count > 1 ? "s" : ""} 🔥</p>
-            <div>
-              <h1 className="text-3xl font-black text-white">Salut {profile.pseudo} !</h1>
-              <PlayerTitle titleId={profile.titleId} peakRp={game.peakRp} />
-            </div>
-            <div className="max-w-md">
-              <div className="mb-1 flex justify-between text-xs text-slate-300">
-                <span className="font-bold">Niveau {level.level}</span>
-                <span>{level.current} / {level.needed} XP</span>
-              </div>
-              <ProgressBar value={level.progress} height="h-3" />
-            </div>
-          </div>
-          <div className="space-y-2 sm:text-right">
-            <RankBadge rp={game.rp} size="lg" />
-            {rank.nextLabel && (
-              <p className="text-xs text-slate-400">Encore <b className="text-white">{rank.rpToNext} RP</b> pour {rank.nextLabel}</p>
-            )}
-            <Link href="/classement?vue=rangs" className="block text-xs font-semibold text-violet-300 hover:text-violet-200">Voir tous les rangs →</Link>
-            <p className="text-xs text-slate-400">Cette semaine : <b className="text-white">{game.weekly.xp} XP</b></p>
           </div>
         </div>
+
+        <div className="relative mt-5 grid grid-cols-2 gap-3">
+          <Link href="/classement" className="group rounded-2xl border border-amber-400/30 bg-gradient-to-br from-amber-500/15 to-orange-600/5 p-3 transition hover:border-amber-300/60 sm:p-4">
+            <p className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-amber-200/80">
+              ⚔️ Classé <ArrowRight size={14} className="transition group-hover:translate-x-1" />
+            </p>
+            <div className="mt-2 flex items-center gap-3">
+              <RankBadge rp={game.rp} size="sm" />
+            </div>
+            <p className="mt-2 text-xs text-slate-400">
+              {rank.nextLabel ? <><b className="text-white">{rank.rpToNext} RP</b> → {rank.nextLabel}</> : "Sommet de l'échelle !"}
+            </p>
+          </Link>
+          <Link href="/matieres" className="group rounded-2xl border border-violet-400/30 bg-gradient-to-br from-violet-500/15 to-indigo-600/5 p-3 transition hover:border-violet-300/60 sm:p-4">
+            <p className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-violet-200/80">
+              🎯 Niveau <ArrowRight size={14} className="transition group-hover:translate-x-1" />
+            </p>
+            <p className="mt-2 text-lg font-black leading-tight text-white">Niv. {level.level}</p>
+            <ProgressBar value={level.progress} height="h-2" className="mt-1" />
+            <p className="mt-2 text-xs text-slate-400">{level.current} / {level.needed} XP</p>
+          </Link>
+        </div>
       </section>
+
+      {/* Reprendre */}
+      {next && (
+        <Link
+          href={`/mission/${next.id}`}
+          className={clsx("group flex items-center gap-4 rounded-3xl border border-white/10 bg-gradient-to-r p-4 transition hover:-translate-y-0.5 hover:border-white/25 sm:p-5", subjectMeta(next.subject).gradient)}
+        >
+          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-black/25 text-3xl">{subjectMeta(next.subject).emoji}</span>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold uppercase tracking-wider text-white/80">Continuer · {subjectMeta(next.subject).name}</p>
+            <p className="truncate text-lg font-black text-white">{next.title}</p>
+          </div>
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white text-slate-900 transition group-hover:scale-105">
+            <Play size={20} className="ml-0.5" fill="currentColor" />
+          </span>
+        </Link>
+      )}
 
       <LeagueResultBanner />
       <NotificationsCard variant="home" />
@@ -143,50 +157,30 @@ export default function HomePage() {
         )}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Missions conseillées */}
-        <Card className="lg:col-span-2">
+      {/* Autres missions conseillées */}
+      {otherRecos.length > 0 && (
+        <Card>
           <SectionTitle icon={<span>🎯</span>} action={<Link href="/matieres" className="text-sm text-violet-300 hover:text-violet-200">Toute la carte →</Link>}>
-            Missions conseillées
+            Aussi conseillé
           </SectionTitle>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {recos.map((c) => {
+          <div className="grid gap-3 sm:grid-cols-2">
+            {otherRecos.map((c) => {
               const s = subjectMeta(c.subject);
               const stars = chapterStars(game, c.id);
               return (
-                <Link key={c.id} href={`/mission/${c.id}`} className="group rounded-2xl border border-white/10 bg-slate-800/40 p-4 transition hover:-translate-y-0.5 hover:border-violet-400/50">
-                  <div className={clsx("mb-3 grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br text-xl", s.gradient)}>{s.emoji}</div>
-                  <p className="text-xs text-slate-400">{s.name}</p>
-                  <p className="font-bold text-white">{c.title}</p>
-                  <div className="mt-2 flex items-center justify-between">
-                    <span className="text-sm tracking-widest">{[1, 2, 3].map((i) => (i <= stars ? "⭐" : "☆")).join("")}</span>
-                    <ArrowRight size={16} className="text-slate-500 transition group-hover:translate-x-1 group-hover:text-violet-300" />
+                <Link key={c.id} href={`/mission/${c.id}`} className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-800/40 p-3 transition hover:border-violet-400/50">
+                  <div className={clsx("grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br text-xl", s.gradient)}>{s.emoji}</div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-slate-400">{s.name}</p>
+                    <p className="truncate font-bold text-white">{c.title}</p>
                   </div>
+                  <span className="shrink-0 text-xs tracking-widest">{[1, 2, 3].map((i) => (i <= stars ? "⭐" : "☆")).join("")}</span>
                 </Link>
               );
             })}
           </div>
         </Card>
-
-        <Card>
-          <SectionTitle icon={<span>📊</span>}>Ton XP sur 7 jours</SectionTitle>
-          <XpBarChart data={xpHistory(game, 7)} />
-        </Card>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2"><NewsFeed /></div>
-        {/* Raccourcis */}
-        <div className="grid grid-cols-2 content-start gap-3">
-          {SHORTCUTS.map((s) => (
-            <Link key={s.href} href={s.href} className={clsx("rounded-2xl border border-white/10 bg-gradient-to-br p-4 transition hover:-translate-y-0.5 hover:border-white/25", s.gradient)}>
-              <div className="text-3xl">{s.emoji}</div>
-              <p className="mt-2 font-bold text-white">{s.title}</p>
-              <p className="text-xs text-slate-400">{s.text}</p>
-            </Link>
-          ))}
-        </div>
-      </div>
+      )}
     </div>
   );
 }
