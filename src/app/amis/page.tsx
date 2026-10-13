@@ -33,7 +33,7 @@ export default function FriendsPage() {
         <p className="text-6xl">👥</p>
         <h1 className="text-2xl font-black text-white">Joue avec tes amis</h1>
         <p className="text-slate-300">Pour ajouter des amis et comparer vos scores, crée un compte (ta progression actuelle sera conservée).</p>
-        <Link href="/profil" className="inline-block rounded-xl bg-violet-600 px-5 py-3 font-semibold text-white hover:bg-violet-500">Créer mon compte</Link>
+        <Link href="/profil?onglet=compte" className="inline-block rounded-xl bg-violet-600 px-5 py-3 font-semibold text-white hover:bg-violet-500">Créer mon compte</Link>
       </div>
     );
   }
@@ -69,8 +69,8 @@ export default function FriendsPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <h1 className="text-3xl font-black text-white">👥 Amis</h1>
-        <p className="text-slate-400">Invite tes amis, défie-les en duel et suis leurs exploits.</p>
+        <h1 className="text-2xl font-black text-white sm:text-3xl">👥 Amis</h1>
+        <p className="text-sm text-slate-400">Invite-les, défie-les, suis leurs exploits.</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect } from "react";
 import { Clock, Swords } from "lucide-react";
 import { formatCountdown } from "@/lib/game/league";
-import { PLACEMENT_MATCHES } from "@/lib/game/ranked";
 import { useCloud } from "@/lib/store/cloud-sync";
 import { loadRanked, useRanked } from "@/lib/store/ranked-store";
 import { RankedBadge } from "./RankedBadge";
@@ -38,24 +37,20 @@ export function RankedHomeCard() {
   return (
     <div className="space-y-3">
       <WeekResults ranks={overview.ranks} />
-      <Link href="/classement" className="group block rounded-3xl border border-amber-400/30 bg-gradient-to-br from-amber-500/15 via-slate-900 to-slate-950 p-5 transition hover:border-amber-300/60">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs font-bold uppercase tracking-wider text-amber-300">⚔️ Ta semaine classée</p>
-          <p className="flex items-center gap-1 text-xs text-amber-200"><Clock size={12} /> {formatCountdown(endsIn)}</p>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          {general && <RankedBadge step={general.step} size="md" />}
-          <p className="text-sm text-slate-300">
-            {played === 0 ? "Aucune manche cette semaine" : `${played} manche${played > 1 ? "s" : ""} jouée${played > 1 ? "s" : ""}`}
-            {position > 0 && overview.group.length > 1 && <> · <b className="text-white">{position}<sup>e</sup></b>/{overview.group.length} de ton groupe</>}
+      <Link href="/classement" className="group flex items-center gap-3 rounded-3xl border border-amber-400/30 bg-gradient-to-br from-amber-500/15 via-slate-900 to-slate-950 p-3 transition hover:border-amber-300/60">
+        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 text-2xl">⚔️</span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <p className="text-sm font-bold text-white">Ta semaine</p>
+            {general && <RankedBadge step={general.step} size="sm" />}
+          </div>
+          <p className="truncate text-xs text-slate-400">
+            {played === 0 ? "Aucune manche" : `${played} manche${played > 1 ? "s" : ""}`}
+            {position > 0 && overview.group.length > 1 && ` · ${position}e/${overview.group.length}`} · {placed}/{subjects.length} matières classées
           </p>
+          <p className="flex items-center gap-1 text-[11px] text-amber-200"><Clock size={11} /> Promotions dans {formatCountdown(endsIn)}</p>
         </div>
-        <p className="mt-2 text-xs text-slate-400">
-          {placed}/{subjects.length} matières classées · {PLACEMENT_MATCHES} manches de placement par matière
-        </p>
-        <span className="mt-3 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 px-3 py-2 text-sm font-bold text-slate-950">
-          <Swords size={16} /> Jouer en classé
-        </span>
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-gradient-to-br from-amber-300 to-orange-500 text-slate-950"><Swords size={18} /></span>
       </Link>
     </div>
   );

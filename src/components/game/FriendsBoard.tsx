@@ -52,7 +52,7 @@ export function FriendsBoard({ player }: { player: Omit<LeaderboardEntry, "id" |
       <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-6 text-center">
         <p className="text-4xl">👥</p>
         <p className="mt-2 text-slate-300">Crée un compte (depuis ton profil) pour ajouter des amis et vous affronter au classement.</p>
-        <Link href="/profil" className="mt-4 inline-block rounded-xl bg-violet-600 px-4 py-2 font-semibold text-white">Aller au profil</Link>
+        <Link href="/profil?onglet=compte" className="mt-4 inline-block rounded-xl bg-violet-600 px-4 py-2 font-semibold text-white">Aller au profil</Link>
       </div>
     );
   }

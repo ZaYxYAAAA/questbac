@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
-import { Clock, Flag, Lock, Play, Swords } from "lucide-react";
+import { Clock, Flag, Play, Swords } from "lucide-react";
 import { Avatar } from "@/components/game/Avatar";
 import { FriendsBoard } from "@/components/game/FriendsBoard";
 import { RankLadder } from "@/components/game/RankLadder";
@@ -169,21 +169,18 @@ export default function RankedPage() {
     <div className="space-y-5">
       {rulesModal}
       {/* En-tête : ambiance compétition, distincte de l'entraînement */}
-      <section className="relative overflow-hidden rounded-3xl border border-amber-400/30 bg-gradient-to-br from-amber-500/20 via-slate-900 to-slate-950 p-5 sm:p-6">
-        <div aria-hidden className="absolute -right-6 -top-8 text-[8rem] opacity-10">⚔️</div>
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div className="space-y-1">
-            <p className="text-xs font-bold uppercase tracking-wider text-amber-300">Mode classé</p>
-            <h1 className="text-3xl font-black text-white">Chaque manche compte</h1>
-            <p className="max-w-md text-sm text-slate-300">
-              Ton rang ne monte qu&apos;ici. Les missions de l&apos;onglet Entraînement rapportent de l&apos;XP, pas de rang.
-            </p>
+      <section className="relative overflow-hidden rounded-3xl border border-amber-400/30 bg-gradient-to-br from-amber-500/20 via-slate-900 to-slate-950 p-4">
+        <div aria-hidden className="absolute -right-4 -top-6 text-[6rem] opacity-10">⚔️</div>
+        <div className="relative flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-wider text-amber-300">⚔️ Mode classé</p>
+            <h1 className="text-xl font-black text-white">Ici, chaque manche compte</h1>
+            <p className="text-xs text-slate-400">Seul le classé fait monter ton rang.</p>
           </div>
           {general && (
-            <div className="space-y-1 sm:text-right">
-              <p className="text-xs text-slate-400">Rang général</p>
-              <RankedBadge step={general.step} size="lg" />
-              <p className="flex items-center gap-1 text-xs text-amber-200 sm:justify-end"><Clock size={12} /> Promotions dans {formatCountdown(endsIn)}</p>
+            <div className="shrink-0 space-y-1 text-right">
+              <RankedBadge step={general.step} size="md" />
+              <p className="flex items-center justify-end gap-1 text-[11px] text-amber-200"><Clock size={11} /> {formatCountdown(endsIn)}</p>
             </div>
           )}
         </div>
@@ -193,7 +190,7 @@ export default function RankedPage() {
         <div className="space-y-3 rounded-3xl border border-white/10 bg-slate-900/70 p-6 text-center">
           <p className="text-4xl">🔐</p>
           <p className="text-slate-200">Le mode classé se joue avec un compte : tes manches sont corrigées par le serveur pour que le classement reste juste.</p>
-          <Link href="/profil" className="inline-flex rounded-xl bg-violet-600 px-4 py-2 font-semibold text-white">Créer mon compte</Link>
+          <Link href="/profil?onglet=compte" className="inline-flex rounded-xl bg-violet-600 px-4 py-2 font-semibold text-white">Créer mon compte</Link>
         </div>
       ) : (
         <>
@@ -268,45 +265,60 @@ function SubjectChips({ ranks, value, onChange }: { ranks: RankView[]; value: Ra
 }
 
 function PlayView({ ranks, starting, onPlay }: { ranks: RankView[]; starting: RankedSubject | null; onPlay: (s: RankedSubject) => void }) {
+  const [general, ...subjects] = ranks;
+  const weekLine = (r: RankView) =>
+    !r.placed
+      ? `Placement : ${PLACEMENT_MATCHES - r.placementLeft}/${PLACEMENT_MATCHES}`
+      : r.played === 0
+        ? "Pas encore joué cette semaine"
+        : `${r.played} manche${r.played > 1 ? "s" : ""} · moyenne ${r.avg} / ${r.par}`;
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-2 text-center text-xs text-slate-300">
-        <p className="rounded-2xl bg-slate-900/70 p-3"><b className="block text-lg text-white">{MATCH_SIZE}</b>questions chronométrées</p>
-        <p className="rounded-2xl bg-slate-900/70 p-3"><b className="block text-lg text-white">{COUNTED_MATCHES}</b>meilleures manches comptent</p>
-        <p className="rounded-2xl bg-slate-900/70 p-3"><b className="block text-lg text-white">Dimanche</b>promotions à minuit</p>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {ranks.map((r) => {
+    <div className="space-y-3">
+      {/* Général en vedette */}
+      <button
+        type="button"
+        disabled={starting !== null}
+        onClick={() => onPlay(general.subject)}
+        className="flex w-full items-center gap-3 rounded-3xl border border-amber-400/40 bg-gradient-to-r from-amber-500/20 to-orange-600/10 p-4 text-left transition active:scale-[0.99] disabled:opacity-60"
+      >
+        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 text-3xl">⭐</span>
+        <div className="min-w-0 flex-1">
+          <p className="font-black text-white">Général <span className="text-xs font-normal text-slate-400">toutes les matières</span></p>
+          <RankedBadge step={general.step} size="sm" />
+          <p className="mt-1 text-xs text-slate-400">{weekLine(general)}</p>
+        </div>
+        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-gradient-to-br from-amber-300 to-orange-500 text-slate-950">
+          {starting === general.subject ? "…" : <Play size={20} className="ml-0.5" fill="currentColor" />}
+        </span>
+      </button>
+
+      {/* Une ligne par matière */}
+      <div className="overflow-hidden rounded-3xl border border-white/10 bg-slate-900/70">
+        {subjects.map((r) => {
           const m = rankedSubjectMeta(r.subject);
           return (
-            <div key={r.subject} className={clsx("rounded-3xl border bg-slate-900/70 p-4", r.subject === "general" ? "border-amber-400/40 sm:col-span-2" : "border-white/10")}>
-              <div className="flex items-center gap-3">
-                <span className={clsx("grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br text-2xl", m.gradient)}>{m.emoji}</span>
-                <div className="min-w-0 flex-1">
-                  <p className="font-black text-white">{m.name}{r.subject === "general" && <span className="ml-1 text-xs font-normal text-slate-400">toutes les matières</span>}</p>
-                  <RankedBadge step={r.step} placementLeft={r.placed ? 0 : r.placementLeft} size="sm" />
-                </div>
-                <Button variant="gold" disabled={starting !== null} onClick={() => onPlay(r.subject)} className="shrink-0">
-                  {starting === r.subject ? "…" : <><Swords size={16} /> Jouer</>}
-                </Button>
+            <button
+              key={r.subject}
+              type="button"
+              disabled={starting !== null}
+              onClick={() => onPlay(r.subject)}
+              className="flex w-full items-center gap-3 border-b border-white/5 px-3 py-2.5 text-left transition last:border-0 hover:bg-white/5 active:bg-white/10 disabled:opacity-60"
+            >
+              <span className={clsx("grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br text-xl", m.gradient)}>{m.emoji}</span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-bold text-white">{m.name}</p>
+                <p className="truncate text-xs text-slate-500">{weekLine(r)}</p>
               </div>
-              <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
-                {r.placed ? (
-                  <>
-                    <span>{r.played} manche{r.played > 1 ? "s" : ""} cette semaine · {r.total} pts</span>
-                    <span className={r.played >= PLACEMENT_MATCHES && r.avg >= r.par ? "font-bold text-emerald-300" : ""}>moyenne {r.avg} / objectif {r.par}</span>
-                  </>
-                ) : (
-                  <span>{r.placementLeft} manche{r.placementLeft > 1 ? "s" : ""} de placement pour obtenir ton rang (jusqu&apos;à Or III)</span>
-                )}
-              </div>
-            </div>
+              {r.placed && <RankedBadge step={r.step} size="sm" />}
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-amber-400/15 text-amber-300">
+                {starting === r.subject ? "…" : <Play size={14} className="ml-0.5" fill="currentColor" />}
+              </span>
+            </button>
           );
         })}
       </div>
-      <p className="flex items-center gap-2 rounded-2xl bg-slate-900/70 p-3 text-xs text-slate-400">
-        <Lock size={14} className="shrink-0 text-amber-300" />
-        Les questions arrivent une par une et sont corrigées par le serveur. Ne quitte pas l&apos;appli pendant une manche.
+      <p className="text-center text-xs text-slate-500">
+        {MATCH_SIZE} questions chronométrées · tes {COUNTED_MATCHES} meilleures manches comptent · promotions dimanche à minuit
       </p>
     </div>
   );

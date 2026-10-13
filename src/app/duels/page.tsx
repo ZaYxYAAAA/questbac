@@ -69,7 +69,7 @@ export default function DuelsPage() {
         <p className="text-6xl">⚔️</p>
         <h1 className="text-2xl font-black text-white">Duels entre amis</h1>
         <p className="text-slate-300">Crée un compte pour défier tes amis sur les mêmes questions.</p>
-        <Link href="/profil" className="inline-block rounded-xl bg-violet-600 px-5 py-3 font-semibold text-white">Créer mon compte</Link>
+        <Link href="/profil?onglet=compte" className="inline-block rounded-xl bg-violet-600 px-5 py-3 font-semibold text-white">Créer mon compte</Link>
       </div>
     );
   }
@@ -102,8 +102,8 @@ export default function DuelsPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-black text-white">⚔️ Duels</h1>
-          <p className="text-slate-400">Mêmes questions, chacun joue quand il veut. Le plus de bonnes réponses gagne, puis le plus rapide.</p>
+          <h1 className="text-2xl font-black text-white sm:text-3xl">⚔️ Duels</h1>
+          <p className="text-sm text-slate-400">Mêmes questions, chacun son tour. Le plus juste gagne, puis le plus rapide.</p>
         </div>
         {finished.length > 0 && (
           <p className="rounded-xl bg-slate-900/70 px-3 py-2 text-sm text-slate-300">

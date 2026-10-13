@@ -46,7 +46,7 @@ export default function DuelPage() {
       <div className="space-y-4 py-10 text-center">
         <p className="text-5xl">⚔️</p>
         <p className="text-slate-300">Connecte-toi à ton compte pour jouer ce duel.</p>
-        <Link href="/profil" className="text-violet-300 underline">Aller au profil</Link>
+        <Link href="/profil?onglet=compte" className="text-violet-300 underline">Aller au profil</Link>
       </div>
     );
   }

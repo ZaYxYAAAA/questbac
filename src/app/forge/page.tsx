@@ -138,8 +138,8 @@ export default function ForgePage() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-black text-white">⚒️ La Forge</h1>
-          <p className="text-slate-400">Transforme ton propre cours en mission : une fiche de révision + un QCM sur mesure.</p>
+          <h1 className="text-2xl font-black text-white sm:text-3xl">⚒️ Forge</h1>
+          <p className="text-sm text-slate-400">Ton cours en photo ou en texte → une fiche + un QCM.</p>
         </div>
         <AiBadge />
       </div>

@@ -112,8 +112,8 @@ export function ProfStudio({ initialSubject, initialLevel, initialTopic }: { ini
       <div className="min-w-0 space-y-5">
         <div className="qb-no-print flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-black text-white">🎓 Prof IA</h1>
-            <p className="text-slate-400">Le Professeur Atlas rédige une fiche claire et précise sur la notion de ton choix.</p>
+            <h1 className="text-2xl font-black text-white sm:text-3xl">🎓 Prof IA</h1>
+            <p className="text-sm text-slate-400">Une fiche claire sur la notion de ton choix.</p>
           </div>
           <AiBadge />
         </div>

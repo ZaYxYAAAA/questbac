@@ -6,7 +6,7 @@ import type { CustomMission, Level, QuizResult, SavedFiche, SubjectId } from "@/
 import { DUEL_REWARDS, type DuelOutcome } from "./duel";
 import { type AchievementDef, newlyUnlocked } from "./achievements";
 import { type DailyReward, type DailyState, claimDaily } from "./daily";
-import { LEAGUE_MIN_SIZE, type LeagueState, finalLeagueResult } from "./league";
+import type { LeagueState } from "./league";
 import {
   dayKey,
   levelFromXp,
@@ -166,23 +166,11 @@ export function refreshPeriods(d: GameData, now = new Date()): GameData {
   let next = d;
   if (d.quests.day !== today) next = { ...next, quests: { day: today, progress: {}, done: [], chest: false } };
   if (d.weekly.week !== week || d.league.week !== week) {
-    let { xp, rp, peakRp, feed } = next;
-    let last = next.league.last;
-    // Classé seulement si le joueur a gagné de l'XP pendant la semaine de sa ligue,
-    // dans un groupe d'au moins 3 vrais joueurs.
-    const result = next.league.week !== week && next.league.week === next.weekly.week && next.weekly.xp > 0
-      ? finalLeagueResult(next.league, next.weekly.xp)
-      : null;
-    // L'ancienne ligue d'XP est remplacée par les groupes classés : plus de récompense ici.
-    void result;
+    // L'ancienne ligue d'XP est remplacée par les groupes du mode classé : plus de récompense ici.
     next = {
       ...next,
-      xp,
-      rp,
-      peakRp,
-      feed,
       weekly: next.weekly.week === week ? next.weekly : { week, xp: 0 },
-      league: next.league.week === week ? next.league : { week, tierId: rankFromRp(rp).tier.id, last, rivals: [] },
+      league: next.league.week === week ? next.league : { week, tierId: rankFromRp(next.rp).tier.id, last: next.league.last, rivals: [] },
     };
   }
   return next;

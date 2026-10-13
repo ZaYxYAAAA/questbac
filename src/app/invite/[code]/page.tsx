@@ -28,7 +28,7 @@ export default function InvitePage() {
             Pour devenir ami avec <b className="font-mono text-white">{code}</b>, il te faut un compte QuestBac. Crée-le (ou connecte-toi) depuis ton profil :
             l&apos;ami sera ajouté automatiquement.
           </p>
-          <Link href="/profil" className="inline-block rounded-xl bg-violet-600 px-5 py-3 font-semibold text-white hover:bg-violet-500">
+          <Link href="/profil?onglet=compte" className="inline-block rounded-xl bg-violet-600 px-5 py-3 font-semibold text-white hover:bg-violet-500">
             Créer mon compte / me connecter
           </Link>
         </>

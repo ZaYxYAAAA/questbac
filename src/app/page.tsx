@@ -9,14 +9,13 @@ import { NotificationsCard } from "@/components/layout/NotificationsCard";
 import { RankedHomeCard } from "@/components/ranked/RankedHomeCard";
 import { PlayerTitle } from "@/components/game/PlayerTitle";
 import { RankBadge } from "@/components/game/RankBadge";
-import { Card, SectionTitle } from "@/components/ui/Card";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { bossesForLevel } from "@/lib/content/bosses";
 import { levelLabel, subjectMeta } from "@/lib/content/curriculum";
 import { levelFromXp, rankFromRp } from "@/lib/game/progression";
 import { CHEST_XP, dailyQuests } from "@/lib/game/quests";
 import { playerFrame } from "@/lib/game/ranks";
-import { bossStatus, chapterStars, continueChapter, recommendedChapters } from "@/lib/game/selectors";
+import { bossStatus, continueChapter } from "@/lib/game/selectors";
 import { useGame } from "@/lib/store/game-store";
 
 export default function HomePage() {
@@ -26,7 +25,6 @@ export default function HomePage() {
   const rank = rankFromRp(game.rp);
   const quests = dailyQuests(game.quests.day);
   const next = continueChapter(game, profile.level);
-  const otherRecos = recommendedChapters(game, profile.level, 3).filter((c) => c.id !== next?.id).slice(0, 2);
   const bosses = bossesForLevel(profile.level).map((b) => ({ boss: b, status: bossStatus(game, b, profile.level) }));
   const nextBoss = bosses.find((b) => b.status.unlocked && !b.status.defeated) ?? bosses.find((b) => !b.status.unlocked) ?? bosses[0];
 
@@ -93,93 +91,64 @@ export default function HomePage() {
 
       <NotificationsCard variant="home" />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2"><DailyChest /></div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <DailyChest />
         <RankedHomeCard />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-2">
         {/* Quêtes du jour */}
-        <Card className="lg:col-span-2">
-          <SectionTitle icon={<span>📜</span>} action={<span className="text-xs text-slate-500">Renouvelées chaque jour</span>}>
-            Quêtes du jour
-          </SectionTitle>
-          <div className="space-y-3">
+        <section className="rounded-3xl border border-white/10 bg-slate-900/70 p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="font-black text-white">📜 Quêtes du jour</h2>
+            <span className={clsx("text-xs", game.quests.chest ? "text-amber-300" : "text-slate-500")}>
+              <Gift size={12} className="mr-1 inline" />{game.quests.chest ? "Coffre ouvert" : `3/3 → +${CHEST_XP} XP`}
+            </span>
+          </div>
+          <ul className="space-y-2">
             {quests.map((q) => {
               const progress = Math.min(q.target, game.quests.progress[q.id] ?? 0);
               const done = game.quests.done.includes(q.id);
               return (
-                <div key={q.id} className={clsx("flex items-center gap-3 rounded-2xl border p-3", done ? "border-emerald-500/30 bg-emerald-500/10" : "border-white/5 bg-slate-800/40")}>
-                  <span className="text-2xl">{q.emoji}</span>
+                <li key={q.id} className="flex items-center gap-3">
+                  <span className="text-xl">{q.emoji}</span>
                   <div className="min-w-0 flex-1">
-                    <div className="mb-1 flex items-center justify-between gap-2 text-sm">
-                      <span className={clsx("font-semibold", done ? "text-emerald-300" : "text-slate-100")}>{q.label}</span>
+                    <div className="flex items-center justify-between gap-2 text-sm">
+                      <span className={clsx("truncate", done ? "text-emerald-300 line-through decoration-emerald-500/50" : "text-slate-100")}>{q.label}</span>
                       <span className="shrink-0 text-xs text-slate-400">{progress}/{q.target}</span>
                     </div>
-                    <ProgressBar value={progress / q.target} height="h-1.5" barClassName={done ? "bg-emerald-400" : undefined} />
+                    <ProgressBar value={progress / q.target} height="h-1" className="mt-1" barClassName={done ? "bg-emerald-400" : undefined} />
                   </div>
-                  {done ? <CheckCircle2 className="text-emerald-400" /> : <span className="shrink-0 text-xs font-bold text-amber-300">+{q.xp} XP</span>}
-                </div>
+                  {done ? <CheckCircle2 size={18} className="shrink-0 text-emerald-400" /> : <span className="w-14 shrink-0 text-right text-xs font-bold text-amber-300">+{q.xp} XP</span>}
+                </li>
               );
             })}
-            <div className={clsx("flex items-center gap-3 rounded-2xl p-3 text-sm", game.quests.chest ? "bg-amber-400/15 text-amber-200" : "bg-slate-800/40 text-slate-400")}>
-              <Gift className={game.quests.chest ? "text-amber-300" : ""} />
-              {game.quests.chest ? "Coffre du jour ouvert ! Reviens demain pour de nouvelles quêtes." : `Termine les 3 quêtes pour ouvrir le coffre (+${CHEST_XP} XP).`}
-            </div>
-          </div>
-        </Card>
+          </ul>
+        </section>
 
-        {/* Boss */}
+        {/* Boss à affronter */}
         {nextBoss && (
-          <Link href={nextBoss.status.unlocked ? `/boss/${nextBoss.boss.id}` : "/boss"} className="group block">
-            <div className={clsx("relative h-full overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br p-5", nextBoss.boss.gradient)}>
-              <div className="absolute inset-0 bg-slate-950/50 transition group-hover:bg-slate-950/35" />
-              <div className="relative flex h-full flex-col">
-                <p className="text-xs font-bold uppercase tracking-wider text-white/70">Boss de la semaine</p>
-                <div className="qb-bob my-3 text-7xl">{nextBoss.boss.emoji}</div>
-                <h3 className="text-xl font-black text-white">{nextBoss.boss.name}</h3>
-                <p className="text-sm text-white/80">{nextBoss.boss.title}</p>
-                <div className="mt-auto pt-4">
-                  {nextBoss.status.unlocked ? (
-                    <span className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-bold text-slate-900">
-                      <Swords size={16} /> {nextBoss.status.defeated ? "Revanche" : "Combattre"}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-2 rounded-xl bg-black/40 px-3 py-2 text-sm text-white">
-                      <Lock size={14} /> Réussis {nextBoss.status.required - nextBoss.status.completed} chapitre(s) de plus
-                    </span>
-                  )}
-                </div>
-              </div>
+          <Link
+            href={nextBoss.status.unlocked ? `/boss/${nextBoss.boss.id}` : "/boss"}
+            className={clsx("relative flex items-center gap-3 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br p-4", nextBoss.boss.gradient)}
+          >
+            <div className="absolute inset-0 bg-slate-950/50" />
+            <span className="qb-bob relative text-5xl">{nextBoss.boss.emoji}</span>
+            <div className="relative min-w-0 flex-1">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-white/70">Boss à affronter</p>
+              <p className="truncate text-lg font-black text-white">{nextBoss.boss.name}</p>
+              <p className="text-xs text-white/75">
+                {nextBoss.status.unlocked ? nextBoss.boss.title : `🔒 Encore ${nextBoss.status.required - nextBoss.status.completed} chapitre(s) à valider`}
+              </p>
             </div>
+            {nextBoss.status.unlocked ? (
+              <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white text-slate-900"><Swords size={18} /></span>
+            ) : (
+              <Lock size={18} className="relative shrink-0 text-white/70" />
+            )}
           </Link>
         )}
       </div>
-
-      {/* Autres missions conseillées */}
-      {otherRecos.length > 0 && (
-        <Card>
-          <SectionTitle icon={<span>🎯</span>} action={<Link href="/matieres" className="text-sm text-violet-300 hover:text-violet-200">Toute la carte →</Link>}>
-            Aussi conseillé
-          </SectionTitle>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {otherRecos.map((c) => {
-              const s = subjectMeta(c.subject);
-              const stars = chapterStars(game, c.id);
-              return (
-                <Link key={c.id} href={`/mission/${c.id}`} className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-800/40 p-3 transition hover:border-violet-400/50">
-                  <div className={clsx("grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br text-xl", s.gradient)}>{s.emoji}</div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs text-slate-400">{s.name}</p>
-                    <p className="truncate font-bold text-white">{c.title}</p>
-                  </div>
-                  <span className="shrink-0 text-xs tracking-widest">{[1, 2, 3].map((i) => (i <= stars ? "⭐" : "☆")).join("")}</span>
-                </Link>
-              );
-            })}
-          </div>
-        </Card>
-      )}
     </div>
   );
 }

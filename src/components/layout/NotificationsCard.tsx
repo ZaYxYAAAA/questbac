@@ -58,7 +58,7 @@ export function NotificationsCard({ variant }: { variant: "home" | "settings" })
         </span>
         <div className="min-w-0 flex-1 pr-6">
           <p className="font-bold text-white">{state === "on" ? "Notifications activées" : "Active les notifications"}</p>
-          {state !== "on" && perks}
+          {state !== "on" && (variant === "settings" ? perks : <p className="text-sm text-slate-300">Défis d&apos;amis, tours de duel, rappel de série.</p>)}
           {state === "on" && <p className="text-sm text-slate-300">Tu seras prévenu(e) des défis, des tours de duel et de ta série.</p>}
         </div>
       </div>
@@ -66,7 +66,7 @@ export function NotificationsCard({ variant }: { variant: "home" | "settings" })
       <div className="mt-3 space-y-2">
         {!user ? (
           <p className="text-sm text-slate-300">
-            <Link href="/profil" className="font-semibold text-violet-300 underline">Crée un compte</Link> pour recevoir des notifications.
+            <Link href="/profil?onglet=compte" className="font-semibold text-violet-300 underline">Crée un compte</Link> pour recevoir des notifications.
           </p>
         ) : state === "ios-install" ? (
           <ol className="space-y-1.5 rounded-2xl bg-slate-950/50 p-3 text-sm text-slate-200">

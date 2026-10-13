@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import clsx from "clsx";
+import { ChevronRight } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Tabs } from "@/components/ui/Tabs";
 import { LEVELS, subjectsForLevel } from "@/lib/content/curriculum";
@@ -15,29 +17,32 @@ export default function SubjectsPage() {
   const [level, setLevel] = useState<Level>(game.profile!.level);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-white">🗺️ Carte des matières</h1>
-          <p className="text-slate-400">Choisis un territoire, termine ses chapitres et débloque son boss.</p>
-        </div>
-        <Tabs value={level} onChange={setLevel} options={LEVELS.map((l) => ({ value: l.id, label: l.label }))} />
-      </div>
+    <div className="space-y-4">
+      <PageHeader
+        title="🗺️ Carte"
+        subtitle="Termine les chapitres pour débloquer les boss."
+        action={<Tabs value={level} onChange={setLevel} options={LEVELS.map((l) => ({ value: l.id, label: l.label }))} />}
+      />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
         {subjectsForLevel(level).map((s) => {
           const p = subjectProgress(game, s.id, level);
           return (
             <Link
               key={s.id}
               href={`/matieres/${s.id}?niveau=${level}`}
-              className="group relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/70 p-5 transition hover:-translate-y-1 hover:border-white/25"
+              className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-900/70 p-3 transition hover:border-white/25 active:scale-[0.99]"
             >
-              <div className={clsx("absolute -right-8 -top-8 h-32 w-32 rounded-full bg-gradient-to-br opacity-30 blur-2xl transition group-hover:opacity-60", s.gradient)} />
-              <div className={clsx("relative mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br text-3xl shadow-lg", s.gradient)}>{s.emoji}</div>
-              <h2 className="relative text-lg font-black text-white">{s.name}</h2>
-              <p className="relative mb-3 text-sm text-slate-400">{p.done}/{p.total} chapitres · {p.stars}/{p.maxStars} ⭐</p>
-              <ProgressBar value={p.ratio} barClassName={clsx("bg-gradient-to-r", s.gradient)} />
+              <span className={clsx("grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-gradient-to-br text-2xl", s.gradient)}>{s.emoji}</span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <h2 className="truncate font-bold text-white">{s.name}</h2>
+                  <span className="shrink-0 text-xs text-slate-400">{p.stars}/{p.maxStars} ⭐</span>
+                </div>
+                <ProgressBar value={p.ratio} height="h-1.5" className="mt-1.5" barClassName={clsx("bg-gradient-to-r", s.gradient)} />
+                <p className="mt-1 text-xs text-slate-500">{p.done}/{p.total} chapitres</p>
+              </div>
+              <ChevronRight size={18} className="shrink-0 text-slate-600 transition group-hover:translate-x-0.5 group-hover:text-slate-300" />
             </Link>
           );
         })}
