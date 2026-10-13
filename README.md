@@ -171,3 +171,15 @@ pourront tourner telles quelles côté serveur.
   et évite les énoncés déjà vus (mémoire locale `questbac-seen`, 500 derniers par chapitre).
 - Les boss, le mode « Mélange de tout le niveau » et la Forge en mode démo utilisent ces générateurs.
 - Test : 10 missions de 10 questions par chapitre donnent 100 énoncés tous différents.
+
+## Notifications push
+
+- L'appli est une **PWA** (`app/manifest.ts`, icônes dans `public/`, service worker `public/sw.js`).
+- Le joueur connecté active les notifications depuis l'accueil ou le profil. Sur iPhone (iOS 16.4+),
+  il faut d'abord ajouter l'appli à l'écran d'accueil depuis Safari et l'ouvrir depuis l'icône.
+- Envois automatiques : nouveau défi, adversaire qui a joué son tour ou résultat de duel disponible,
+  nouvel ami, et chaque soir (Vercel Cron, `vercel.json`, 17 h UTC) rappel si la série de jours va se
+  perdre ou si des duels attendent. Un seul rappel par joueur et par jour.
+- Clés VAPID : `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` si définies, sinon dérivées du secret de session
+  (rien à configurer). `CRON_SECRET` (facultatif) protège la route `/api/cron/reminders`.
+- Données serveur : hash `pushsubs` (abonnements par compte, 5 appareils max), `reminded:<id>`.

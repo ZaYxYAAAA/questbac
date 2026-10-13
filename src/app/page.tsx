@@ -6,6 +6,7 @@ import { ArrowRight, CheckCircle2, Gift, Lock, Swords } from "lucide-react";
 import { XpBarChart } from "@/components/game/Charts";
 import { Avatar } from "@/components/game/Avatar";
 import { DailyChest } from "@/components/game/DailyChest";
+import { NotificationsCard } from "@/components/layout/NotificationsCard";
 import { LeagueCard, LeagueResultBanner } from "@/components/game/LeagueCard";
 import { NewsFeed } from "@/components/game/NewsFeed";
 import { PlayerTitle } from "@/components/game/PlayerTitle";
@@ -77,6 +78,7 @@ export default function HomePage() {
       </section>
 
       <LeagueResultBanner />
+      <NotificationsCard variant="home" />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2"><DailyChest /></div>

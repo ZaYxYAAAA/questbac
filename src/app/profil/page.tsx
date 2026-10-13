@@ -13,6 +13,7 @@ import { RankEmblem } from "@/components/game/RankEmblem";
 import { RankBadge } from "@/components/game/RankBadge";
 import { Button } from "@/components/ui/Button";
 import { Card, SectionTitle } from "@/components/ui/Card";
+import { NotificationsCard } from "@/components/layout/NotificationsCard";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { LEVELS, levelLabel, subjectsForLevel } from "@/lib/content/curriculum";
 import { ACHIEVEMENTS } from "@/lib/game/achievements";
@@ -120,6 +121,8 @@ export default function ProfilePage() {
       </Card>
 
       <AccountSection />
+
+      <NotificationsCard variant="settings" />
 
       <Card>
         <SectionTitle icon={<span>⚙️</span>}>Réglages</SectionTitle>

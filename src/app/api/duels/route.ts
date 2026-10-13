@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { z } from "zod";
 import { clientKey, rateLimit } from "@/lib/ai/rate-limit";
 import { DUEL_THEMES } from "@/lib/game/duel";
@@ -5,6 +6,7 @@ import { currentSession, jsonError, readJson, storageDown } from "@/lib/server/a
 import { publicPlayerId } from "@/lib/server/auth";
 import { createDuel, listDuels, opponentProfiles, viewDuel } from "@/lib/server/duels";
 import { friendIds } from "@/lib/server/friends";
+import { sendPush } from "@/lib/server/push";
 import { getStore } from "@/lib/server/store";
 import type { PublicProfile } from "@/lib/game/save";
 
@@ -47,6 +49,7 @@ export async function POST(req: Request) {
     if (!friend) return jsonError("Tu ne peux défier que tes amis.", 403);
     const [profile] = await getStore().hmget<PublicProfile>("players", [friend]);
     const duel = await createDuel({ uid: session.uid, pseudo: session.pseudo }, { uid: friend, pseudo: profile?.pseudo ?? "Ami" }, parsed.data.chapterId);
+    after(() => sendPush(friend, { title: "⚔️ Nouveau défi !", body: `${session.pseudo} te défie : ${duel.chapterTitle}. 10 questions éclair, à toi de jouer !`, url: `/duels/${duel.id}`, tag: `duel-${duel.id}` }));
     return Response.json({ id: duel.id }, { status: 201, headers: NO_STORE });
   } catch (error) {
     return storageDown(error);

@@ -19,6 +19,7 @@ import { playerFrame } from "@/lib/game/ranks";
 import { useCloud, useCloudSync } from "@/lib/store/cloud-sync";
 import { useGame, useHydrated } from "@/lib/store/game-store";
 import { usePlayersSync } from "@/lib/store/players-store";
+import { initPush } from "@/lib/push-client";
 
 const NAV = [
   { href: "/", label: "Accueil", icon: Home },
@@ -81,6 +82,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (hydrated) refresh();
   }, [hydrated, refresh, pathname]);
+
+  // Service worker + état des notifications (une fois la session connue).
+  const userId = useCloud((s) => s.user?.id ?? null);
+  useEffect(() => {
+    if (cloudChecked) void initPush();
+  }, [cloudChecked, userId]);
 
   // Fin de l'onboarding : l'accueil s'affiche depuis le haut, pas à la hauteur du formulaire.
   const onboarding = useRef(false);

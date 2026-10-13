@@ -1,7 +1,9 @@
+import { after } from "next/server";
 import { z } from "zod";
 import { clientKey, rateLimit } from "@/lib/ai/rate-limit";
 import { normalizeFriendCode } from "@/lib/friend-code";
 import { currentSession, jsonError, readJson, storageDown } from "@/lib/server/accounts";
+import { sendPush } from "@/lib/server/push";
 import { accountIdForCode, addFriendship, friendCodeOf, friendProfiles, registerFriendCode, removeFriendship } from "@/lib/server/friends";
 
 export const runtime = "nodejs";
@@ -44,6 +46,7 @@ export async function POST(req: Request) {
     if (result === "self") return jsonError("C'est ton propre code !", 400);
     if (result === "full") return jsonError("Limite de 100 amis atteinte.", 409);
     const friends = await friendProfiles(session.uid);
+    if (result === "added") after(() => sendPush(other, { title: "👥 Nouvel ami", body: `${session.pseudo} t'a ajouté(e) en ami. Lance-lui un défi !`, url: "/amis", tag: "friends" }));
     return Response.json({ result, friends }, { headers: NO_STORE });
   } catch (error) {
     return storageDown(error);
