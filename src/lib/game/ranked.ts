@@ -8,7 +8,7 @@
 import { SUBJECTS, subjectsForLevel } from "@/lib/content/curriculum";
 import type { Level, Question, SubjectId } from "@/lib/types";
 import { LEAGUE_MIN_SIZE, promotionSpots, relegationSpots, weekEnd } from "./league";
-import { weekKey } from "./progression";
+import { dayKey, weekKey } from "./progression";
 import { RANK_STEPS, stepIndex } from "./ranks";
 
 export type RankedSubject = SubjectId | "general";
@@ -95,6 +95,7 @@ export function parisDate(now = new Date()): Date {
 }
 
 export const rankedWeek = (now = new Date()) => weekKey(parisDate(now));
+export const rankedDay = (now = new Date()) => dayKey(parisDate(now));
 /** Millisecondes avant la fin de la semaine classée (lundi 0 h, heure de Paris). */
 export function msUntilWeekEnd(now = new Date()): number {
   const p = parisDate(now);
@@ -116,7 +117,7 @@ export function seasonLabel(key: string): string {
 
 // ─────────────────────────── Profil classé ───────────────────────────
 
-export type WeekZone = "promotion" | "objective" | "safe" | "relegation" | "unranked" | "inactive";
+export type WeekZone = "promotion" | "objective" | "safe" | "relegation" | "unranked" | "inactive" | "review";
 
 export interface WeekResult {
   week: string;
@@ -154,6 +155,11 @@ export interface RankedProfile {
   active?: string;
   /** Empreintes des dernières questions posées (pas de répétition d'une manche à l'autre). */
   seen?: string[];
+  /** Jour (Paris) du dernier joker utilisé. */
+  jokerDay?: string;
+  /** Manche perdue par sortie de l'appli, en attente (joker possible). */
+  pendingLoss?: string;
+  integrity?: Integrity;
 }
 
 export function newSubjectRank(week: string, step = 0, placed = false): SubjectRank {
@@ -285,8 +291,10 @@ export function settleWeeks(profiles: Record<string, RankedProfile>, now = new D
         .filter((x): x is readonly [string, SubjectRank] => !!x[1] && x[1].placed && x[1].week === week && x[1].settled !== week && x[1].played > 0)
         .map(([id, r]) => entryOf(id, r));
       for (const group of formGroups(entries)) {
-        for (const [id, res] of settleGroup(group, week)) {
+        for (const [id, raw] of settleGroup(group, week)) {
           const r = get(id).subjects[s]!;
+          // Compte en vérification : pas de promotion tant que les alertes sont récentes.
+          const res = raw.to > raw.from && underReview(get(id).integrity, now.getTime()) ? { ...raw, zone: "review" as const, to: raw.from } : raw;
           put(id, s, { ...r, step: res.to, peak: Math.max(r.peak, res.to), settled: week, last: res });
         }
       }
@@ -315,4 +323,97 @@ export function publicQuestion(q: Question): Question {
   if (q.type === "mcq") return { ...q, answer: -1, explanation: "" };
   if (q.type === "truefalse") return { ...q, answer: false, explanation: "" };
   return { id: q.id, type: "numeric", prompt: q.prompt, unit: q.unit, difficulty: q.difficulty, answer: 0, explanation: "" };
+}
+
+// ─────────────────────────── Anti-triche : présence ───────────────────────────
+
+/** Le téléphone signale sa présence toutes les 5 s pendant une manche. */
+export const BEAT_MS = 5000;
+/** Sans signal pendant ce temps, on considère que le joueur a quitté l'appli. */
+export const BEAT_GAP_MS = 12_000;
+/** Absence au-delà de laquelle la manche est perdue d'office. */
+export const AWAY_MAX_MS = 10_000;
+/** Nombre de sorties qui font perdre la manche. */
+export const MAX_EXITS = 2;
+
+export interface Presence {
+  exits: number;
+  hiddenAt?: number;
+  lastBeat: number;
+}
+
+export type PresenceEvent = "hidden" | "visible" | "beat";
+
+export type PresenceOutcome =
+  /** Rien à signaler. */
+  | { kind: "ok" }
+  /** Sortie : la question en cours compte fausse. */
+  | { kind: "strike"; exits: number }
+  /** Manche perdue (deuxième sortie ou absence trop longue). */
+  | { kind: "lost"; reason: string };
+
+/**
+ * Applique un signal de présence. Une sortie est comptée à l'événement
+ * « hidden » (l'appli passe en arrière-plan), ou quand les signaux se sont
+ * interrompus (événement bloqué, appli tuée…). Revenir après plus de 10 s,
+ * ou sortir une deuxième fois, fait perdre la manche.
+ */
+export function applyPresence(p: Presence, event: PresenceEvent, now: number): { presence: Presence; outcome: PresenceOutcome } {
+  const gap = now - p.lastBeat;
+  let presence: Presence = { ...p, lastBeat: now };
+  // Signaux interrompus sans « hidden » : absence de toute la durée du trou.
+  if (event !== "hidden" && p.hiddenAt === undefined && gap > BEAT_GAP_MS) {
+    return { presence: { ...presence, exits: p.exits + 1 }, outcome: { kind: "lost", reason: "Signal perdu : l'appli a été quittée" } };
+  }
+  if (event === "hidden") {
+    if (p.hiddenAt !== undefined) return { presence: { ...presence, lastBeat: p.lastBeat }, outcome: { kind: "ok" } };
+    const exits = p.exits + 1;
+    presence = { ...presence, exits, hiddenAt: now };
+    return { presence, outcome: exits >= MAX_EXITS ? { kind: "lost", reason: "Deuxième sortie de l'appli" } : { kind: "strike", exits } };
+  }
+  // Retour (ou signal reçu alors que l'appli était cachée).
+  if (p.hiddenAt !== undefined) {
+    const away = now - p.hiddenAt;
+    presence = { exits: p.exits, lastBeat: now };
+    if (away > AWAY_MAX_MS) return { presence, outcome: { kind: "lost", reason: `Absent ${Math.round(away / 1000)} s pendant la manche` } };
+  }
+  return { presence, outcome: { kind: "ok" } };
+}
+
+// ─────────────────────────── Anti-triche : comportements suspects ───────────────────────────
+
+/**
+ * Manche suspecte : beaucoup de bonnes réponses données bien plus vite qu'il
+ * n'est possible de lire l'énoncé, ou des temps de réponse quasi identiques.
+ */
+export function suspicion(questions: Pick<Question, "prompt" | "type">[], results: boolean[], times: number[]): string | null {
+  const answered = times.map((t, i) => ({ t, ok: results[i], len: questions[i]?.prompt.length ?? 0 })).filter((x) => x.t > 0);
+  const correct = answered.filter((x) => x.ok);
+  if (correct.length < 7) return null;
+  // Lecture minimale : environ 25 caractères par seconde, au moins 0,8 s.
+  const tooFast = correct.filter((x) => x.t < Math.max(800, (x.len / 25) * 1000 * 0.35)).length;
+  if (tooFast >= 6) return `${tooFast} bonnes réponses plus rapides que la lecture de l'énoncé`;
+  const ts = correct.map((x) => x.t);
+  const mean = ts.reduce((s, t) => s + t, 0) / ts.length;
+  const sd = Math.sqrt(ts.reduce((s, t) => s + (t - mean) ** 2, 0) / ts.length);
+  if (correct.length >= 9 && sd < 120) return "Temps de réponse identiques à chaque question";
+  return null;
+}
+
+/** Signalements et alertes qui bloquent les promotions (vérification). */
+export const REPORTS_FOR_REVIEW = 3;
+export const FLAGS_FOR_REVIEW = 3;
+export const REVIEW_WINDOW_MS = 14 * 86_400_000;
+
+export interface Integrity {
+  flags: { at: number; reason: string }[];
+  reports: { by: string; at: number }[];
+}
+
+/** Compte à vérifier : promotions bloquées tant que les alertes sont récentes. */
+export function underReview(i: Integrity | undefined, now = Date.now()): boolean {
+  if (!i) return false;
+  const flags = i.flags.filter((f) => now - f.at < REVIEW_WINDOW_MS).length;
+  const reporters = new Set(i.reports.filter((r) => now - r.at < REVIEW_WINDOW_MS).map((r) => r.by)).size;
+  return flags >= FLAGS_FOR_REVIEW || reporters >= REPORTS_FOR_REVIEW;
 }

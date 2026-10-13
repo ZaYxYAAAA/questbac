@@ -1,6 +1,6 @@
 import { isRankedSubject } from "@/lib/game/ranked";
 import { currentSession, jsonError, storageDown } from "@/lib/server/accounts";
-import { activeMatch, groupFor, loadProfile, profileViews, settleIfNeeded, weekInfo } from "@/lib/server/ranked";
+import { activeMatch, groupFor, loadProfile, pendingLossInfo, profileViews, settleIfNeeded, weekInfo } from "@/lib/server/ranked";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +17,7 @@ export async function GET(req: Request) {
   try {
     await settleIfNeeded();
     const { profile, level } = await loadProfile(session.uid, session.pseudo);
-    const [group, active] = await Promise.all([groupFor(session.uid, subject), activeMatch(session.uid, session.pseudo)]);
+    const [group, active, pendingLoss] = await Promise.all([groupFor(session.uid, subject), activeMatch(session.uid, session.pseudo), pendingLossInfo(profile)]);
     return Response.json(
       {
         level,
@@ -26,6 +26,7 @@ export async function GET(req: Request) {
         group: group.rows,
         top: group.top,
         players: group.players,
+        pendingLoss,
         active: active ? { id: active.id, subject: active.subject, index: active.index, total: active.questions.length } : null,
         seasons: profile.seasons ?? {},
         season: profile.season,

@@ -4,6 +4,13 @@ import { questionKey } from "@/lib/content/generated";
 import { rankedQuestions } from "@/lib/content/ranked-questions";
 import {
   type GroupEntry,
+  type Integrity,
+  type Presence,
+  type PresenceEvent,
+  type PresenceOutcome,
+  applyPresence,
+  rankedDay,
+  suspicion,
   LATENCY_GRACE_MS,
   MATCH_SIZE,
   PLACEMENT_MATCHES,
@@ -70,15 +77,27 @@ export interface StoredMatch {
   score?: number;
   /** Fin anticipée (abandon, nouvelle manche lancée…). */
   forfeit?: string;
+  /** Présence du joueur (anti-triche). */
+  presence?: Presence;
+  /** Questions comptées fausses parce que le joueur a quitté l'appli. */
+  voided?: number[];
+  /** Manche perdue par sortie de l'appli (0 point, joker possible). */
+  exitLoss?: boolean;
+  /** Manche annulée par le joker du jour. */
+  annulled?: boolean;
 }
 
 export interface MatchResult {
+  matchId: string;
   subject: RankedSubject;
   score: number;
   results: boolean[];
   points: number[];
   forfeit?: string;
   rank: RankView;
+  /** Perdue en quittant l'appli : le joker du jour peut l'annuler. */
+  exitLoss?: boolean;
+  jokerAvailable?: boolean;
 }
 
 export interface RankView {
@@ -222,6 +241,8 @@ export async function startMatch(uid: string, pseudo: string, subject: RankedSub
   await settleIfNeeded(now);
   let { profile, level } = await loadProfile(uid, pseudo, now);
   if (!rankedSubjectsFor(level).includes(subject)) throw new Error("Matière indisponible pour ton niveau.");
+  // Manche perdue en quittant l'appli et laissée sans réponse au joker : elle compte (0 point).
+  if (profile.pendingLoss) profile = await settlePendingLoss(uid, profile, false, now);
   // Une manche laissée en plan compte telle quelle (pas de « je relance si ça se passe mal »).
   if (profile.active) {
     const old = await getMatch(profile.active);
@@ -230,7 +251,21 @@ export async function startMatch(uid: string, pseudo: string, subject: RankedSub
   const id = newId();
   const step = currentRank(profile.subjects[subject], now)?.step ?? 0;
   const questions = rankedQuestions(subject, level, `${uid}:${id}`, new Set(profile.seen ?? []));
-  const match: StoredMatch = { id, uid, subject, level, step, questions, index: 0, servedAt: now.getTime(), results: [], points: [], times: [], startedAt: now.getTime() };
+  const match: StoredMatch = {
+    id,
+    uid,
+    subject,
+    level,
+    step,
+    questions,
+    index: 0,
+    servedAt: now.getTime(),
+    results: [],
+    points: [],
+    times: [],
+    startedAt: now.getTime(),
+    presence: { exits: 0, lastBeat: now.getTime() },
+  };
   await saveMatch(match);
   profile = { ...profile, active: id, seen: [...(profile.seen ?? []), ...questions.map(questionKey)].slice(-SEEN_KEPT) };
   await putProfile(uid, profile);
@@ -238,19 +273,23 @@ export async function startMatch(uid: string, pseudo: string, subject: RankedSub
 }
 
 /** Envoie la question suivante (le chrono démarre maintenant). */
-export async function serveNext(m: StoredMatch, now = Date.now()) {
+export async function serveNext(m: StoredMatch, pseudo: string, now = Date.now()) {
   if (m.finishedAt) throw new Error("Manche terminée.");
+  const check = await presenceEvent(m, "beat", pseudo, new Date(now));
+  if (check.outcome.kind === "lost") return { lost: check };
   if (m.servedAt === null) {
     m.servedAt = now;
     await saveMatch(m);
   }
-  return servedQuestion(m, now);
+  return { served: servedQuestion(m, now) };
 }
 
 /** Corrige une réponse ; la manche se termine après la dernière question. */
 export async function answerQuestion(m: StoredMatch, index: number, given: unknown, pseudo: string, now = new Date()) {
   if (m.finishedAt) throw new Error("Manche terminée.");
   if (index !== m.index || m.servedAt === null) throw new Error("Question inattendue.");
+  const check = await presenceEvent(m, "beat", pseudo, now);
+  if (check.outcome.kind !== "ok") return { lost: check };
   const q = m.questions[index];
   const limit = secondsFor(m.step, q) * 1000;
   const elapsed = now.getTime() - m.servedAt;
@@ -266,11 +305,11 @@ export async function answerQuestion(m: StoredMatch, index: number, given: unkno
   const reply = { correct, timedOut: !inTime, points, question: q, done: m.index >= m.questions.length };
   if (!reply.done) {
     await saveMatch(m);
-    return { ...reply, result: null };
+    return { reply: { ...reply, result: null } };
   }
   const { profile } = await loadProfile(m.uid, pseudo, now);
   const { result } = await finishMatch(m, profile, undefined, now);
-  return { ...reply, result };
+  return { reply: { ...reply, result } };
 }
 
 /** Termine une manche (questions restantes comptées fausses) et l'inscrit dans la semaine. */
@@ -286,10 +325,13 @@ export async function finishMatch(m: StoredMatch, profile: RankedProfile, forfei
   m.score = matchScore(m.points);
   if (forfeit) m.forfeit = forfeit;
   await saveMatch(m);
-  const { profile: next } = recordMatch(profile, m.subject, m.score, now);
+  const { profile: recorded } = recordMatch(profile, m.subject, m.score, now);
+  const flag = forfeit ? null : suspicion(m.questions, m.results, m.times);
+  const next = flag ? { ...recorded, integrity: withFlag(recorded.integrity, { at: now.getTime(), reason: flag }) } : recorded;
   const saved = { ...next, active: next.active === m.id ? undefined : next.active };
   await putProfile(m.uid, saved);
   const result: MatchResult = {
+    matchId: m.id,
     subject: m.subject,
     score: m.score,
     results: m.results,
@@ -336,3 +378,173 @@ export async function generalStep(uid: string): Promise<number | null> {
 }
 
 export { MATCH_SIZE };
+
+// ─────────────────────────── Anti-triche ───────────────────────────
+
+const withFlag = (i: Integrity | undefined, flag: Integrity["flags"][number]): Integrity => ({
+  flags: [...(i?.flags ?? []), flag].slice(-20),
+  reports: i?.reports ?? [],
+});
+
+export interface PresenceReply {
+  outcome: PresenceOutcome;
+  exits: number;
+  /** La question en cours a été comptée fausse (sortie). */
+  voided: boolean;
+  /** La manche est finie (dernière question annulée, ou perdue). */
+  result: MatchResult | null;
+  /** Question en cours côté serveur (le téléphone rattrape une question annulée pendant son absence). */
+  index: number;
+}
+
+/** Perd la manche (0 point) ; elle n'est inscrite qu'après le choix du joker. */
+async function loseByExit(m: StoredMatch, reason: string, now: Date): Promise<MatchResult> {
+  while (m.results.length < m.questions.length) {
+    m.results.push(false);
+    m.points.push(0);
+    m.times.push(0);
+  }
+  m.index = m.questions.length;
+  m.servedAt = null;
+  m.finishedAt = now.getTime();
+  m.score = 0;
+  m.forfeit = reason;
+  m.exitLoss = true;
+  await saveMatch(m);
+  const [stored] = await getStore().hmget<RankedProfile>(HASH, [m.uid]);
+  const p = stored;
+  if (p) await putProfile(m.uid, { ...p, active: p.active === m.id ? undefined : p.active, pendingLoss: m.id });
+  return {
+    matchId: m.id,
+    subject: m.subject,
+    score: 0,
+    results: m.results,
+    points: m.points,
+    forfeit: reason,
+    exitLoss: true,
+    jokerAvailable: p?.jokerDay !== rankedDay(now),
+    rank: rankView(m.subject, p?.subjects[m.subject], now),
+  };
+}
+
+/**
+ * Signal de présence du téléphone : sortie (la question en cours compte
+ * fausse), retour, ou simple battement. Deux sorties, ou plus de 10 s dehors,
+ * font perdre la manche.
+ */
+export async function presenceEvent(m: StoredMatch, event: PresenceEvent, pseudo: string, now = new Date(), awayMs = 0): Promise<PresenceReply> {
+  let before = m.presence ?? { exits: 0, lastBeat: m.servedAt ?? m.startedAt };
+  // Manche déjà finie (perdue pendant l'absence, signal parti par sendBeacon) : le téléphone découvre le résultat.
+  if (m.finishedAt) return { outcome: m.exitLoss ? { kind: "lost", reason: m.forfeit ?? "Sortie de l'appli" } : { kind: "ok" }, exits: before.exits, voided: false, result: await storedResult(m, now), index: m.index };
+  // Retour annoncé par le téléphone alors que le signal de sortie n'est jamais arrivé.
+  if (event === "visible" && before.hiddenAt === undefined && awayMs > 500) {
+    const hidden = applyPresence(before, "hidden", now.getTime() - Math.min(awayMs, 3_600_000));
+    if (hidden.outcome.kind === "lost") {
+      m.presence = hidden.presence;
+      return { outcome: hidden.outcome, exits: hidden.presence.exits, voided: false, result: await loseByExit(m, hidden.outcome.reason, now), index: m.index };
+    }
+    before = hidden.presence;
+    if (hidden.outcome.kind === "strike") {
+      const back = applyPresence(before, "visible", now.getTime());
+      if (back.outcome.kind === "lost") {
+        m.presence = back.presence;
+        return { outcome: back.outcome, exits: back.presence.exits, voided: false, result: await loseByExit(m, back.outcome.reason, now), index: m.index };
+      }
+      m.presence = back.presence;
+      return voidCurrent(m, hidden.outcome, back.presence.exits, pseudo, now);
+    }
+  }
+  const { presence, outcome } = applyPresence(before, event, now.getTime());
+  m.presence = presence;
+  if (outcome.kind === "lost") return { outcome, exits: presence.exits, voided: false, result: await loseByExit(m, outcome.reason, now), index: m.index };
+  if (outcome.kind === "strike") return voidCurrent(m, outcome, presence.exits, pseudo, now);
+  await saveMatch(m);
+  return { outcome, exits: presence.exits, voided: false, result: null, index: m.index };
+}
+
+/** Sortie : la question en cours (s'il y en a une) compte fausse. */
+async function voidCurrent(m: StoredMatch, outcome: PresenceOutcome, exits: number, pseudo: string, now: Date): Promise<PresenceReply> {
+  if (m.servedAt !== null) {
+    const limit = secondsFor(m.step, m.questions[m.index]) * 1000;
+    m.voided = [...(m.voided ?? []), m.index];
+    m.results.push(false);
+    m.points.push(0);
+    m.times.push(limit);
+    m.index += 1;
+    m.servedAt = null;
+    if (m.index >= m.questions.length) {
+      const { profile } = await loadProfile(m.uid, pseudo, now);
+      const { result } = await finishMatch(m, profile, undefined, now);
+      return { outcome, exits, voided: true, result, index: m.index };
+    }
+    await saveMatch(m);
+    return { outcome, exits, voided: true, result: null, index: m.index };
+  }
+  await saveMatch(m);
+  return { outcome, exits, voided: false, result: null, index: m.index };
+}
+
+/** Résultat d'une manche déjà terminée. */
+async function storedResult(m: StoredMatch, now: Date): Promise<MatchResult> {
+  const [p] = await getStore().hmget<RankedProfile>(HASH, [m.uid]);
+  const pending = !!p && p.pendingLoss === m.id;
+  return {
+    matchId: m.id,
+    subject: m.subject,
+    score: m.score ?? 0,
+    results: m.results,
+    points: m.points,
+    ...(m.forfeit ? { forfeit: m.forfeit } : {}),
+    ...(m.exitLoss && pending ? { exitLoss: true, jokerAvailable: p.jokerDay !== rankedDay(now) } : {}),
+    rank: rankView(m.subject, p?.subjects[m.subject], now),
+  };
+}
+
+/** Manche perdue en quittant l'appli : joker (annulée, une fois par jour) ou 0 point inscrit. */
+async function settlePendingLoss(uid: string, profile: RankedProfile, useJoker: boolean, now: Date): Promise<RankedProfile> {
+  const id = profile.pendingLoss;
+  if (!id) return profile;
+  const m = await getMatch(id);
+  const today = rankedDay(now);
+  let next: RankedProfile = { ...profile, pendingLoss: undefined };
+  if (m && useJoker && profile.jokerDay !== today) {
+    m.annulled = true;
+    await saveMatch(m);
+    next = { ...next, jokerDay: today };
+  } else if (m) {
+    next = recordMatch(next, m.subject, 0, now).profile;
+  }
+  await putProfile(uid, next);
+  return next;
+}
+
+export async function resolvePendingLoss(uid: string, pseudo: string, matchId: string, useJoker: boolean, now = new Date()) {
+  const { profile } = await loadProfile(uid, pseudo, now);
+  if (profile.pendingLoss !== matchId) throw new Error("Rien à annuler pour cette manche.");
+  if (useJoker && profile.jokerDay === rankedDay(now)) throw new Error("Joker du jour déjà utilisé.");
+  const m = await getMatch(matchId);
+  const next = await settlePendingLoss(uid, profile, useJoker, now);
+  return { annulled: useJoker, rank: m ? rankView(m.subject, next.subjects[m.subject], now) : null };
+}
+
+/** Manche perdue en attente de décision (affichée si le joueur revient plus tard). */
+export async function pendingLossInfo(profile: RankedProfile, now = new Date()) {
+  if (!profile.pendingLoss) return null;
+  const m = await getMatch(profile.pendingLoss);
+  if (!m) return null;
+  return { id: m.id, subject: m.subject, reason: m.forfeit ?? "Sortie de l'appli", jokerAvailable: profile.jokerDay !== rankedDay(now) };
+}
+
+/** Signalement d'un joueur (un par joueur signalant). */
+export async function reportPlayer(reporterUid: string, publicId: string, now = Date.now()) {
+  const store = getStore();
+  const all = await store.hgetall<RankedProfile>(HASH);
+  const uid = Object.keys(all).find((id) => publicPlayerId(id) === publicId);
+  if (!uid) throw new Error("Joueur introuvable.");
+  if (uid === reporterUid) throw new Error("Tu ne peux pas te signaler toi-même.");
+  const p = all[uid];
+  const i = p.integrity ?? { flags: [], reports: [] };
+  if (i.reports.some((r) => r.by === reporterUid)) return { already: true };
+  await putProfile(uid, { ...p, integrity: { ...i, reports: [...i.reports, { by: reporterUid, at: now }].slice(-50) } });
+  return { already: false };
+}

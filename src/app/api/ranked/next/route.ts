@@ -16,7 +16,8 @@ export async function POST(req: Request) {
     const m = await getMatch(id);
     if (!m || m.uid !== session.uid) return jsonError("Manche introuvable.", 404);
     if (m.finishedAt) return jsonError("Manche terminée.", 409);
-    return Response.json({ next: await serveNext(m) }, { headers: { "Cache-Control": "no-store" } });
+    const r = await serveNext(m, session.pseudo);
+    return Response.json("lost" in r ? { lost: r.lost } : { next: r.served }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return storageDown(error);
   }

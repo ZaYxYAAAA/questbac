@@ -2,13 +2,24 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { Flag, RotateCcw, Timer } from "lucide-react";
+import { AlertTriangle, Flag, RotateCcw, Timer } from "lucide-react";
 import { QuestionCard } from "@/components/game/QuestionCard";
 import { celebrate } from "@/components/game/RewardScreen";
 import { Button } from "@/components/ui/Button";
-import { MATCH_SIZE, PLACEMENT_MATCHES, type RankedSubject, rankedSubjectMeta } from "@/lib/game/ranked";
+import { BEAT_MS, MATCH_SIZE, PLACEMENT_MATCHES, type RankedSubject, rankedSubjectMeta } from "@/lib/game/ranked";
 import type { GivenAnswer } from "@/lib/game/session";
-import { type AnswerReply, type MatchResult, type ServedQuestion, answerRanked, forfeitRanked, nextRanked } from "@/lib/store/ranked-store";
+import {
+  type AnswerReply,
+  type MatchResult,
+  type PresenceReply,
+  type ServedQuestion,
+  answerRanked,
+  beaconHidden,
+  forfeitRanked,
+  jokerRanked,
+  nextRanked,
+  presenceRanked,
+} from "@/lib/store/ranked-store";
 import { useToasts } from "@/lib/store/toast-store";
 import { RankedBadge } from "./RankedBadge";
 
@@ -31,8 +42,82 @@ export function RankedMatch({ start, onClose, onReplay }: { start: MatchStart; o
   const [timedOut, setTimedOut] = useState(false);
   const [remaining, setRemaining] = useState(start.seconds - start.elapsedMs / 1000);
   const [busy, setBusy] = useState(false);
+  const [warning, setWarning] = useState<string | null>(null);
   const receivedAt = useRef(Date.now() - start.elapsedMs);
   const answered = useRef(false);
+  const finished = useRef(false);
+  finished.current = result !== null;
+
+  /** Fin de manche imposée par le serveur (perdue en quittant l'appli, ou dernière question annulée). */
+  const endWith = useCallback((r: MatchResult) => {
+    finished.current = true;
+    setReply(null);
+    setResult(r);
+  }, []);
+
+  const loadNext = useCallback(async () => {
+    const n = await nextRanked(start.id);
+    if ("lost" in n) {
+      if (n.lost.result) endWith(n.lost.result);
+      return;
+    }
+    receivedAt.current = Date.now() - n.next.elapsedMs;
+    setReply(null);
+    setServed(n.next);
+  }, [start.id, endWith]);
+
+  const servedIndex = useRef(start.index);
+  servedIndex.current = served.index;
+  const knownExits = useRef(0);
+
+  /**
+   * Réponse du serveur à un signal de présence. La sortie elle-même part par
+   * sendBeacon (sans réponse) : on la constate au retour, quand le nombre de
+   * sorties a augmenté et que la question en cours a été annulée.
+   */
+  const onPresence = useCallback(
+    (p: PresenceReply) => {
+      if (p.result) return endWith(p.result);
+      if (p.exits > knownExits.current) {
+        knownExits.current = p.exits;
+        setWarning("Tu as quitté l'appli : la question en cours compte fausse. Encore une sortie et la manche est perdue.");
+      }
+      if (p.index > servedIndex.current) {
+        answered.current = true;
+        setResults((x) => [...x, false]);
+        void loadNext();
+      }
+    },
+    [endWith, loadNext],
+  );
+
+  // Anti-triche : sortie de l'appli (arrière-plan, autre appli, écran verrouillé) et signal de présence.
+  useEffect(() => {
+    let hiddenAt: number | null = null;
+    const onHide = () => {
+      if (finished.current || hiddenAt !== null) return;
+      hiddenAt = Date.now();
+      beaconHidden(start.id);
+    };
+    const onShow = () => {
+      if (finished.current || hiddenAt === null) return;
+      const away = Date.now() - hiddenAt;
+      hiddenAt = null;
+      presenceRanked(start.id, "visible", away).then(onPresence).catch(() => {});
+    };
+    const onVisibility = () => (document.visibilityState === "hidden" ? onHide() : onShow());
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onHide);
+    const beat = setInterval(() => {
+      if (finished.current || document.visibilityState === "hidden") return;
+      presenceRanked(start.id, "beat").then(onPresence).catch(() => {});
+    }, BEAT_MS);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onHide);
+      clearInterval(beat);
+    };
+  }, [start.id, onPresence]);
 
   // Chrono de la question en cours (le serveur garde le sien, celui-ci n'est qu'un affichage).
   useEffect(() => {
@@ -54,7 +139,12 @@ export function RankedMatch({ start, onClose, onReplay }: { start: MatchStart; o
     async (given: GivenAnswer) => {
       answered.current = true;
       try {
-        const r = await answerRanked(start.id, served.index, given);
+        const res = await answerRanked(start.id, served.index, given);
+        if ("lost" in res) {
+          if (res.lost.result) endWith(res.lost.result);
+          throw new Error("Manche perdue");
+        }
+        const r = res;
         setReply(r);
         setResults((x) => [...x, r.correct]);
         setScore((s) => s + r.points);
@@ -62,11 +152,11 @@ export function RankedMatch({ start, onClose, onReplay }: { start: MatchStart; o
         return { correct: r.correct, question: r.question };
       } catch (e) {
         answered.current = false;
-        useToasts.getState().push({ emoji: "⚠️", title: "Réponse non envoyée", body: e instanceof Error ? e.message : undefined, tone: "rose" });
+        if (!finished.current) useToasts.getState().push({ emoji: "⚠️", title: "Réponse non envoyée", body: e instanceof Error ? e.message : undefined, tone: "rose" });
         throw e;
       }
     },
-    [start.id, served.index],
+    [start.id, served.index, endWith],
   );
   const onAnswered = useCallback(() => {}, []);
 
@@ -78,10 +168,7 @@ export function RankedMatch({ start, onClose, onReplay }: { start: MatchStart; o
     }
     setBusy(true);
     try {
-      const n = await nextRanked(start.id);
-      receivedAt.current = Date.now() - n.elapsedMs;
-      setReply(null);
-      setServed(n);
+      await loadNext();
     } catch (e) {
       useToasts.getState().push({ emoji: "⚠️", title: "Question suivante indisponible", body: e instanceof Error ? e.message : undefined, tone: "rose" });
     } finally {
@@ -103,6 +190,7 @@ export function RankedMatch({ start, onClose, onReplay }: { start: MatchStart; o
   };
 
   const showResult = result && !reply;
+  const dots = showResult ? result.results : results;
   const ratio = remaining / served.seconds;
 
   return (
@@ -133,11 +221,19 @@ export function RankedMatch({ start, onClose, onReplay }: { start: MatchStart; o
               key={i}
               className={clsx(
                 "h-1.5 flex-1 rounded-full",
-                i < results.length ? (results[i] ? "bg-emerald-400" : "bg-rose-500") : i === served.index && !showResult ? "bg-amber-300" : "bg-slate-800",
+                i < dots.length ? (dots[i] ? "bg-emerald-400" : "bg-rose-500") : i === served.index && !showResult ? "bg-amber-300" : "bg-slate-800",
               )}
             />
           ))}
         </div>
+
+        {warning && !showResult && (
+          <div role="alert" className="qb-shake mt-3 flex items-start gap-2 rounded-2xl border border-rose-500/50 bg-rose-500/15 p-3 text-sm text-rose-100">
+            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-rose-400" />
+            <span className="flex-1">{warning}</span>
+            <button type="button" onClick={() => setWarning(null)} className="text-xs font-bold text-rose-300">OK</button>
+          </div>
+        )}
 
         {!showResult && (
           <>
@@ -180,8 +276,62 @@ export function RankedMatch({ start, onClose, onReplay }: { start: MatchStart; o
 }
 
 function MatchSummary({ result, onClose, onReplay }: { result: MatchResult; onClose: () => void; onReplay: () => void }) {
+  const [joker, setJoker] = useState<"pending" | "used" | "accepted">(result.exitLoss ? "pending" : "accepted");
+  const [busy, setBusy] = useState(false);
   const r = result.rank;
   const good = result.results.filter(Boolean).length;
+
+  const decide = async (use: boolean) => {
+    setBusy(true);
+    try {
+      await jokerRanked(result.matchId, use);
+      setJoker(use ? "used" : "accepted");
+    } catch (e) {
+      useToasts.getState().push({ emoji: "⚠️", title: e instanceof Error ? e.message : "Erreur", tone: "rose" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (result.exitLoss && joker !== "accepted") {
+    return (
+      <div className="qb-pop mt-8 space-y-5 text-center">
+        <p className="text-6xl">{joker === "used" ? "🃏" : "🚪"}</p>
+        <div>
+          <p className="text-3xl font-black text-white">{joker === "used" ? "Manche annulée" : "Manche perdue"}</p>
+          <p className="mt-1 text-slate-400">{result.forfeit}</p>
+        </div>
+        {joker === "used" ? (
+          <p className="rounded-3xl border border-white/10 bg-slate-900/70 p-4 text-sm text-slate-300">Ton joker du jour a annulé cette manche : elle ne compte pas, ni en bien ni en mal. Reviens demain pour un nouveau joker.</p>
+        ) : (
+          <div className="space-y-3 rounded-3xl border border-rose-500/30 bg-rose-500/10 p-5 text-left text-sm text-slate-200">
+            <p>Quitter l&apos;appli pendant une manche la fait perdre (0 point dans ta semaine).</p>
+            {result.jokerAvailable ? (
+              <>
+                <p>Un appel, une fausse manip ? Tu as <b>un joker par jour</b> : il annule la manche sans pénalité, mais elle ne rapporte rien.</p>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button variant="gold" disabled={busy} onClick={() => decide(true)}>🃏 Utiliser mon joker</Button>
+                  <Button variant="secondary" disabled={busy} onClick={() => decide(false)}>Accepter le 0</Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p>Ton joker du jour est déjà utilisé.</p>
+                <Button variant="secondary" disabled={busy} onClick={() => decide(false)}>Compris</Button>
+              </>
+            )}
+          </div>
+        )}
+        {joker === "used" && (
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <Button variant="gold" className="py-3" onClick={onReplay}><RotateCcw size={16} /> Rejouer</Button>
+            <Button variant="secondary" className="py-3" onClick={onClose}>Terminer</Button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="qb-pop mt-8 space-y-5 text-center">
       <p className="text-6xl">{result.forfeit ? "🏳️" : result.score >= 80 ? "🏆" : result.score >= 50 ? "⚔️" : "💪"}</p>

@@ -30,8 +30,8 @@ missions IA sont remplacées par du contenu d'exemple (badge « Mode démo » da
 | 🗺️ **Carte** | 149 chapitres alignés sur les programmes officiels, dont ceux de 2026 (9 matières dont l'espagnol × 3 niveaux), chemin de progression, étoiles |
 | 🎯 **Missions** | Questions **générées à chaque partie** pour les 149 chapitres (valeurs tirées au hasard en sciences, grandes banques de connaissances ailleurs), sans retomber sur une question déjà vue ; QCM / vrai-faux / réponse numérique, combos, explications |
 | 💀 **Boss** | 18 boss (un par matière/niveau, plus El Toro Gramático en espagnol) : PV, 3 cœurs, chrono, coups critiques, phase « enragé », déblocage par chapitres |
-| 🏆 **Progression** | XP & niveaux, rangs Bronze → Légende avec divisions, séries de jours, 19 succès, 3 quêtes du jour + coffre |
-| 📊 **Classement** | Vrais joueurs uniquement : ligue de la semaine, amis, hebdomadaire, global (RP) et par classe |
+| 🏆 **Progression** | XP & niveaux, rangs Bronze → Légende avec divisions (gagnés en classé), séries de jours, 19 succès, 3 quêtes du jour + coffre |
+| ⚔️ **Classé** | Manches corrigées par le serveur, un rang par matière, groupes de la semaine et promotions le dimanche, anti-triche |
 | 🧪 **Labo** | 10 labos : traceur universel (paramètres animables, dérivée), affine, vecteurs & produit scalaire, second degré, sécante → tangente, cercle trigo, suites (toile d'araignée), exp/ln, intégrales (Riemann), loi binomiale |
 | 🎓 **Prof IA** | Fiche complète, express ou méthode sur n'importe quelle notion, en streaming, avec LaTeX ; bibliothèque, impression PDF, « Créer un QCM » depuis la fiche |
 | ⚒️ **Forge** | Photos du cours (appareil photo ou import, compressées côté client), texte collé, sujet ou création manuelle → fiche + questions ; éditeur complet des questions |
@@ -152,14 +152,32 @@ pourront tourner telles quelles côté serveur.
 - Une pastille ⚔️ dans l'en-tête signale les duels où c'est ton tour.
 - Données serveur : `duel:<id>` et `duels:<id de compte>` (40 derniers duels).
 
-## Ligue de la semaine
+## Mode classé
 
-- Plus aucun joueur simulé : classements, ligue et répartition des rangs ne montrent que les vrais inscrits.
-- La ligue réunit jusqu'à 20 joueurs, les plus proches de ton rang (RP). Il faut au moins
-  3 joueurs pour qu'elle compte. Places promues : 1 (3–4 joueurs), 2 (5–9), 3 (10+) ;
-  reléguées : 1 (6–9 joueurs), 3 (10+).
-- Les derniers scores connus du groupe sont gardés dans la sauvegarde (`league.rivals`) pour
-  calculer le résultat final au changement de semaine, même hors ligne.
+- Navigation à 5 onglets : Accueil, **Entraînement** (Carte, Boss, Forge, Labo, Prof IA : XP
+  seulement), **Classé** au centre, Social (Amis, Duels, fil d'actu), Profil.
+- Le rang ne se gagne qu'en classé. Un rang par matière et un rang **Général** (mélange des
+  matières du niveau). Placement en 5 manches par matière (jusqu'à Or III) ; le Général
+  reprend l'ancien rang (RP).
+- Manche : 10 questions tirées par le serveur, envoyées une à une, chronométrées (30 s en
+  Bronze → 15 s au sommet, +15 s en réponse libre) et corrigées par le serveur. 7 points par
+  bonne réponse + jusqu'à 3 pour la vitesse (sur 100).
+- Semaine (heure de Paris) : groupes de 20 joueurs max, de rangs voisins. Seules les
+  10 meilleures manches comptent, 3 au minimum pour être classé. Dimanche à minuit : le haut
+  du groupe monte d'une division, le bas descend (groupes de 6+) ; atteindre l'objectif de sa
+  division (moyenne ≥ 50 en Bronze … 95 en Légende sur 5 manches) fait aussi monter. Dès
+  Platine, une semaine sans jouer fait perdre une division.
+- Saisons = trimestres scolaires : meilleur rang conservé au profil, puis chacun redescend
+  d'un palier.
+- Anti-triche : sortie de l'appli détectée (`visibilitychange`, `pagehide`, envoi par
+  `sendBeacon`) et signal de présence toutes les 5 s. 1re sortie : la question compte fausse ;
+  2e sortie, plus de 10 s dehors ou signal coupé 12 s : manche perdue (0 point), avec un joker
+  par jour pour l'annuler. Texte non copiable. Manches suspectes (réponses plus rapides que la
+  lecture, temps identiques) et signalements de joueurs : à 3 alertes ou 3 signalements en
+  14 jours, les promotions sont bloquées.
+- Stockage : hash `ranked` (profil classé par compte), `rkm:<id>` (manche), `rk:settled:<semaine>`
+  (clôture faite une fois, aussi déclenchée par le cron quotidien). Le rang Général est recopié
+  dans la sauvegarde par le serveur (`rp`), qui fait foi.
 
 ## Questions générées
 

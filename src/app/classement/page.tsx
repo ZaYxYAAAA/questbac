@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
-import { Clock, Lock, Play, Swords } from "lucide-react";
+import { Clock, Flag, Lock, Play, Swords } from "lucide-react";
 import { Avatar } from "@/components/game/Avatar";
 import { FriendsBoard } from "@/components/game/FriendsBoard";
 import { RankLadder } from "@/components/game/RankLadder";
@@ -20,7 +20,7 @@ import { activeTierReward, playerFrame } from "@/lib/game/ranks";
 import { useCloud } from "@/lib/store/cloud-sync";
 import { useGame } from "@/lib/store/game-store";
 import { loadPlayers, usePlayers } from "@/lib/store/players-store";
-import { type GroupRow, type RankView, loadRanked, nextRanked, startRanked, useRanked } from "@/lib/store/ranked-store";
+import { type GroupRow, type RankView, type RankedOverview, jokerRanked, loadRanked, nextRanked, reportRanked, startRanked, useRanked } from "@/lib/store/ranked-store";
 import { useToasts } from "@/lib/store/toast-store";
 
 type View = "jouer" | "groupe" | "rangs" | "amis";
@@ -33,6 +33,7 @@ const ZONE_STYLE: Record<WeekZone, { row: string; label: string }> = {
   relegation: { row: "border-l-rose-500 bg-rose-500/10", label: "⬇️ Relégation" },
   unranked: { row: "border-l-slate-800 opacity-70", label: `Moins de ${MIN_MATCHES} manches` },
   inactive: { row: "border-l-slate-800", label: "Inactif" },
+  review: { row: "border-l-slate-600", label: "En vérification" },
 };
 
 export default function RankedPage() {
@@ -44,6 +45,8 @@ export default function RankedPage() {
   const [subject, setSubject] = useState<RankedSubject>("general");
   const [match, setMatch] = useState<MatchStart | null>(null);
   const [starting, setStarting] = useState<RankedSubject | null>(null);
+  /** Matière choisie, en attente de confirmation des règles. */
+  const [ready, setReady] = useState<RankedSubject | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -77,8 +80,13 @@ export default function RankedPage() {
     const active = overview?.active;
     if (!active) return;
     try {
-      const served = await nextRanked(active.id);
-      setMatch({ ...served, id: active.id, subject: active.subject });
+      const r = await nextRanked(active.id);
+      if ("lost" in r) {
+        useToasts.getState().push({ emoji: "🚪", title: "Manche perdue", body: r.lost.outcome.kind === "lost" ? r.lost.outcome.reason : undefined, tone: "rose" });
+        void loadRanked(subject);
+        return;
+      }
+      setMatch({ ...r.next, id: active.id, subject: active.subject });
     } catch (e) {
       useToasts.getState().push({ emoji: "⚠️", title: e instanceof Error ? e.message : "Erreur", tone: "rose" });
       void loadRanked(subject);
@@ -125,10 +133,41 @@ export default function RankedPage() {
   }
 
   const general = overview?.ranks.find((r) => r.subject === "general");
+  const rulesModal = ready && (
+    <div className="fixed inset-0 z-[60] grid place-items-end bg-slate-950/80 p-3 backdrop-blur-sm sm:place-items-center" onClick={() => setReady(null)}>
+      <div className="qb-pop w-full max-w-md space-y-4 rounded-3xl border border-amber-400/40 bg-slate-900 p-5" onClick={(e) => e.stopPropagation()}>
+        <p className="text-xs font-bold uppercase tracking-wider text-amber-300">{rankedSubjectMeta(ready).emoji} {rankedSubjectMeta(ready).name} · manche classée</p>
+        <p className="text-2xl font-black text-white">Reste dans l&apos;appli jusqu&apos;à la fin</p>
+        <ul className="space-y-2 text-sm text-slate-300">
+          <li>⏱️ {MATCH_SIZE} questions, une à la fois, avec un chrono. Plus tu réponds vite, plus tu marques.</li>
+          <li>⚠️ <b className="text-white">1re sortie</b> de l&apos;appli : la question en cours compte fausse.</li>
+          <li>🚪 <b className="text-white">2e sortie</b>, ou plus de 10 s dehors : la manche est perdue (0 point).</li>
+          <li>🃏 Un appel, une fausse manip ? Un <b className="text-white">joker par jour</b> annule une manche perdue.</li>
+          <li>🔒 Texte non copiable, réponses corrigées par le serveur.</li>
+        </ul>
+        <div className="flex gap-2">
+          <Button variant="secondary" className="flex-1" onClick={() => setReady(null)}>Plus tard</Button>
+          <Button
+            variant="gold"
+            className="flex-1 py-3"
+            disabled={starting !== null}
+            onClick={() => {
+              const s = ready;
+              setReady(null);
+              void play(s);
+            }}
+          >
+            <Swords size={16} /> C&apos;est parti
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
   const endsIn = overview ? overview.endsInMs - (now - fetchedAt) : 0;
 
   return (
     <div className="space-y-5">
+      {rulesModal}
       {/* En-tête : ambiance compétition, distincte de l'entraînement */}
       <section className="relative overflow-hidden rounded-3xl border border-amber-400/30 bg-gradient-to-br from-amber-500/20 via-slate-900 to-slate-950 p-5 sm:p-6">
         <div aria-hidden className="absolute -right-6 -top-8 text-[8rem] opacity-10">⚔️</div>
@@ -160,6 +199,8 @@ export default function RankedPage() {
         <>
           {overview && <WeekResults ranks={overview.ranks} />}
 
+          {overview?.pendingLoss && <PendingLoss loss={overview.pendingLoss} onDone={() => loadRanked(subject)} />}
+
           {overview?.active && (
             <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-amber-400/40 bg-amber-500/10 p-4">
               <p className="flex-1 text-sm text-amber-100">
@@ -184,11 +225,11 @@ export default function RankedPage() {
           {error && !overview && <p className="rounded-xl bg-rose-500/15 p-3 text-sm text-rose-300">{error}</p>}
           {!overview && !error && <div className="h-48 animate-pulse rounded-3xl bg-slate-900/60" />}
 
-          {overview && view === "jouer" && <PlayView ranks={overview.ranks} starting={starting} onPlay={play} />}
+          {overview && view === "jouer" && <PlayView ranks={overview.ranks} starting={starting} onPlay={setReady} />}
           {overview && view === "groupe" && (
             <>
               <SubjectChips ranks={overview.ranks} value={subject} onChange={setSubject} />
-              <GroupView rank={overview.ranks.find((r) => r.subject === subject)} rows={overview.subject === subject ? overview.group : []} endsIn={endsIn} onPlay={() => play(subject)} />
+              <GroupView rank={overview.ranks.find((r) => r.subject === subject)} rows={overview.subject === subject ? overview.group : []} endsIn={endsIn} onPlay={() => setReady(subject)} />
             </>
           )}
           {overview && view === "rangs" && (
@@ -300,6 +341,7 @@ function GroupView({ rank, rows, endsIn, onPlay }: { rank?: RankView; rows: Grou
               <p className="text-xs text-slate-500">{r.label} · {r.played} manche{r.played > 1 ? "s" : ""} · {ZONE_STYLE[r.zone].label}</p>
             </div>
             <span className="font-mono text-sm font-bold text-slate-100">{r.total}</span>
+            {!r.isMe && <ReportButton row={r} />}
           </div>
         ))}
       </div>
@@ -324,8 +366,54 @@ function TopView({ rows, players }: { rows: GroupRow[]; players: number }) {
             <Avatar emoji={r.avatar} photo={r.photoThumb} name={r.pseudo} size="sm" />
             <p className={clsx("min-w-0 flex-1 truncate font-semibold", r.isMe ? "text-amber-200" : "text-white")}>{r.pseudo}{r.isMe && " (toi)"}</p>
             <span className="text-xs font-bold text-slate-300">{r.label}</span>
+            {!r.isMe && <ReportButton row={r} />}
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function ReportButton({ row }: { row: GroupRow }) {
+  const report = async () => {
+    if (!window.confirm(`Signaler ${row.pseudo} pour triche ? Après 3 signalements de joueurs différents, ses promotions sont bloquées le temps d'une vérification.`)) return;
+    try {
+      const r = await reportRanked(row.id);
+      useToasts.getState().push({ emoji: "🚩", title: r.already ? "Déjà signalé" : "Signalement envoyé", body: r.already ? undefined : "Merci, c'est pris en compte.", tone: "emerald" });
+    } catch (e) {
+      useToasts.getState().push({ emoji: "⚠️", title: e instanceof Error ? e.message : "Erreur", tone: "rose" });
+    }
+  };
+  return (
+    <button type="button" onClick={report} aria-label={`Signaler ${row.pseudo}`} className="rounded-lg p-1.5 text-slate-600 hover:bg-rose-600/20 hover:text-rose-300">
+      <Flag size={14} />
+    </button>
+  );
+}
+
+function PendingLoss({ loss, onDone }: { loss: NonNullable<RankedOverview["pendingLoss"]>; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const decide = async (use: boolean) => {
+    setBusy(true);
+    try {
+      await jokerRanked(loss.id, use);
+      useToasts.getState().push({ emoji: use ? "🃏" : "✔️", title: use ? "Manche annulée par ton joker" : "Manche comptée (0 point)", tone: "emerald" });
+      onDone();
+    } catch (e) {
+      useToasts.getState().push({ emoji: "⚠️", title: e instanceof Error ? e.message : "Erreur", tone: "rose" });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="space-y-3 rounded-2xl border border-rose-500/40 bg-rose-500/10 p-4 text-sm text-rose-100">
+      <p>
+        🚪 Manche de <b>{rankedSubjectMeta(loss.subject).name}</b> perdue : {loss.reason}.
+        {loss.jokerAvailable ? " Un appel, une fausse manip ? Ton joker du jour peut l'annuler." : " Ton joker du jour est déjà utilisé."}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {loss.jokerAvailable && <Button variant="gold" disabled={busy} onClick={() => decide(true)}>🃏 Utiliser mon joker</Button>}
+        <Button variant="secondary" disabled={busy} onClick={() => decide(false)}>Accepter le 0</Button>
       </div>
     </div>
   );

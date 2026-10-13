@@ -14,6 +14,7 @@ const TEXT: Record<WeekZone, string> = {
   relegation: "Relégué ⬇️",
   unranked: "Pas assez de manches",
   inactive: "Inactif ⬇️",
+  review: "Promotion bloquée : compte en vérification",
 };
 
 /** Bilan de la semaine écoulée, matière par matière (une fois). */

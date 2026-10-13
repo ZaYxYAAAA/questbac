@@ -24,7 +24,8 @@ export async function POST(req: Request) {
     if (!m || m.uid !== session.uid) return jsonError("Manche introuvable.", 404);
     if (m.finishedAt) return jsonError("Manche terminée.", 409);
     if (parsed.data.index !== m.index || m.servedAt === null) return jsonError("Question inattendue.", 409);
-    return Response.json(await answerQuestion(m, parsed.data.index, parsed.data.answer, session.pseudo), { headers: { "Cache-Control": "no-store" } });
+    const r = await answerQuestion(m, parsed.data.index, parsed.data.answer, session.pseudo);
+    return Response.json("lost" in r ? { lost: r.lost } : r.reply, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return storageDown(error);
   }

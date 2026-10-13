@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { rankedQuestions } from "@/lib/content/ranked-questions";
 import {
   type RankedProfile,
+  applyPresence,
   applySeason,
   formGroups,
   matchScore,
@@ -15,6 +16,8 @@ import {
   settleGroup,
   settleWeeks,
   stepLabel,
+  suspicion,
+  underReview,
 } from "./ranked";
 
 const monday = new Date("2026-10-12T10:00:00+02:00");
@@ -119,5 +122,47 @@ describe("questions classées", () => {
       }
     }
     expect(rankedQuestions("maths", "premiere", "a")).toEqual(rankedQuestions("maths", "premiere", "a"));
+  });
+});
+
+describe("anti-triche", () => {
+  const start = { exits: 0, lastBeat: 0 };
+
+  it("première sortie : avertissement ; deuxième : manche perdue", () => {
+    const a = applyPresence(start, "hidden", 1000);
+    expect(a.outcome).toEqual({ kind: "strike", exits: 1 });
+    const b = applyPresence(a.presence, "visible", 3000);
+    expect(b.outcome.kind).toBe("ok");
+    const c = applyPresence(b.presence, "hidden", 6000);
+    expect(c.outcome.kind).toBe("lost");
+  });
+
+  it("plus de 10 s dehors fait perdre la manche", () => {
+    const a = applyPresence(start, "hidden", 1000);
+    expect(applyPresence(a.presence, "visible", 12_500).outcome.kind).toBe("lost");
+  });
+
+  it("des signaux interrompus valent une sortie, des signaux réguliers non", () => {
+    let p = start;
+    for (let t = 5000; t <= 30_000; t += 5000) {
+      const r = applyPresence(p, "beat", t);
+      expect(r.outcome.kind).toBe("ok");
+      p = r.presence;
+    }
+    expect(applyPresence(p, "beat", 30_000 + 13_000).outcome.kind).toBe("lost");
+  });
+
+  it("repère les réponses impossibles à lire à temps", () => {
+    const qs = Array.from({ length: 10 }, () => ({ type: "mcq" as const, prompt: "x".repeat(150) }));
+    expect(suspicion(qs, Array(10).fill(true), Array(10).fill(400))).toMatch(/plus rapides/);
+    expect(suspicion(qs, Array(10).fill(true), [3100, 5200, 4100, 6900, 2500, 3800, 7700, 4400, 5100, 3300])).toBeNull();
+    expect(suspicion(qs, Array(10).fill(true), Array(10).fill(4000))).toMatch(/identiques/);
+  });
+
+  it("bloque les promotions d'un compte signalé 3 fois", () => {
+    const now = Date.now();
+    expect(underReview({ flags: [], reports: [{ by: "a", at: now }, { by: "a", at: now }, { by: "b", at: now }] }, now)).toBe(false);
+    expect(underReview({ flags: [], reports: ["a", "b", "c"].map((by) => ({ by, at: now })) }, now)).toBe(true);
+    expect(underReview({ flags: [1, 2, 3].map(() => ({ at: now - 20 * 86_400_000, reason: "x" })), reports: [] }, now)).toBe(false);
   });
 });
