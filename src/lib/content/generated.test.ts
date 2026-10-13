@@ -29,7 +29,7 @@ describe("questions générées", () => {
           }
           if (q.type === "numeric") {
             expect(Number.isFinite(q.answer), where).toBe(true);
-            expect(isCorrect({ ...q, id: "x" }, String(Math.round(q.answer * 1000) / 1000).replace(".", ",")), where).toBe(true);
+            expect(isCorrect({ ...q, id: "x" }, String(q.answer).replace(".", ",")), where).toBe(true);
           }
         }
       });
@@ -37,13 +37,15 @@ describe("questions générées", () => {
   });
 
   it("ne répètent pas une question sur 100 tirages d'un chapitre", () => {
+    const short: string[] = [];
     for (const id of Object.keys(CHAPTER_GENERATORS)) {
       const seen = new Set<string>();
       const r = seededRandom(7);
       // 10 missions de 10 questions, en évitant ce qui a déjà été vu.
       for (let m = 0; m < 10; m++) for (const q of chapterQuestions(id, 10, r, seen)) seen.add(questionKey(q));
-      expect(seen.size, id).toBeGreaterThanOrEqual(100);
+      if (seen.size < 100) short.push(`${id} (${seen.size})`);
     }
+    expect(short).toEqual([]);
   });
 
   it("trouvent des générateurs pour un sujet libre", () => {

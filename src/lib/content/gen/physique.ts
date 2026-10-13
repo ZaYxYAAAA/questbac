@@ -1,6 +1,7 @@
 /** Générateurs de questions — Physique-Chimie (Seconde, Première, Terminale). */
-import { type Generator, cards, claims, int, mcq, nonZero, numeric, oneOf, pairs, pick, tex, texMcq, tf } from "./kit";
+import { type Generator, cards, claims, int, mcq, nonZero, numeric, oneOf, pairs, pick, tex, tf } from "./kit";
 
+const oneOfNum = (r: () => number, f: Array<() => number>) => pick(r, f)();
 const sci = (m: number, e: number) => `$${tex(m)} \\times 10^{${e}}$`;
 
 // ───────────── Seconde : constitution de l'atome ─────────────
@@ -80,10 +81,14 @@ const mole: Generator[] = [
     ]);
   },
   (r) => {
-    const c = int(r, 1, 6), h = 2 * int(r, 1, 6), o = int(r, 0, 3), nN = int(r, 0, 1);
-    const formula = `C_{${c}}H_{${h}}${nN ? "N" : ""}${o ? `O_{${o}}` : ""}`.replace(/_\{1\}/g, "");
+    const [name, formula, c, h, nN, o] = pick(r, [
+      ["l'éthanol", "C_2H_6O", 2, 6, 0, 1], ["le propane", "C_3H_8", 3, 8, 0, 0], ["le glucose", "C_6H_{12}O_6", 6, 12, 0, 6], ["le méthanol", "CH_4O", 1, 4, 0, 1],
+      ["l'acide éthanoïque", "C_2H_4O_2", 2, 4, 0, 2], ["l'acétone", "C_3H_6O", 3, 6, 0, 1], ["l'urée", "CH_4N_2O", 1, 4, 2, 1], ["la glycine", "C_2H_5NO_2", 2, 5, 1, 2],
+      ["le butane", "C_4H_{10}", 4, 10, 0, 0], ["l'octane", "C_8H_{18}", 8, 18, 0, 0], ["l'alanine", "C_3H_7NO_2", 3, 7, 1, 2], ["le benzène", "C_6H_6", 6, 6, 0, 0],
+      ["l'acide benzoïque", "C_7H_6O_2", 7, 6, 0, 2], ["l'aspirine", "C_9H_8O_4", 9, 8, 0, 4], ["l'ammoniac", "NH_3", 0, 3, 1, 0], ["le saccharose", "C_{12}H_{22}O_{11}", 12, 22, 0, 11],
+    ] as const);
     const M = c * ATOMS.C + h * ATOMS.H + o * ATOMS.O + nN * ATOMS.N;
-    return numeric(`Masse molaire de $\\mathrm{${formula}}$ ? (H = 1, C = 12, N = 14, O = 16 g/mol)`, M, `$M = ${c} \\times 12 + ${h} \\times 1${nN ? " + 14" : ""}${o ? ` + ${o} \\times 16` : ""} = ${M}$ g/mol.`, "g/mol");
+    return numeric(`Masse molaire de ${name} $\\mathrm{${formula}}$ ? (H = 1, C = 12, N = 14, O = 16 g/mol)`, M, `$M = ${[c && `${c} \\times 12`, `${h} \\times 1`, nN && `${nN} \\times 14`, o && `${o} \\times 16`].filter(Boolean).join(" + ")} = ${M}$ g/mol.`, "g/mol");
   },
   (r) => {
     const n = pick(r, [0.5, 2, 3, 0.1, 5, 10]);
@@ -173,6 +178,17 @@ const transformations: Generator[] = [
     const [sym, z, a] = pick(r, [["U", 92, 238], ["Ra", 88, 226], ["Po", 84, 210], ["Th", 90, 232], ["Rn", 86, 222], ["Pu", 94, 239]] as const);
     return mcq(r, `Désintégration $\\alpha$ : ${nuclide(sym, z, a)} $\\rightarrow\\ ^{4}_{2}\\mathrm{He} + {}^{A}_{Z}\\mathrm{Y}$. $(A\\,;\\,Z) = \\;?$`, `$(${a - 4}\\,;\\,${z - 2})$`, [`$(${a - 2}\\,;\\,${z - 4})$`, `$(${a - 4}\\,;\\,${z})$`, `$(${a}\\,;\\,${z - 2})$`], `Conservation du nombre de masse et du numéro atomique.`);
   },
+  (r) => {
+    const [reac, prod, ratio] = pick(r, [["de carbone", "de dioxyde de carbone", 44 / 12], ["de magnésium", "d'oxyde de magnésium", 40 / 24], ["de fer", "d'oxyde de fer", 160 / 112]] as const);
+    const m1 = pick(r, [1.2, 2.4, 3.6, 4.8, 6, 12]);
+    const m2 = Math.round(m1 * (ratio - 1) * 100) / 100;
+    return numeric(`On fait réagir entièrement $${tex(m1)}$ g ${reac} avec $${tex(m2)}$ g de dioxygène. Masse ${prod} formée (g) ?`, m1 + m2, `Conservation de la masse : $${tex(m1)} + ${tex(m2)} = ${tex(m1 + m2)}$ g.`, "g", 0.02);
+  },
+  (r) => {
+    const [what, L] = pick(r, [["faire fondre de la glace", 334], ["vaporiser de l'eau", 2260], ["faire fondre de l'aluminium", 397]] as const);
+    const m = pick(r, [0.1, 0.2, 0.5, 1, 2, 5]);
+    return numeric(`Énergie pour ${what} : $m = ${tex(m)}$ kg, $L = ${L}$ kJ/kg. $Q$ (kJ) ?`, m * L, `$Q = m \\times L = ${tex(m)} \\times ${L}$.`, "kJ", 0.5);
+  },
   claims([
     ["Lors d'une transformation chimique, les éléments chimiques sont conservés.", true, "Lavoisier : rien ne se perd, rien ne se crée."],
     ["Une transformation exothermique libère de l'énergie thermique.", true, "Le milieu extérieur se réchauffe."],
@@ -194,6 +210,12 @@ const mouvement: Generator[] = [
     return r() < 0.5
       ? numeric(`$${v}$ m/s, c'est combien en km/h ?`, v * 3.6, `On multiplie par $3{,}6$.`, "km/h", 0.01)
       : numeric(`$${tex(v * 3.6)}$ km/h, c'est combien en m/s ?`, v, `On divise par $3{,}6$.`, "m/s", 0.01);
+  },
+  (r) => {
+    const v = pick(r, [30, 45, 50, 60, 72, 80, 90, 110, 120, 130]), t = pick(r, [10, 15, 20, 30, 40, 45, 90]);
+    return r() < 0.5
+      ? numeric(`Une voiture roule à $${v}$ km/h pendant $${t}$ min. Distance parcourue (km) ?`, (v * t) / 60, `$d = v \\times t = ${v} \\times \\dfrac{${t}}{60}$ h.`, "km", 0.01)
+      : numeric(`Durée pour parcourir $${tex((v * t) / 60)}$ km à $${v}$ km/h (en min) ?`, t, `$t = \\dfrac{d}{v}$ en heures, puis $\\times 60$.`, "min", 0.1);
   },
   (r) => {
     const m = pick(r, [0.5, 2, 5, 10, 60, 75]);
@@ -224,17 +246,17 @@ const mouvement: Generator[] = [
 
 const ondes2: Generator[] = [
   (r) => {
-    const T = pick(r, [1, 2, 2.5, 4, 5, 10, 20]);
+    const T = pick(r, [0.1, 0.125, 0.2, 0.25, 0.5, 1, 2, 2.5, 4, 5, 8, 10, 12.5, 16, 20, 25, 40, 50]);
     return r() < 0.5
       ? numeric(`Période $T = ${tex(T)}$ ms. Fréquence (Hz) ?`, 1000 / T, `$f = \\dfrac{1}{T} = \\dfrac{1}{${tex(T / 1000)}}$.`, "Hz", 0.1)
       : numeric(`Fréquence $f = ${tex(1000 / T)}$ Hz. Période (ms) ?`, T, `$T = \\dfrac{1}{f}$, converti en millisecondes.`, "ms", 0.01);
   },
   (r) => {
-    const t = pick(r, [0.2, 0.5, 1, 2, 3, 4]);
+    const t = int(r, 1, 40) / 10;
     return numeric(`Un écho revient $${tex(t)}$ s après le cri ($v = 340$ m/s). Distance de la paroi (m) ?`, (340 * t) / 2, `Aller-retour : $d = \\dfrac{v \\times t}{2} = \\dfrac{340 \\times ${tex(t)}}{2}$.`, "m", 0.5);
   },
   (r) => {
-    const f = pick(r, [5, 12, 18, 25, 440, 1000, 15000, 25000, 40000, 100000]);
+    const f = oneOfNum(r, [() => int(r, 1, 19), () => int(r, 2, 200) * 100, () => int(r, 21, 200) * 1000]);
     const ans = f < 20 ? "infrason" : f <= 20000 ? "son audible" : "ultrason";
     return mcq(r, `Une onde sonore de $${tex(f)}$ Hz est…`, ans, ["infrason", "son audible", "ultrason", "onde lumineuse"], `L'oreille humaine perçoit de 20 Hz à 20 000 Hz environ.`);
   },
@@ -242,6 +264,14 @@ const ondes2: Generator[] = [
     const n2 = pick(r, [1.33, 1.5, 2]);
     const i = pick(r, [[30, 0.5, "\\dfrac12"], [90, 1, "1"]] as const);
     return numeric(`Lumière passant de l'air ($n = 1$) à un milieu d'indice $${tex(n2)}$ avec $\\sin i_1 = ${i[2]}$. $\\sin i_2$ (arrondi à $0{,}01$) ?`, Math.round((i[1] / n2) * 100) / 100, `Snell-Descartes : $n_1 \\sin i_1 = n_2 \\sin i_2$, donc $\\sin i_2 = \\dfrac{${tex(i[1])}}{${tex(n2)}}$.`, undefined, 0.011);
+  },
+  (r) => {
+    const t = int(r, 1, 20);
+    return numeric(`On entend le tonnerre $${t}$ s après l'éclair. Distance de l'orage (m) ? ($v_{son} = 340$ m/s)`, 340 * t, `La lumière arrive quasi instantanément : $d = 340 \\times ${t}$.`, "m", 1);
+  },
+  (r) => {
+    const [obj, d] = pick(r, [["de la Lune", 384000], ["du Soleil", 1.5e8], ["de Mars (au plus près)", 5.6e7], ["d'un satellite GPS", 20200]] as const);
+    return numeric(`Durée mise par la lumière pour venir ${obj} ($d = ${tex(d)}$ km, $c = 3 \\times 10^5$ km/s), en s ?`, d / 3e5, `$t = \\dfrac{d}{c} = \\dfrac{${tex(d)}}{300\\,000}$.`, "s", 0.01);
   },
   claims([
     ["Le son ne se propage pas dans le vide.", true, "Il lui faut un milieu matériel."],
@@ -300,9 +330,19 @@ const redox: Generator[] = [
     const [ox, red, e] = pick(r, COUPLES);
     return numeric(`Combien d'électrons dans la demi-équation du couple $\\mathrm{${ox}/${red}}$ ?`, e, `$\\mathrm{${ox}} + ${e === 1 ? "" : e}\\,e^- = \\dots\\mathrm{${red}}$ (en équilibrant éléments et charges).`);
   },
+  (r) => {
+    const simple = COUPLES.filter(([o]) => o !== "MnO_4^-");
+    const [o1, , e1] = pick(r, simple);
+    const [o2, r2, e2] = pick(r, simple.filter(([o, rr]) => o !== o1 && rr !== o1));
+    const g = (a: number, b: number): number => (b ? g(b, a % b) : a);
+    const l = (e1 * e2) / g(e1, e2);
+    return r() < 0.5
+      ? numeric(`Réaction entre $\\mathrm{${o1}}$ et $\\mathrm{${r2}}$ (couple $\\mathrm{${o2}/${r2}}$). Nombre d'électrons échangés dans l'équation bilan ?`, l, `On multiplie les demi-équations pour avoir autant d'électrons cédés que captés : $\\mathrm{ppcm}(${e1}, ${e2}) = ${l}$.`)
+      : numeric(`Réaction entre $\\mathrm{${o1}}$ et $\\mathrm{${r2}}$. Coefficient de $\\mathrm{${r2}}$ dans l'équation bilan (le plus petit entier) ?`, l / e2 * (r2 === "I^-" || r2 === "Cl^-" ? 2 : 1), `Il faut ${l} électrons de chaque côté : on multiplie la demi-équation de $\\mathrm{${o2}/${r2}}$ par $${l / e2}$${r2 === "I^-" || r2 === "Cl^-" ? ", et elle contient déjà 2 ions" : ""}.`);
+  },
   ...pairs(
-    [["oxydant", "espèce capable de capter des électrons"], ["réducteur", "espèce capable de céder des électrons"], ["oxydation", "perte d'électrons"], ["réduction", "gain d'électrons"]],
-    { ask: (a) => `Un(e) ${a}, c'est…`, reverse: (b) => `Comment appelle-t-on : ${b} ?`, explain: (a, b) => `${a} : ${b}.` },
+    [["un oxydant", "une espèce capable de capter des électrons"], ["un réducteur", "une espèce capable de céder des électrons"], ["une oxydation", "une perte d'électrons"], ["une réduction", "un gain d'électrons"]],
+    { ask: (a) => `${a.charAt(0).toUpperCase() + a.slice(1)}, c'est…`, reverse: (b) => `Comment appelle-t-on ${b} ?`, explain: (a, b) => `${a.charAt(0).toUpperCase() + a.slice(1)} : ${b}.` },
   ),
   claims([
     ["Dans une réaction d'oxydoréduction, l'oxydant d'un couple réagit avec le réducteur d'un autre couple.", true, "Il y a transfert d'électrons du réducteur vers l'oxydant."],
@@ -323,17 +363,41 @@ const lewis: Generator[] = [
     { ask: (a) => `Doublets non liants autour de $\\mathrm{${a}}$ dans une molécule ?`, explain: (a, b) => `$\\mathrm{${a}}$ porte ${b} doublet(s) non liant(s).` },
   )[0],
   ...pairs(
-    [["CH_4", "tétraédrique"], ["NH_3", "pyramidale"], ["H_2O", "coudée"], ["CO_2", "linéaire"]],
-    { ask: (a) => `Géométrie de la molécule $\\mathrm{${a}}$ ?`, reverse: (b) => `Quelle molécule a une géométrie ${b} ?`, explain: (a, b) => `$\\mathrm{${a}}$ : ${b} (répulsion des doublets).` },
+    [["$\\mathrm{CH_4}$", "tétraédrique"], ["$\\mathrm{NH_3}$", "pyramidale"], ["$\\mathrm{H_2O}$", "coudée"], ["$\\mathrm{CO_2}$", "linéaire"]],
+    { ask: (a) => `Géométrie de la molécule ${a} ?`, reverse: (b) => `Quelle molécule a une géométrie ${b} ?`, explain: (a, b) => `${a} : ${b} (répulsion des doublets).` },
   ),
-  pairs(
-    [["H_2O", "polaire"], ["CO_2", "apolaire"], ["CH_4", "apolaire"], ["NH_3", "polaire"], ["HCl", "polaire"], ["O_2", "apolaire"]],
-    { ask: (a) => `La molécule $\\mathrm{${a}}$ est…`, explain: (a, b) => `$\\mathrm{${a}}$ est ${b} (géométrie + électronégativités).` },
-  )[0],
+  (r) => {
+    const [mol, polar, why] = pick(r, [
+      ["H_2O", true, "molécule coudée : les polarités des liaisons O–H ne se compensent pas"],
+      ["CO_2", false, "molécule linéaire : les deux liaisons C=O se compensent"],
+      ["CH_4", false, "molécule tétraédrique symétrique (et liaisons C–H peu polarisées)"],
+      ["NH_3", true, "molécule pyramidale : les polarités N–H ne se compensent pas"],
+      ["HCl", true, "liaison H–Cl polarisée, chlore plus électronégatif"],
+      ["O_2", false, "deux atomes identiques : liaison non polarisée"],
+      ["CCl_4", false, "molécule tétraédrique symétrique : les polarités se compensent"],
+      ["HF", true, "liaison très polarisée, le fluor est très électronégatif"],
+    ] as const);
+    return tf(`La molécule $\\mathrm{${mol}}$ est polaire.`, polar, `$\\mathrm{${mol}}$ est ${polar ? "polaire" : "apolaire"} : ${why}.`);
+  },
   (r) => {
     const [sym, , z] = pick(r, ELEMENTS.filter(([, , zz]) => zz <= 17 && ![2, 10].includes(zz)));
     const v = z <= 2 ? z : z <= 10 ? z - 2 : z - 10;
     return numeric(`Électrons de valence de $\\mathrm{${sym}}$ ($Z = ${z}$) ?`, v, `$${config(z)}$ : ${v} électron(s) de valence.`);
+  },
+  (r) => {
+    const [mol, ve] = pick(r, [["H_2O", 8], ["CO_2", 16], ["CH_4", 8], ["NH_3", 8], ["HCl", 8], ["C_2H_6", 14], ["C_2H_4", 12], ["HCN", 10], ["CH_3OH", 14], ["H_2O_2", 14], ["N_2", 10], ["O_2", 12], ["CH_2O", 12], ["Cl_2", 14]] as const);
+    return r() < 0.5
+      ? numeric(`Nombre total d'électrons de valence dans $\\mathrm{${mol}}$ ?`, ve, `On additionne les électrons de valence de chaque atome (H : 1, C : 4, N : 5, O : 6, Cl : 7).`)
+      : numeric(`Nombre de doublets (liants + non liants) dans le schéma de Lewis de $\\mathrm{${mol}}$ ?`, ve / 2, `$${ve}$ électrons de valence, soit $${ve / 2}$ doublets.`);
+  },
+  (r) => {
+    const [mol, nl] = pick(r, [["H_2O", 2], ["NH_3", 1], ["CH_4", 0], ["CO_2", 4], ["HCl", 3], ["N_2", 2], ["O_2", 4], ["HCN", 1], ["Cl_2", 6], ["CH_3OH", 2], ["H_2O_2", 4], ["CH_2O", 2]] as const);
+    return numeric(`Nombre total de doublets non liants dans le schéma de Lewis de $\\mathrm{${mol}}$ ?`, nl, `On compte ceux de chaque atome (O : 2, N : 1, Cl : 3, C et H : 0).`);
+  },
+  (r) => {
+    const order = ["H", "C", "N", "O", "F"];
+    const i = int(r, 0, 4), j = (i + int(r, 1, 4)) % 5;
+    return tf(`$\\mathrm{${order[i]}}$ est plus électronégatif que $\\mathrm{${order[j]}}$.`, i > j, `Électronégativité : F > O > N > C > H.`);
   },
   claims([
     ["Le fluor est l'élément le plus électronégatif.", true, "Il attire le plus les électrons d'une liaison."],
@@ -377,14 +441,14 @@ const energie: Generator[] = [
 
 const ondes1: Generator[] = [
   (r) => {
-    const f = pick(r, [50, 100, 200, 250, 440, 500, 1000]), v = pick(r, [340, 1500, 5000]);
+    const f = int(r, 1, 40) * 50, v = pick(r, [340, 1500, 5000, 1450]);
     return oneOf(r, [
       () => numeric(`Onde de fréquence $${f}$ Hz, célérité $${v}$ m/s. Longueur d'onde (m) ?`, v / f, `$\\lambda = \\dfrac{v}{f} = \\dfrac{${v}}{${f}}$.`, "m", 0.01),
       () => numeric(`$\\lambda = ${tex(v / f)}$ m et $f = ${f}$ Hz. Célérité (m/s) ?`, v, `$v = \\lambda \\times f$.`, "m/s", 0.5),
     ]);
   },
   (r) => {
-    const d = pick(r, [17, 34, 68, 170, 340, 680]);
+    const d = int(r, 1, 40) * 17;
     return numeric(`Retard d'un son entre deux micros distants de $${d}$ m ($v = 340$ m/s) ?`, d / 340, `$\\tau = \\dfrac{d}{v} = \\dfrac{${d}}{340}$ s.`, "s", 0.001);
   },
   cards([
@@ -405,7 +469,7 @@ const ondes1: Generator[] = [
 const lentilles: Generator[] = [
   (r) => {
     const n = pick(r, [2, 3, 1.5, 5]);
-    const f = n === 3 ? pick(r, [4, 10, 20]) : n === 5 ? pick(r, [4, 8, 20]) : pick(r, [5, 10, 20, 15]);
+    const f = n === 3 ? 2 * int(r, 1, 15) : n === 5 ? 4 * int(r, 1, 8) : int(r, 2, 30);
     const oa = -n * f, oap = (n * f) / (n - 1);
     return oneOf(r, [
       () => numeric(`Lentille convergente $f' = ${f}$ cm, objet à $\\overline{OA} = ${tex(oa)}$ cm. Position de l'image $\\overline{OA'}$ (cm) ?`, oap, `$\\dfrac{1}{\\overline{OA'}} = \\dfrac{1}{f'} + \\dfrac{1}{\\overline{OA}} = \\dfrac{1}{${f}} - \\dfrac{1}{${tex(-oa)}}$, donc $\\overline{OA'} = ${tex(oap)}$ cm.`, "cm", 0.05),
@@ -523,11 +587,11 @@ const newton: Generator[] = [
 
 const ondesT: Generator[] = [
   (r) => {
-    const lam = pick(r, [400, 500, 600, 633, 800]), a = pick(r, [10, 20, 50, 100]);
+    const lam = int(r, 40, 80) * 10, a = pick(r, [5, 10, 20, 25, 40, 50, 100]);
     return numeric(`Diffraction : $\\lambda = ${lam}$ nm, fente de largeur $a = ${a}$ µm. Écart angulaire $\\theta = \\lambda/a$ (en mrad) ?`, (lam / 1000 / a) * 1000, `$\\theta = \\dfrac{${lam} \\times 10^{-9}}{${a} \\times 10^{-6}}$ rad.`, "mrad", 0.05);
   },
   (r) => {
-    const lam = pick(r, [500, 600, 650]), D = pick(r, [1, 2]), b = pick(r, [0.2, 0.5, 1]);
+    const lam = int(r, 40, 80) * 10, D = pick(r, [1, 1.5, 2, 3]), b = pick(r, [0.1, 0.2, 0.25, 0.5, 1]);
     return numeric(`Fentes d'Young : $\\lambda = ${lam}$ nm, $D = ${D}$ m, $b = ${tex(b)}$ mm. Interfrange $i$ (mm) ?`, (lam * 1e-9 * D) / (b * 1e-3) * 1000, `$i = \\dfrac{\\lambda D}{b}$.`, "mm", 0.01);
   },
   (r) => {
@@ -579,19 +643,20 @@ const thermo: Generator[] = [
 
 const rc: Generator[] = [
   (r) => {
-    const R = pick(r, [1, 2, 5, 10, 47, 100]), C = pick(r, [1, 2, 10, 22, 100]);
-    return numeric(`$R = ${R}$ kΩ et $C = ${C}$ µF. Constante de temps $\\tau$ (ms) ?`, R * C, `$\\tau = RC = ${R} \\times 10^3 \\times ${C} \\times 10^{-6}$ s $= ${R * C}$ ms.`, "ms");
+    const R = pick(r, [1, 2, 3.3, 4.7, 5, 10, 15, 22, 33, 47, 68, 100]), C = pick(r, [1, 2.2, 4.7, 10, 22, 47, 100, 220]);
+    return numeric(`$R = ${tex(R)}$ kΩ et $C = ${tex(C)}$ µF. Constante de temps $\\tau$ (ms) ?`, R * C, `$\\tau = RC = ${tex(R)} \\times 10^3 \\times ${tex(C)} \\times 10^{-6}$ s $= ${tex(R * C)}$ ms.`, "ms", 0.01);
   },
   (r) => {
-    const E = pick(r, [5, 6, 10, 12]);
+    const E = int(r, 3, 24);
     return oneOf(r, [
+      () => numeric(`Décharge d'un condensateur initialement à $${E}$ V. Tension à $t = \\tau$ (arrondie au dixième) ?`, Math.round(0.37 * E * 10) / 10, `$u_C(\\tau) = E\\,e^{-1} \\approx 0{,}37E$.`, "V", 0.15),
       () => numeric(`Charge d'un condensateur sous $E = ${E}$ V. Tension $u_C$ à $t = \\tau$ (arrondie au dixième) ?`, Math.round(0.63 * E * 10) / 10, `$u_C(\\tau) = E(1 - e^{-1}) \\approx 0{,}63E$.`, "V", 0.15),
       () => numeric(`Charge sous $E = ${E}$ V : tension $u_C$ au bout de $5\\tau$ (environ) ?`, E, `Après $5\\tau$, le condensateur est chargé à plus de 99 %.`, "V", 0.1),
     ]);
   },
   (r) => {
-    const C = pick(r, [1, 10, 47, 100]), U = pick(r, [5, 10, 12]);
-    return numeric(`Condensateur de $${C}$ µF sous $${U}$ V. Charge $q$ (µC) ?`, C * U, `$q = C \\times u_C$.`, "µC");
+    const C = pick(r, [1, 2.2, 4.7, 10, 47, 100, 220]), U = int(r, 3, 24);
+    return numeric(`Condensateur de $${tex(C)}$ µF sous $${U}$ V. Charge $q$ (µC) ?`, C * U, `$q = C \\times u_C$.`, "µC");
   },
   claims([
     ["L'intensité dans un condensateur est $i = C\\dfrac{du_C}{dt}$.", true, "Relation caractéristique."],
@@ -605,7 +670,7 @@ const rc: Generator[] = [
 
 const radioactivite: Generator[] = [
   (r) => {
-    const N0 = pick(r, [1000, 8000, 1600, 64000, 1e6]), n = int(r, 1, 5);
+    const N0 = pick(r, [1000, 2000, 4000, 8000, 1600, 3200, 6400, 12800, 64000, 1e6, 5e5, 2.4e4]), n = int(r, 1, 6);
     return numeric(`$N_0 = ${tex(N0)}$ noyaux. Combien en reste-t-il après $${n}$ demi-vies ?`, N0 / 2 ** n, `$N = \\dfrac{N_0}{2^{${n}}}$.`, undefined, 0.5);
   },
   (r) => {
@@ -654,5 +719,3 @@ export const PHYSIQUE: Record<string, Generator[]> = {
   "pc-t-radioactivite": radioactivite,
 };
 
-void texMcq;
-void tf;

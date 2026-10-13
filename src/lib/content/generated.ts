@@ -10,12 +10,16 @@ import type { Generator, Rand } from "./gen/kit";
 import { MATHS_PREMIERE } from "./gen/maths-premiere";
 import { MATHS_SECONDE } from "./gen/maths-seconde";
 import { MATHS_TERMINALE } from "./gen/maths-terminale";
+import { PHYSIQUE } from "./gen/physique";
+import { SVT } from "./gen/svt";
 import { questionsForChapter } from "./questions";
 
 export const CHAPTER_GENERATORS: Record<string, Generator[]> = {
   ...MATHS_SECONDE,
   ...MATHS_PREMIERE,
   ...MATHS_TERMINALE,
+  ...PHYSIQUE,
+  ...SVT,
 };
 
 export const hasGenerators = (chapterId: string) => (CHAPTER_GENERATORS[chapterId]?.length ?? 0) > 0;

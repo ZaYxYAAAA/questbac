@@ -71,6 +71,15 @@ export function poly(coefs: number[], v = "x"): string {
 
 // ───────────── Fabriques de questions ─────────────
 
+/** Contractions françaises après assemblage : « de le » → « du », « à les » → « aux »… */
+export const frText = (t: string) =>
+  t
+    .replace(/\b([Dd])e le\b/g, "$1u")
+    .replace(/\b([Dd])e les\b/g, "$1es")
+    .replace(/\b([Dd])e des\b/g, "$1e")
+    .replace(/\b([Àà]) le\b/g, (_, a) => (a === "À" ? "Au" : "au"))
+    .replace(/\b([Àà]) les\b/g, (_, a) => (a === "À" ? "Aux" : "aux"));
+
 /**
  * Leurre automatique : modifie un ou plusieurs nombres de la bonne réponse
  * (coordonnées, polynômes, fractions…). Null si la réponse ne contient aucun nombre.
@@ -99,7 +108,7 @@ export function mcq(r: Rand, prompt: string, answer: string, wrongs: string[], e
     if (w !== answer && !pool.includes(w)) pool.push(w);
   }
   const choices = shuffle([answer, ...shuffle(pool, r).slice(0, 3)], r);
-  return { type: "mcq", prompt, choices, answer: choices.indexOf(answer), explanation, difficulty };
+  return { type: "mcq", prompt: frText(prompt), choices, answer: choices.indexOf(answer), explanation: frText(explanation), difficulty };
 }
 
 /** QCM numérique : leurres proches (erreurs typiques puis voisins). `wrap` habille chaque choix. */
@@ -126,7 +135,7 @@ export const numeric = (prompt: string, answer: number, explanation: string, uni
   ...(tolerance !== undefined ? { tolerance } : {}),
 });
 
-export const tf = (prompt: string, answer: boolean, explanation: string, difficulty: Difficulty = 1): Draft => ({ type: "truefalse", prompt, answer, explanation, difficulty });
+export const tf = (prompt: string, answer: boolean, explanation: string, difficulty: Difficulty = 1): Draft => ({ type: "truefalse", prompt: frText(prompt), answer, explanation: frText(explanation), difficulty });
 
 // ───────────── Banques de connaissances ─────────────
 
