@@ -5,6 +5,7 @@
  */
 import type { Question, SubjectId } from "@/lib/types";
 import { shuffle } from "@/lib/game/quests";
+import { ESPAGNOL } from "./gen/espagnol";
 import { type Generator, type Rand, fr, frac, gcd, int, mcq, numMcq, numeric, pick, tf } from "./gen/kit";
 
 export interface DuelTheme {
@@ -421,12 +422,20 @@ export const DUEL_THEMES: DuelTheme[] = [
   { id: "culture-bac", title: "Culture bac", emoji: "🎓", subject: "francais", description: "Auteurs, philosophes, SVT, SES", generators: culture },
   { id: "anglais-flash", title: "English flash", emoji: "🇬🇧", subject: "anglais", description: "Vocabulaire, verbes irréguliers, grammaire", generators: anglais },
   {
+    id: "espanol-flash",
+    title: "Español flash",
+    emoji: "🇪🇸",
+    subject: "espagnol",
+    description: "Conjugaison, ser / estar, vocabulaire, culture",
+    generators: [...ESPAGNOL["es-2-presente"], ...ESPAGNOL["es-2-vocabulaire"], ...ESPAGNOL["es-2-cliches"].slice(0, 3)],
+  },
+  {
     id: "grand-melange",
     title: "Grand mélange",
     emoji: "🎲",
     subject: "maths",
     description: "Un peu de tout, toutes matières",
-    generators: [...calcul, ...fractions, ...fonctions, ...physique, ...histoire, ...culture, ...anglais],
+    generators: [...calcul, ...fractions, ...fonctions, ...physique, ...histoire, ...culture, ...anglais, ...ESPAGNOL["es-2-presente"]],
   },
 ];
 

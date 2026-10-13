@@ -31,7 +31,7 @@ export function bossStatus(d: GameData, boss: Boss, level: Level) {
 
 /** Missions conseillées : chapitres jouables hors-ligne les moins maîtrisés de la classe. */
 export function recommendedChapters(d: GameData, level: Level, count = 3) {
-  const subjects: SubjectId[] = ["maths", "physique", "svt", "histoire", "francais", "philo", "ses", "anglais"];
+  const subjects: SubjectId[] = ["maths", "physique", "svt", "histoire", "francais", "philo", "ses", "anglais", "espagnol"];
   return subjects
     .flatMap((s) => chaptersFor(s, level))
     .filter((c) => hasGenerators(c.id) || hasLocalQuestions(c.id))

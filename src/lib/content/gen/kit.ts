@@ -74,12 +74,12 @@ export function poly(coefs: number[], v = "x"): string {
 /** Contractions françaises après assemblage : « de le » → « du », « à les » → « aux »… */
 export const frText = (t: string) =>
   t
-    .replace(/\b([Dd])e le\b/g, "$1u")
-    .replace(/\b([Dd])e les\b/g, "$1es")
-    .replace(/\b([Dd])e des\b/g, "$1e")
-    .replace(/\b([Dd])e ([aeiouyéèêAEIOUYÉ])/g, "$1'$2")
-    .replace(/\b([Àà]) le\b/g, (_, a) => (a === "À" ? "Au" : "au"))
-    .replace(/\b([Àà]) les\b/g, (_, a) => (a === "À" ? "Aux" : "aux"));
+    .replace(/(?<!\p{L})([Dd])e le(?!\p{L})/gu, "$1u")
+    .replace(/(?<!\p{L})([Dd])e les(?!\p{L})/gu, "$1es")
+    .replace(/(?<!\p{L})([Dd])e des(?!\p{L})/gu, "$1e")
+    .replace(/(?<!\p{L})([Dd])e ([aeiouyéèê])/gu, "$1'$2")
+    .replace(/(?<!\p{L})([Àà]) le(?!\p{L})/gu, (_, a) => (a === "À" ? "Au" : "au"))
+    .replace(/(?<!\p{L})([Àà]) les(?!\p{L})/gu, (_, a) => (a === "À" ? "Aux" : "aux"));
 
 /**
  * Leurre automatique : modifie un ou plusieurs nombres de la bonne réponse
@@ -128,9 +128,9 @@ export const texMcq = (r: Rand, prompt: string, answer: number, typical: number[
 
 export const numeric = (prompt: string, answer: number, explanation: string, unit?: string, tolerance?: number, difficulty: Difficulty = 1): Draft => ({
   type: "numeric",
-  prompt,
+  prompt: frText(prompt),
   answer: Math.round(answer * 1e6) / 1e6,
-  explanation,
+  explanation: frText(explanation),
   difficulty,
   ...(unit ? { unit } : {}),
   ...(tolerance !== undefined ? { tolerance } : {}),

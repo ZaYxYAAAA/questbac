@@ -27,9 +27,9 @@ missions IA sont remplacées par du contenu d'exemple (badge « Mode démo » da
 
 | Module | Ce qu'il fait |
 |---|---|
-| 🗺️ **Carte** | ~100 chapitres alignés sur les programmes (8 matières × 3 niveaux), chemin de progression, étoiles |
-| 🎯 **Missions** | Questions **générées à chaque partie** pour les 106 chapitres (valeurs tirées au hasard en sciences, grandes banques de connaissances ailleurs), sans retomber sur une question déjà vue ; QCM / vrai-faux / réponse numérique, combos, explications |
-| 💀 **Boss** | 17 boss (un par matière/niveau) : PV, 3 cœurs, chrono, coups critiques, phase « enragé », déblocage par chapitres |
+| 🗺️ **Carte** | 149 chapitres alignés sur les programmes officiels, dont ceux de 2026 (9 matières dont l'espagnol × 3 niveaux), chemin de progression, étoiles |
+| 🎯 **Missions** | Questions **générées à chaque partie** pour les 149 chapitres (valeurs tirées au hasard en sciences, grandes banques de connaissances ailleurs), sans retomber sur une question déjà vue ; QCM / vrai-faux / réponse numérique, combos, explications |
+| 💀 **Boss** | 18 boss (un par matière/niveau, plus El Toro Gramático en espagnol) : PV, 3 cœurs, chrono, coups critiques, phase « enragé », déblocage par chapitres |
 | 🏆 **Progression** | XP & niveaux, rangs Bronze → Légende avec divisions, séries de jours, 19 succès, 3 quêtes du jour + coffre |
 | 📊 **Classement** | Vrais joueurs uniquement : ligue de la semaine, amis, hebdomadaire, global (RP) et par classe |
 | 🧪 **Labo** | 10 labos : traceur universel (paramètres animables, dérivée), affine, vecteurs & produit scalaire, second degré, sécante → tangente, cercle trigo, suites (toile d'araignée), exp/ln, intégrales (Riemann), loi binomiale |
@@ -164,7 +164,8 @@ pourront tourner telles quelles côté serveur.
 ## Questions générées
 
 - `src/lib/content/gen/` : un fichier par matière (maths 2nde / 1re / Tle, physique-chimie, SVT,
-  histoire-géo, lettres et philo, SES et anglais). Chaque chapitre a plusieurs **générateurs** :
+  histoire-géo, lettres et philo, SES, anglais et espagnol, plus des fichiers « 2 » d'extension :
+  `histoire2`, `sciences2`, `humanites2`, `maths-2026`). Chaque chapitre a plusieurs **générateurs** :
   calculs aux valeurs tirées au hasard, ou tables de connaissances déclinées en question directe,
   question inverse et vrai/faux.
 - `src/lib/content/generated.ts` tire les questions en faisant tourner les générateurs, sans doublon,

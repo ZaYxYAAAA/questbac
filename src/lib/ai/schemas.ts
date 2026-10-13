@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Difficulty, Question } from "@/lib/types";
 
 const level = z.enum(["seconde", "premiere", "terminale"]);
-const subject = z.enum(["maths", "physique", "svt", "histoire", "francais", "philo", "ses", "anglais"]);
+const subject = z.enum(["maths", "physique", "svt", "histoire", "francais", "philo", "ses", "anglais", "espagnol"]);
 
 // ───────────── Requêtes ─────────────
 

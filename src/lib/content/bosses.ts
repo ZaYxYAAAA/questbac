@@ -139,6 +139,14 @@ export const BOSSES: Boss[] = [
     taunts: ["Wrong tense, sailor!", "You mustn't fail... but you did.", "I have been waiting for this."],
     defeatLine: "I... would have won, if only...",
   },
+  {
+    id: "toro-gramatico", name: "El Toro Gramático", title: "Gardien du subjonctif", emoji: "🐂",
+    subject: "espagnol", level: "all", hp: 110, secondsPerQuestion: 20, unlockChapters: 2, xpReward: 300, rpReward: 70,
+    gradient: "from-red-600 via-orange-700 to-amber-900",
+    intro: "¡Olé! Si quieres pasar, conjuga sin errores.",
+    taunts: ["¡Ser o estar, esa es la cuestión!", "¿Subjuntivo? ¡Nunca lo dominarás!", "¡Te falta un acento!"],
+    defeatLine: "¡Ay, caramba... me has ganado!",
+  },
 ];
 
 export const bossById = (id: string) => BOSSES.find((b) => b.id === id);

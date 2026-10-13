@@ -9,7 +9,7 @@ const year = (y: number) => (y < 0 ? `${-y} av. J.-C.` : String(y));
  * Quatre générateurs à partir d'une frise d'événements : trouver l'année,
  * l'événement d'une année, le plus ancien parmi quatre, et vrai/faux sur une date.
  */
-function chrono(events: readonly Event[]): Generator[] {
+export function chrono(events: readonly Event[]): Generator[] {
   const uniqueYears = events.filter(([, y]) => events.filter(([, z]) => z === y).length === 1);
   return [
     (r) => {

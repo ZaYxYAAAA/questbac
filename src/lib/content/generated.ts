@@ -7,8 +7,13 @@ import type { Level, Question, SubjectId } from "@/lib/types";
 import { hashString, shuffle } from "@/lib/game/quests";
 import { CHAPTERS, chapterById } from "./curriculum";
 import type { Generator, Rand } from "./gen/kit";
+import { ESPAGNOL } from "./gen/espagnol";
 import { HISTOIRE } from "./gen/histoire";
+import { HISTOIRE2 } from "./gen/histoire2";
+import { HUMANITES2 } from "./gen/humanites2";
+import { SCIENCES2 } from "./gen/sciences2";
 import { LETTRES } from "./gen/lettres";
+import { MATHS_2026, STATS_CLASSES } from "./gen/maths-2026";
 import { MATHS_PREMIERE } from "./gen/maths-premiere";
 import { MATHS_SECONDE } from "./gen/maths-seconde";
 import { MATHS_TERMINALE } from "./gen/maths-terminale";
@@ -21,11 +26,17 @@ export const CHAPTER_GENERATORS: Record<string, Generator[]> = {
   ...MATHS_SECONDE,
   ...MATHS_PREMIERE,
   ...MATHS_TERMINALE,
+  ...MATHS_2026,
+  "maths-2-stats": [...MATHS_SECONDE["maths-2-stats"], STATS_CLASSES],
   ...PHYSIQUE,
   ...SVT,
   ...HISTOIRE,
   ...LETTRES,
   ...SES_ANGLAIS,
+  ...ESPAGNOL,
+  ...HISTOIRE2,
+  ...SCIENCES2,
+  ...HUMANITES2,
 };
 
 export const hasGenerators = (chapterId: string) => (CHAPTER_GENERATORS[chapterId]?.length ?? 0) > 0;

@@ -20,11 +20,6 @@ import {
 } from "./kit";
 
 const pt = (...n: number[]) => `(${n.map((v) => tex(v)).join("\\,;\\,")})`;
-const isPrime = (n: number) => {
-  if (n < 2) return false;
-  for (let d = 2; d * d <= n; d++) if (n % d === 0) return false;
-  return true;
-};
 
 // ───────────── Nombres et calculs ─────────────
 
@@ -80,10 +75,28 @@ const nombres: Generator[] = [
       [p + (up ? -1 : 1) * (p * t) / 100, p + (up ? t : -t), (p * t) / 100], `Coefficient multiplicateur : $1 ${up ? "+" : "-"} ${tex(t / 100)} = ${tex(1 + (up ? t : -t) / 100)}$, donc $${p} \\times ${tex(1 + (up ? t : -t) / 100)} = ${tex(ans)}$.`, "€");
   },
   (r) => {
-    const n = int(r, 21, 199);
-    const prime = isPrime(n);
-    const div = [2, 3, 5, 7, 11, 13].find((d) => n % d === 0 && d !== n);
-    return tf(`$${n}$ est un nombre premier.`, prime, prime ? `$${n}$ n'a que deux diviseurs : 1 et lui-même.` : `$${n} = ${div} \\times ${n / div!}$.`);
+    // Programme 2026 : multiples, diviseurs, parité (les nombres premiers ne sont plus exigés).
+    const d = pick(r, [2, 3, 4, 5, 6, 7, 9, 11, 12, 15]), n = int(r, 12, 300);
+    const isMultiple = r() < 0.5 ? true : n % d === 0;
+    const m = isMultiple ? d * int(r, 3, 40) : n % d === 0 ? n + 1 : n;
+    return oneOf(r, [
+      () => tf(`$${m}$ est un multiple de $${d}$.`, m % d === 0, m % d === 0 ? `$${m} = ${d} \\times ${m / d}$.` : `$${m} = ${d} \\times ${Math.floor(m / d)} + ${m % d}$ : le reste n'est pas nul.`),
+      () => tf(`$${m}$ est un nombre pair.`, m % 2 === 0, `Un nombre est pair s'il est multiple de 2 (chiffre des unités 0, 2, 4, 6 ou 8).`),
+      () => tf(`$${d}$ est un diviseur de $${m}$.`, m % d === 0, m % d === 0 ? `$${m} \\div ${d} = ${m / d}$.` : `La division de $${m}$ par $${d}$ ne tombe pas juste.`),
+      () => {
+        const a = int(r, 1, 30);
+        return tf(`Pour tout entier $n$, $2n + ${2 * a + 1}$ est impair.`, true, `$2n + ${2 * a + 1} = 2(n + ${a}) + 1$ : c'est un nombre impair.`);
+      },
+    ]);
+  },
+  (r) => {
+    // Valeur absolue (ajoutée au programme 2026).
+    const a = int(r, -9, 9), b = int(r, 1, 8);
+    return oneOf(r, [
+      () => numeric(`$|${a} - ${par(b)}| = \\;?$`, Math.abs(a - b), `$|${a - b}| = ${Math.abs(a - b)}$ : une valeur absolue est toujours positive.`),
+      () => mcq(r, `Solutions de $|x - ${par(a)}| = ${b}$ ?`, `$\\{${a - b}\\,;\\,${a + b}\\}$`, [`$\\{${-a - b}\\,;\\,${-a + b}\\}$`, `$\\{${a + b}\\}$`, `$\\{${b - a}\\,;\\,${a + b}\\}$`], `Les nombres à distance $${b}$ de $${a}$ : $${a} - ${b}$ et $${a} + ${b}$.`),
+      () => mcq(r, `$|x - ${par(a)}| \\leq ${b}$ équivaut à $x \\in \\;?$`, `$[${a - b}\\,;\\,${a + b}]$`, [`$]${a - b}\\,;\\,${a + b}[$`, `$[${-b}\\,;\\,${b}]$`, `$[${a}\\,;\\,${a + b}]$`], `Distance à $${a}$ inférieure ou égale à $${b}$.`),
+    ]);
   },
   (r) => {
     const a = int(r, -15, 15), b = int(r, -15, 15);
