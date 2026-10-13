@@ -3,7 +3,9 @@
 import { useState } from "react";
 import clsx from "clsx";
 import { AccountSection } from "@/components/layout/AccountSection";
+import { Avatar } from "@/components/game/Avatar";
 import { AccuracyBars, MasteryRadar, XpBarChart } from "@/components/game/Charts";
+import { PhotoPicker } from "@/components/game/PhotoPicker";
 import { RankBadge } from "@/components/game/RankBadge";
 import { Button } from "@/components/ui/Button";
 import { Card, SectionTitle } from "@/components/ui/Card";
@@ -43,7 +45,7 @@ export default function ProfilePage() {
   return (
     <div className="space-y-6">
       <section className="flex flex-col items-center gap-4 rounded-3xl border border-white/10 bg-gradient-to-br from-violet-700/30 to-slate-950 p-6 text-center sm:flex-row sm:text-left">
-        <div className="grid h-24 w-24 place-items-center rounded-3xl bg-slate-950/60 text-6xl ring-2 ring-violet-400/50">{profile.avatar}</div>
+        <Avatar emoji={profile.avatar} photo={profile.photo} name={profile.pseudo} size="xl" rp={game.rp} className="m-1" />
         <div className="flex-1">
           <h1 className="text-3xl font-black text-white">{profile.pseudo}</h1>
           <p className="text-slate-400">{levelLabel(profile.level)} · inscrit le {new Date(profile.createdAt).toLocaleDateString("fr-FR")}</p>
@@ -140,6 +142,22 @@ export default function ProfilePage() {
               <Button variant="secondary" disabled={pseudo.trim().length < 2 || pseudo === profile.pseudo} onClick={() => game.updateProfile({ pseudo: pseudo.trim() })}>Renommer</Button>
             </div>
           )}
+          <div className="space-y-3">
+            <p className="text-sm font-bold text-slate-300">Photo de profil</p>
+            <div className="flex flex-wrap items-center gap-4">
+              <Avatar emoji={profile.avatar} photo={profile.photo} name={profile.pseudo} size="lg" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <PhotoPicker
+                  hasPhoto={Boolean(profile.photo)}
+                  onChange={(p) => game.updateProfile(p ? { photo: p.photo, photoThumb: p.photoThumb } : { photo: undefined, photoThumb: undefined })}
+                />
+                <p className="text-xs text-slate-500">
+                  Sans photo, c&apos;est ton emoji qui s&apos;affiche. Les autres joueurs voient une miniature de ta photo dans le classement.
+                </p>
+              </div>
+            </div>
+            <p className="text-sm font-bold text-slate-300">Emoji{profile.photo ? " (affiché si tu retires ta photo)" : ""}</p>
+          </div>
           <div className="grid grid-cols-8 gap-2">
             {AVATARS.map((a) => (
               <button key={a} type="button" onClick={() => game.updateProfile({ avatar: a })} className={clsx("grid aspect-square place-items-center rounded-xl text-2xl", profile.avatar === a ? "bg-violet-600 ring-2 ring-violet-300" : "bg-slate-800 hover:bg-slate-700")} aria-label={`Avatar ${a}`}>

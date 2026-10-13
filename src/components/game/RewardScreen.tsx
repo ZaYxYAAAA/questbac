@@ -3,6 +3,7 @@
 import { type ReactNode, useEffect, useState } from "react";
 import clsx from "clsx";
 import { ArrowUpCircle, RotateCcw, Star, Trophy } from "lucide-react";
+import { Avatar } from "@/components/game/Avatar";
 import { Button, LinkButton } from "@/components/ui/Button";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { levelFromXp } from "@/lib/game/progression";
@@ -61,6 +62,8 @@ export function RewardScreen({
   children?: ReactNode;
 }) {
   const xp = useGame((s) => s.xp);
+  const rp = useGame((s) => s.rp);
+  const profile = useGame((s) => s.profile);
   const level = levelFromXp(xp);
   const counted = useCountUp(summary.xpGained);
   const levelUp = summary.levelAfter > summary.levelBefore;
@@ -112,8 +115,9 @@ export function RewardScreen({
             </div>
           )}
           {summary.rankUp && (
-            <div className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-400 to-violet-500 p-3 font-black text-slate-950">
-              <Trophy /> Promotion : {summary.rankBefore} → {summary.rankAfter}
+            <div className="flex items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-cyan-400 to-violet-500 p-3 font-black text-slate-950">
+              {profile ? <Avatar emoji={profile.avatar} photo={profile.photo} name={profile.pseudo} size="md" rp={rp} /> : <Trophy />}
+              <span>Promotion : {summary.rankBefore} → {summary.rankAfter}</span>
             </div>
           )}
         </div>

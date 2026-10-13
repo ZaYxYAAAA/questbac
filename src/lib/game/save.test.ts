@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildLeaderboard, realEntries } from "./leaderboard";
 import { weekKey } from "./progression";
-import { type PublicProfile, migrateSave, parseSave, publicProfileFrom, toGameData } from "./save";
+import { MAX_PHOTO_CHARS } from "./photo";
+import { type PublicProfile, SaveSchema, migrateSave, parseSave, publicProfileFrom, toGameData } from "./save";
 import { createInitialData } from "./state";
 
 const now = new Date(2026, 9, 12, 10);
@@ -26,6 +27,24 @@ describe("migration des sauvegardes", () => {
     expect(Object.keys(toGameData({ ...d, extra: 1 } as never))).not.toContain("extra");
   });
 
+  it("range la photo à part de l'emoji et retire les photos invalides", () => {
+    const jpeg = "data:image/jpeg;base64,/9j/4AAQSkZJRg==";
+    const old = migrateSave({ ...createInitialData(now), profile: { pseudo: "Lina", avatar: jpeg, level: "premiere", createdAt: 1 } })!;
+    expect(old.profile).toMatchObject({ avatar: "🦊", photo: jpeg });
+    const bad = migrateSave({ ...createInitialData(now), profile: { pseudo: "Lina", avatar: "🐼", photo: "javascript:alert(1)", photoThumb: jpeg, level: "premiere", createdAt: 1 } })!;
+    expect(bad.profile).toMatchObject({ avatar: "🐼", photoThumb: jpeg });
+    expect(bad.profile && "photo" in bad.profile).toBe(false);
+  });
+
+  it("refuse une photo trop lourde côté serveur", () => {
+    const huge = `data:image/jpeg;base64,${"A".repeat(MAX_PHOTO_CHARS + 10)}`;
+    const save = { ...createInitialData(now), profile: { pseudo: "Lina", avatar: "🐼", level: "premiere" as const, createdAt: 1 } };
+    const parsed = parseSave({ ...save, profile: { ...save.profile, photo: huge } });
+    expect(parsed.ok && parsed.data.profile?.photo).toBe(undefined);
+    expect(SaveSchema.safeParse({ ...save, profile: { ...save.profile, photo: huge } }).success).toBe(false);
+    expect(SaveSchema.safeParse({ ...save, profile: { ...save.profile, avatar: "x".repeat(100) } }).success).toBe(false);
+  });
+
   it("valide la forme", () => {
     expect(parseSave(createInitialData(now)).ok).toBe(true);
     expect(parseSave({ ...createInitialData(now), xp: "beaucoup" }).ok).toBe(false);
@@ -42,7 +61,16 @@ describe("classement réel", () => {
     const save = { ...createInitialData(now), xp: 1000, rp: 250, profile: { pseudo: "x", avatar: "data:" + "a".repeat(30_000), level: "terminale" as const, createdAt: 1 } };
     const p = publicProfileFrom({ id: "u1", pseudo: "Lina" }, save);
     expect(p).toMatchObject({ id: "u1", pseudo: "Lina", level: "terminale", rp: 250, xp: 1000 });
-    expect(p.avatar).toBe("🙂"); // photo trop lourde pour le classement
+    expect(p.avatar).toBe("🙂"); // l'avatar public reste un emoji
+  });
+
+  it("ne publie que la miniature de la photo", () => {
+    const thumb = "data:image/jpeg;base64,AAAA";
+    const save = { ...createInitialData(now), profile: { pseudo: "x", avatar: "🐼", photo: "data:image/jpeg;base64,BBBB", photoThumb: thumb, level: "premiere" as const, createdAt: 1 } };
+    const p = publicProfileFrom({ id: "u1", pseudo: "Lina" }, save);
+    expect(p.photoThumb).toBe(thumb);
+    expect(JSON.stringify(p)).not.toContain("BBBB");
+    expect(realEntries([p], null, now)[0].photo).toBe(thumb);
   });
 
   it("fusionne vrais joueurs et rivaux, sans doublon du joueur", () => {

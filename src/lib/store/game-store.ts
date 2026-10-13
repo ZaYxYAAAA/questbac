@@ -82,8 +82,9 @@ export const useGame = create<GameStore>()(
     },
     {
       name: "questbac-save",
-      version: 2,
-      // v1 → v2 : ajout de `updatedAt` ; la migration complète sans rien effacer.
+      version: 3,
+      // v1 → v2 : ajout de `updatedAt` ; v2 → v3 : photo de profil à part de l'emoji.
+      // La migration complète sans rien effacer.
       migrate: (persisted) => (migrateSave(persisted) ?? createInitialData()) as GameStore,
     },
   ),

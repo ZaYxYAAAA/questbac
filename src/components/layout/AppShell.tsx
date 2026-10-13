@@ -7,6 +7,7 @@ import clsx from "clsx";
 import { FlaskConical, GraduationCap, Hammer, Home, Map as MapIcon, Skull, Trophy, User } from "lucide-react";
 import { Onboarding } from "@/components/layout/Onboarding";
 import { SaveIndicator } from "@/components/layout/SaveIndicator";
+import { Avatar } from "@/components/game/Avatar";
 import { Toaster } from "@/components/game/Toaster";
 import { RankBadge } from "@/components/game/RankBadge";
 import { ProgressBar } from "@/components/ui/ProgressBar";
@@ -50,8 +51,8 @@ function Hud() {
         🔥 {streak.count}
       </span>
       <Link href="/classement" className="hidden sm:block"><RankBadge rp={rp} size="sm" /></Link>
-      <Link href="/profil" aria-label="Mon profil" className="grid h-9 w-9 place-items-center rounded-full bg-slate-800 text-xl ring-2 ring-violet-500/50 transition hover:ring-violet-400">
-        {profile.avatar}
+      <Link href="/profil" aria-label="Mon profil" className="rounded-full transition hover:brightness-110">
+        <Avatar emoji={profile.avatar} photo={profile.photoThumb ?? profile.photo} name={profile.pseudo} size="sm" rp={rp} />
       </Link>
     </div>
   );

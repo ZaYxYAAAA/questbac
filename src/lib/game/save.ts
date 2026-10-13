@@ -4,6 +4,7 @@
  */
 import { z } from "zod";
 import type { Level } from "@/lib/types";
+import { MAX_PHOTO_CHARS, MAX_THUMB_CHARS, isPhotoDataUrl } from "./photo";
 import { levelFromXp, weekKey } from "./progression";
 import { type GameData, createInitialData } from "./state";
 
@@ -34,8 +35,31 @@ export function migrateSave(raw: unknown): GameData | null {
     merged[k] = isObject(b) && isObject(v) && (k === "streak" || k === "stats" || k === "quests" || k === "weekly") ? { ...b, ...v } : v;
   }
   merged.version = 1;
+  if (isObject(merged.profile)) merged.profile = migrateProfile(merged.profile);
   merged.updatedAt = typeof raw.updatedAt === "number" && Number.isFinite(raw.updatedAt) ? raw.updatedAt : 0;
   return merged as unknown as GameData;
+}
+
+/** Emoji par défaut quand l'avatar enregistré n'en est pas un. */
+export const DEFAULT_AVATAR = "🦊";
+const MAX_AVATAR_CHARS = 32;
+
+/**
+ * Photo rangée à part de l'emoji : une ancienne photo stockée dans `avatar`
+ * passe dans `photo`, et une photo invalide ou trop lourde est retirée.
+ */
+function migrateProfile(profile: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...profile };
+  const avatar = out.avatar;
+  if (typeof avatar === "string" && avatar.startsWith("data:")) {
+    if (out.photo === undefined && isPhotoDataUrl(avatar)) out.photo = avatar;
+    out.avatar = DEFAULT_AVATAR;
+  } else if (typeof avatar !== "string" || !avatar || avatar.length > MAX_AVATAR_CHARS) {
+    out.avatar = DEFAULT_AVATAR;
+  }
+  if (out.photo !== undefined && !isPhotoDataUrl(out.photo, MAX_PHOTO_CHARS)) delete out.photo;
+  if (out.photoThumb !== undefined && !isPhotoDataUrl(out.photoThumb, MAX_THUMB_CHARS)) delete out.photoThumb;
+  return out;
 }
 
 /**
@@ -57,8 +81,9 @@ export const SaveSchema = z.looseObject({
   profile: z
     .looseObject({
       pseudo: z.string().min(1).max(40),
-      // Emoji ou image compressée (data URL).
-      avatar: z.string().max(400_000),
+      avatar: z.string().min(1).max(MAX_AVATAR_CHARS),
+      photo: z.string().refine((v) => isPhotoDataUrl(v, MAX_PHOTO_CHARS)).optional(),
+      photoThumb: z.string().refine((v) => isPhotoDataUrl(v, MAX_THUMB_CHARS)).optional(),
       level,
       createdAt: num,
     })
@@ -86,6 +111,8 @@ export interface PublicProfile {
   id: string;
   pseudo: string;
   avatar: string;
+  /** Miniature 64 × 64 de la photo de profil, s'il y en a une. */
+  photoThumb?: string;
   level: Level;
   playerLevel: number;
   rp: number;
@@ -95,15 +122,15 @@ export interface PublicProfile {
   updatedAt: number;
 }
 
-/** Au-delà, l'avatar (photo) est jugé trop lourd pour le classement : on met un emoji. */
-export const MAX_PUBLIC_AVATAR = 24_000;
-
+/** Seule la miniature est publiée (jamais la grande photo) ; l'avatar reste un emoji. */
 export function publicProfileFrom(account: { id: string; pseudo: string }, save: GameData): PublicProfile {
   const avatar = save.profile?.avatar ?? "🙂";
+  const thumb = save.profile?.photoThumb;
   return {
     id: account.id,
     pseudo: account.pseudo,
-    avatar: avatar.length <= MAX_PUBLIC_AVATAR ? avatar : "🙂",
+    avatar: avatar.length <= MAX_AVATAR_CHARS && !avatar.startsWith("data:") ? avatar : "🙂",
+    ...(isPhotoDataUrl(thumb, MAX_THUMB_CHARS) ? { photoThumb: thumb } : {}),
     level: save.profile?.level ?? "premiere",
     playerLevel: levelFromXp(save.xp).level,
     rp: Math.round(save.rp),

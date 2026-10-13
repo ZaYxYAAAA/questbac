@@ -17,7 +17,12 @@ import { CHEST_XP, type QuestDef, type QuestEvent, dailyQuests } from "./quests"
 
 export interface Profile {
   pseudo: string;
+  /** Emoji, affiché quand il n'y a pas de photo. */
   avatar: string;
+  /** Photo de profil : JPEG 256 × 256 en data URL. */
+  photo?: string;
+  /** Miniature 64 × 64 de la photo, seule partagée dans le classement. */
+  photoThumb?: string;
   level: Level;
   createdAt: number;
 }

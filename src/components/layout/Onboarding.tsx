@@ -3,6 +3,9 @@
 import { type FormEvent, useState } from "react";
 import clsx from "clsx";
 import { Sparkles, TriangleAlert } from "lucide-react";
+import { Avatar } from "@/components/game/Avatar";
+import type { PhotoResult } from "@/components/game/PhotoEditor";
+import { PhotoPicker } from "@/components/game/PhotoPicker";
 import { FormError, LoginForm, PasswordInput, inputClass, labelClass } from "@/components/layout/AccountForms";
 import { Button } from "@/components/ui/Button";
 import { Tabs } from "@/components/ui/Tabs";
@@ -33,6 +36,7 @@ export function Onboarding() {
   const [pseudo, setPseudo] = useState("");
   const [password, setPassword] = useState("");
   const [avatar, setAvatar] = useState(AVATARS[0]);
+  const [photo, setPhoto] = useState<PhotoResult | null>(null);
   const [level, setLevel] = useState<Level>("premiere");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +46,7 @@ export function Onboarding() {
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (busy) return;
-    const profile = { pseudo: pseudo.trim().slice(0, 20), avatar, level };
+    const profile = { pseudo: pseudo.trim().slice(0, 20), avatar, level, ...(photo ?? {}) };
     if (guest) {
       if (valid) completeOnboarding(profile);
       return;
@@ -124,6 +128,13 @@ export function Onboarding() {
 
             <div>
               <p className={labelClass}>Ton avatar</p>
+              <div className="mb-4 flex flex-wrap items-center gap-4">
+                <Avatar emoji={avatar} photo={photo?.photo} name={pseudo.trim() || undefined} size="lg" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <PhotoPicker hasPhoto={Boolean(photo)} onChange={setPhoto} />
+                  <p className="text-xs text-slate-500">Facultatif : ajoute ta photo, ou choisis simplement un emoji.</p>
+                </div>
+              </div>
               <div className="grid grid-cols-8 gap-2">
                 {AVATARS.map((a) => (
                   <button

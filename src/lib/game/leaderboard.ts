@@ -14,6 +14,8 @@ export interface LeaderboardEntry {
   id: string;
   pseudo: string;
   avatar: string;
+  /** Photo de profil (miniature pour les autres joueurs). */
+  photo?: string;
   level: Level;
   playerLevel: number;
   weeklyXp: number;
@@ -70,6 +72,7 @@ export function realEntries(players: PublicProfile[], selfId: string | null, now
       id: `real-${p.id}`,
       pseudo: p.pseudo,
       avatar: p.avatar,
+      photo: p.photoThumb,
       level: p.level,
       playerLevel: p.playerLevel,
       weeklyXp: currentWeeklyXp(p, now),

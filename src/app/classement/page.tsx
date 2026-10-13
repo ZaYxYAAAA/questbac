@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
+import { Avatar } from "@/components/game/Avatar";
 import { RankBadge } from "@/components/game/RankBadge";
 import { Tabs } from "@/components/ui/Tabs";
 import { levelLabel } from "@/lib/content/curriculum";
@@ -35,7 +36,7 @@ export default function LeaderboardPage() {
   const entries = useMemo(
     () =>
       buildLeaderboard(
-        { pseudo: profile.pseudo, avatar: profile.avatar, level: profile.level, playerLevel: levelFromXp(game.xp).level, weeklyXp: game.weekly.xp, rp: game.rp },
+        { pseudo: profile.pseudo, avatar: profile.avatar, photo: profile.photo ?? profile.photoThumb, level: profile.level, playerLevel: levelFromXp(game.xp).level, weeklyXp: game.weekly.xp, rp: game.rp },
         scope,
         new Date(),
         realEntries(players, selfId),
@@ -77,7 +78,7 @@ export default function LeaderboardPage() {
           return (
             <div key={e.id} className={clsx("rounded-3xl border p-4 text-center", e.isPlayer ? "border-violet-400 bg-violet-600/20" : "border-white/10 bg-slate-900/70", i === 0 ? "pb-8" : "pb-4")}>
               <div className="text-3xl">{PODIUM[i]}</div>
-              <div className={clsx("mx-auto my-2 grid place-items-center rounded-2xl bg-slate-800", i === 0 ? "h-16 w-16 text-4xl" : "h-12 w-12 text-3xl")}>{e.avatar}</div>
+              <Avatar emoji={e.avatar} photo={e.photo} name={e.pseudo} size={i === 0 ? "lg" : "md"} rp={e.rp} className="mx-auto my-2" />
               <p className="truncate font-bold text-white">{e.pseudo}</p>
               <p className="text-sm text-violet-300">{valueOf(e)}</p>
             </div>
@@ -89,7 +90,7 @@ export default function LeaderboardPage() {
         {entries.map((e, i) => (
           <div key={e.id} className={clsx("flex items-center gap-3 border-b border-white/5 px-4 py-2.5 last:border-0", e.isPlayer && "bg-violet-600/20")}>
             <span className={clsx("w-8 text-center font-black", i < 3 ? "text-amber-300" : "text-slate-500")}>{i + 1}</span>
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-slate-800 text-xl">{e.avatar}</span>
+            <Avatar emoji={e.avatar} photo={e.photo} name={e.pseudo} size="sm" rp={e.rp} />
             <div className="min-w-0 flex-1">
               <p className={clsx("flex items-center gap-1.5 font-semibold", e.isPlayer ? "text-violet-200" : "text-white")}>
                 <span className="truncate">{e.pseudo}{e.isPlayer && " (toi)"}</span>

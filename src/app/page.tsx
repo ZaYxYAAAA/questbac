@@ -4,6 +4,7 @@ import Link from "next/link";
 import clsx from "clsx";
 import { ArrowRight, CheckCircle2, Gift, Lock, Swords } from "lucide-react";
 import { XpBarChart } from "@/components/game/Charts";
+import { Avatar } from "@/components/game/Avatar";
 import { RankBadge } from "@/components/game/RankBadge";
 import { Card, SectionTitle } from "@/components/ui/Card";
 import { ProgressBar } from "@/components/ui/ProgressBar";
@@ -35,9 +36,16 @@ export default function HomePage() {
     <div className="space-y-6">
       {/* Bandeau joueur */}
       <section className="qb-glow relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-violet-700/40 via-slate-900 to-slate-950 p-5 sm:p-7">
-        <div className="absolute -right-10 -top-10 text-[10rem] opacity-10">{profile.avatar}</div>
+        {profile.photo ? (
+          // eslint-disable-next-line @next/next/no-img-element -- décor flouté
+          <img src={profile.photo} alt="" aria-hidden className="pointer-events-none absolute -right-10 -top-10 h-56 w-56 rounded-full object-cover opacity-15 blur-md" />
+        ) : (
+          <div aria-hidden className="absolute -right-10 -top-10 text-[10rem] opacity-10">{profile.avatar}</div>
+        )}
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center">
-          <div className="grid h-20 w-20 shrink-0 place-items-center rounded-3xl bg-slate-950/60 text-5xl ring-2 ring-violet-400/50">{profile.avatar}</div>
+          <Link href="/profil" aria-label="Mon profil" className="self-start rounded-full sm:self-center">
+            <Avatar emoji={profile.avatar} photo={profile.photo} name={profile.pseudo} size="xl" rp={game.rp} />
+          </Link>
           <div className="flex-1 space-y-2">
             <p className="text-sm text-violet-200">{levelLabel(profile.level)} · Série de {game.streak.count} jour{game.streak.count > 1 ? "s" : ""} 🔥</p>
             <h1 className="text-3xl font-black text-white">Salut {profile.pseudo} !</h1>
