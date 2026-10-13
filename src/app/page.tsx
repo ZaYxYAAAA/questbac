@@ -6,7 +6,7 @@ import { ArrowRight, CheckCircle2, Gift, Lock, Play, Swords } from "lucide-react
 import { Avatar } from "@/components/game/Avatar";
 import { DailyChest } from "@/components/game/DailyChest";
 import { NotificationsCard } from "@/components/layout/NotificationsCard";
-import { LeagueCard, LeagueResultBanner } from "@/components/game/LeagueCard";
+import { RankedHomeCard } from "@/components/ranked/RankedHomeCard";
 import { PlayerTitle } from "@/components/game/PlayerTitle";
 import { RankBadge } from "@/components/game/RankBadge";
 import { Card, SectionTitle } from "@/components/ui/Card";
@@ -60,7 +60,7 @@ export default function HomePage() {
               <RankBadge rp={game.rp} size="sm" />
             </div>
             <p className="mt-2 text-xs text-slate-400">
-              {rank.nextLabel ? <><b className="text-white">{rank.rpToNext} RP</b> → {rank.nextLabel}</> : "Sommet de l'échelle !"}
+              {rank.nextLabel ? <>Prochain : <b className="text-white">{rank.nextLabel}</b></> : "Sommet de l'échelle !"}
             </p>
           </Link>
           <Link href="/matieres" className="group rounded-2xl border border-violet-400/30 bg-gradient-to-br from-violet-500/15 to-indigo-600/5 p-3 transition hover:border-violet-300/60 sm:p-4">
@@ -91,12 +91,11 @@ export default function HomePage() {
         </Link>
       )}
 
-      <LeagueResultBanner />
       <NotificationsCard variant="home" />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2"><DailyChest /></div>
-        <LeagueCard />
+        <RankedHomeCard />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">

@@ -21,11 +21,11 @@ export interface DailyReward {
 export const DAILY_REWARDS: DailyReward[] = [
   { day: 1, xp: 30, rp: 0, emoji: "🪙" },
   { day: 2, xp: 40, rp: 0, emoji: "🪙" },
-  { day: 3, xp: 50, rp: 5, emoji: "💰" },
+  { day: 3, xp: 50, rp: 0, emoji: "💰" },
   { day: 4, xp: 60, rp: 0, emoji: "💰" },
-  { day: 5, xp: 80, rp: 5, emoji: "💎" },
-  { day: 6, xp: 100, rp: 5, emoji: "💎" },
-  { day: 7, xp: 200, rp: 20, emoji: "👑" },
+  { day: 5, xp: 80, rp: 0, emoji: "💎" },
+  { day: 6, xp: 100, rp: 0, emoji: "💎" },
+  { day: 7, xp: 250, rp: 0, emoji: "👑" },
 ];
 
 export type DailyStatus = "claimed" | "today" | "next" | "locked";

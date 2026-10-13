@@ -75,7 +75,7 @@ export function FriendsBoard({ player }: { player: Omit<LeaderboardEntry, "id" |
                 <span>Niv. {e.playerLevel} · {levelLabel(e.level)}</span>
               </p>
             </div>
-            <span className="w-24 text-right font-mono text-sm font-bold text-slate-200">{scope === "hebdo" ? `${e.weeklyXp} XP` : `${e.rp} RP`}</span>
+            <span className="w-24 text-right font-mono text-sm font-bold text-slate-200">{scope === "hebdo" ? `${e.weeklyXp} XP` : rankFromRp(e.rp).label}</span>
           </div>
         ))}
       </div>

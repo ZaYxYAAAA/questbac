@@ -1,6 +1,7 @@
 import { duelState } from "@/lib/game/duel";
 import { getSave } from "@/lib/server/accounts";
 import { listDuels, sideOf } from "@/lib/server/duels";
+import { settleIfNeeded } from "@/lib/server/ranked";
 import { sendPush, subscribedAccounts } from "@/lib/server/push";
 import { getStore } from "@/lib/server/store";
 
@@ -23,6 +24,9 @@ export async function GET(req: Request) {
   const auth = req.headers.get("authorization");
   const fromVercel = (req.headers.get("user-agent") ?? "").startsWith("vercel-cron");
   if (secret ? auth !== `Bearer ${secret}` : !fromVercel) return new Response("Forbidden", { status: 403 });
+
+  // Promotions de la semaine classée (au cas où personne n'a ouvert l'appli depuis lundi).
+  await settleIfNeeded().catch((e) => console.error("[classé] clôture de semaine", e));
 
   const today = parisDay(), yesterday = parisDay(-1);
   const store = getStore();

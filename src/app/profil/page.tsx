@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { RankedProfileGrid } from "@/components/ranked/RankedProfileGrid";
 import clsx from "clsx";
 import { Lock } from "lucide-react";
 import { AccountSection } from "@/components/layout/AccountSection";
@@ -69,6 +70,8 @@ export default function ProfilePage() {
           )}
         </div>
       </section>
+
+      <RankedProfileGrid />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {stats.map((s) => (
@@ -195,7 +198,7 @@ function TitlesAndFrames() {
         Titres et cadres
       </SectionTitle>
       <p className="mb-3 text-sm text-slate-400">
-        Chaque palier atteint débloque un titre et un cadre d&apos;avatar, gardés même si tu perds des RP. Ils sont visibles dans le classement.
+        Chaque palier atteint débloque un titre et un cadre d&apos;avatar, gardés même si tu redescends. Ils sont visibles dans le classement.
       </p>
 
       <p className="mb-2 text-sm font-bold text-slate-300">Titre affiché</p>
@@ -220,7 +223,7 @@ function TitlesAndFrames() {
               <span className="min-w-0">
                 <span className="block truncate text-sm font-bold" style={{ color: open ? tier.color : undefined }}>{open ? r.title : "???"}</span>
                 <span className="block truncate text-[11px] text-slate-500">
-                  {open ? tier.name : <><Lock size={10} className="mr-0.5 inline" />{tier.name} · {tier.minRp} RP</>}
+                  {open ? tier.name : <><Lock size={10} className="mr-0.5 inline" />{tier.name}</>}
                 </span>
               </span>
             </button>

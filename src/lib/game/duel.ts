@@ -19,8 +19,8 @@ const TIE_MARGIN_MS = 500;
 export type DuelOutcome = "win" | "loss" | "draw";
 
 export const DUEL_REWARDS: Record<DuelOutcome, { xp: number; rp: number; label: string }> = {
-  win: { xp: 120, rp: 25, label: "Duel gagné" },
-  draw: { xp: 60, rp: 10, label: "Duel à égalité" },
+  win: { xp: 150, rp: 0, label: "Duel gagné" },
+  draw: { xp: 75, rp: 0, label: "Duel à égalité" },
   loss: { xp: 30, rp: 0, label: "Duel perdu (consolation)" },
 };
 

@@ -1,5 +1,7 @@
 import { MAX_SAVE_BYTES, parseSave } from "@/lib/game/save";
+import { stepMinRp } from "@/lib/game/ranked";
 import { currentSession, getSave, jsonError, putSave, readJson, storageDown } from "@/lib/server/accounts";
+import { generalStep } from "@/lib/server/ranked";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,6 +30,12 @@ export async function PUT(req: Request) {
     }
     // Le pseudo du compte fait foi (il sert à se connecter et au classement).
     if (save.profile) save.profile = { ...save.profile, pseudo: session.pseudo };
+    // Le rang affiché partout est le rang Général du mode classé, tenu par le serveur.
+    const step = await generalStep(session.uid);
+    if (step !== null) {
+      save.rp = stepMinRp(step);
+      save.peakRp = Math.max(save.peakRp, save.rp);
+    }
     await putSave({ id: session.uid, pseudo: session.pseudo }, save);
     return Response.json({ ok: true, updatedAt: save.updatedAt });
   } catch (error) {

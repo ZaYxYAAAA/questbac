@@ -108,7 +108,7 @@ export function DailyChest() {
           ))}
         </ol>
       </div>
-      <p className="mt-3 text-xs text-slate-500">Un jour manqué et le calendrier repart du jour 1. Le 7e jour : grand coffre (+200 XP, +20 RP).</p>
+      <p className="mt-3 text-xs text-slate-500">Un jour manqué et le calendrier repart du jour 1. Le 7e jour : grand coffre (+250 XP).</p>
     </Card>
   );
 }

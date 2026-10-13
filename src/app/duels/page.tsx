@@ -143,7 +143,7 @@ export default function DuelsPage() {
             </div>
             <Button type="submit" disabled={busy || !friendId || !chapterId} className="w-full"><Swords size={16} /> Défier</Button>
             <p className="text-xs text-slate-400">
-              Victoire +{DUEL_REWARDS.win.xp} XP et +{DUEL_REWARDS.win.rp} RP · égalité +{DUEL_REWARDS.draw.xp} XP · défaite +{DUEL_REWARDS.loss.xp} XP. {DUEL_SIZE} questions éclair, {DUEL_SECONDS} s chacune, à faire de tête. Le duel expire après 72 h.
+              Victoire +{DUEL_REWARDS.win.xp} XP · égalité +{DUEL_REWARDS.draw.xp} XP · défaite +{DUEL_REWARDS.loss.xp} XP. {DUEL_SIZE} questions éclair, {DUEL_SECONDS} s chacune, à faire de tête. Le duel expire après 72 h.
             </p>
           </>
         )}

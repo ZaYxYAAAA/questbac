@@ -59,19 +59,23 @@ describe("démarrage d'un appareil aux données anciennes", () => {
 });
 
 describe("ligue et coffre quotidien dans le store", () => {
-  it("clôt une ligue passée au refresh sans modifier updatedAt", () => {
+  it("change de semaine au refresh sans modifier updatedAt", () => {
     const lastWeek = new Date(Date.now() - 8 * 86_400_000);
     const old = { ...createInitialData(lastWeek), profile, rp: 100, peakRp: 100, updatedAt: lastWeek.getTime() };
-    const rivals = [1, 2, 3].map((i) => ({ id: `real-${i}`, pseudo: `J${i}`, avatar: "🐼", weeklyXp: i * 10 }));
-    useGame.setState({ ...old, weekly: { ...old.weekly, xp: 5000 }, league: { ...old.league, rivals } });
+    useGame.setState({ ...old, weekly: { ...old.weekly, xp: 5000 } });
     useGame.getState().refresh();
     const s = useGame.getState();
-    expect(s.league.last).toMatchObject({ seen: false });
+    expect(s.weekly.xp).toBe(0);
     expect(s.league.week).not.toBe(old.league.week);
     expect(s.updatedAt).toBe(old.updatedAt);
-    useGame.getState().acknowledgeLeague();
-    expect(useGame.getState().league.last?.seen).toBe(true);
-    expect(useGame.getState().updatedAt).toBeGreaterThan(old.updatedAt);
+  });
+
+  it("recopie le rang Général du classé sans toucher à updatedAt", () => {
+    useGame.setState({ ...createInitialData(), profile, rp: 0, peakRp: 0, updatedAt: 5 });
+    useGame.getState().syncRankedStep(6);
+    expect(useGame.getState().rp).toBe(800);
+    expect(useGame.getState().peakRp).toBe(800);
+    expect(useGame.getState().updatedAt).toBe(5);
   });
 
   it("le coffre du jour ne s'ouvre qu'une fois", () => {

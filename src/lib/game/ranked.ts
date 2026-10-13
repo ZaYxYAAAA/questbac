@@ -1,0 +1,318 @@
+/**
+ * Mode classé : manches de 10 questions corrigées par le serveur, groupes de
+ * la semaine et promotions décidées le dimanche soir, un rang par matière
+ * (plus un rang « Général » qui mélange les matières du niveau).
+ *
+ * Tout ici est pur (sans stockage) pour être testé et partagé client / serveur.
+ */
+import { SUBJECTS, subjectsForLevel } from "@/lib/content/curriculum";
+import type { Level, Question, SubjectId } from "@/lib/types";
+import { LEAGUE_MIN_SIZE, promotionSpots, relegationSpots, weekEnd } from "./league";
+import { weekKey } from "./progression";
+import { RANK_STEPS, stepIndex } from "./ranks";
+
+export type RankedSubject = SubjectId | "general";
+
+export const RANKED_SUBJECTS: RankedSubject[] = ["general", ...SUBJECTS.map((s) => s.id)];
+export const isRankedSubject = (s: unknown): s is RankedSubject => typeof s === "string" && (RANKED_SUBJECTS as string[]).includes(s);
+
+/** Matières jouables en classé pour un niveau (la philo n'existe qu'en Terminale). */
+export const rankedSubjectsFor = (level: Level): RankedSubject[] => ["general", ...subjectsForLevel(level).map((s) => s.id)];
+
+export const rankedSubjectMeta = (s: RankedSubject) =>
+  s === "general" ? { id: s, name: "Général", emoji: "⭐", gradient: "from-amber-400 to-orange-600", color: "#f59e0b" } : SUBJECTS.find((x) => x.id === s)!;
+
+export const MATCH_SIZE = 10;
+/** Seules les meilleures manches de la semaine comptent (jouer mieux plutôt que plus). */
+export const COUNTED_MATCHES = 10;
+/** Minimum de manches pour être classé dans la semaine. */
+export const MIN_MATCHES = 3;
+/** Manches de placement avant d'obtenir un rang dans une matière. */
+export const PLACEMENT_MATCHES = 5;
+/** Taille maximale d'un groupe de la semaine. */
+export const GROUP_SIZE = 20;
+/** À partir de Platine III, une semaine sans jouer fait perdre une division. */
+export const DECAY_FROM_STEP = RANK_STEPS.findIndex((s) => s.tier.id === "platine");
+/** Le placement ne peut pas dépasser Or III. */
+const PLACEMENT_MAX_STEP = RANK_STEPS.findIndex((s) => s.tier.id === "or");
+export const TOP_STEP = RANK_STEPS.length - 1;
+
+const TIER_ORDER = ["bronze", "argent", "or", "platine", "diamant", "maitre", "grand-maitre", "legende"];
+const tierOf = (step: number) => Math.max(0, TIER_ORDER.indexOf(RANK_STEPS[clampStep(step)].tier.id));
+export const clampStep = (step: number) => Math.max(0, Math.min(TOP_STEP, Math.round(step)));
+export const stepLabel = (step: number) => RANK_STEPS[clampStep(step)].label;
+export const stepMinRp = (step: number) => RANK_STEPS[clampStep(step)].minRp;
+export { stepIndex };
+
+/** Objectif de score moyen d'une division : l'atteindre (sur 5 manches ou plus) suffit pour monter. */
+const PARS = [50, 58, 65, 72, 80, 85, 90, 95];
+export const parFor = (step: number) => PARS[tierOf(step)];
+
+/** Chrono par question : de plus en plus court en montant. */
+const SECONDS = [30, 27, 24, 21, 18, 16, 15, 15];
+export const secondsFor = (step: number, q: Pick<Question, "type">) => SECONDS[tierOf(step)] + (q.type === "numeric" ? 15 : 0);
+/** Marge pour le trajet réseau (la réponse part du téléphone avant la fin du chrono). */
+export const LATENCY_GRACE_MS = 2500;
+
+/** Points d'une question (sur 10) : 7 pour la bonne réponse, jusqu'à 3 pour la rapidité. */
+export function questionPoints(correct: boolean, timeMs: number, limitMs: number): number {
+  if (!correct) return 0;
+  const ratio = Math.min(1, Math.max(0, timeMs) / limitMs);
+  // Plein bonus dans le premier quart du temps, puis décroissance linéaire.
+  const speed = ratio <= 0.25 ? 1 : 1 - (ratio - 0.25) / 0.75;
+  return Math.round((7 + 3 * speed) * 10) / 10;
+}
+
+export const matchScore = (points: number[]) => Math.round(points.reduce((s, p) => s + p, 0));
+
+/** Ajoute un score à la liste des meilleures manches (triée, limitée). */
+export const pushBest = (best: number[], score: number) => [...best, score].sort((a, b) => b - a).slice(0, COUNTED_MATCHES);
+export const weeklyTotal = (best: number[]) => best.reduce((s, x) => s + x, 0);
+export const weeklyAverage = (best: number[]) => (best.length ? weeklyTotal(best) / best.length : 0);
+
+/** Rang de départ après les manches de placement (de Bronze III à Or III). */
+export function placementStep(scores: number[]): number {
+  const avg = scores.length ? scores.reduce((s, x) => s + x, 0) / scores.length : 0;
+  return Math.max(0, Math.min(PLACEMENT_MAX_STEP, Math.floor((avg - 40) / 7)));
+}
+
+// ─────────────────────────── Calendrier ───────────────────────────
+
+/** Date dont les champs « locaux » sont l'heure de Paris (les semaines suivent l'heure française). */
+export function parisDate(now = new Date()): Date {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Paris",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0);
+  return new Date(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+}
+
+export const rankedWeek = (now = new Date()) => weekKey(parisDate(now));
+/** Millisecondes avant la fin de la semaine classée (lundi 0 h, heure de Paris). */
+export function msUntilWeekEnd(now = new Date()): number {
+  const p = parisDate(now);
+  return Math.max(0, weekEnd(p).getTime() - p.getTime());
+}
+
+/** Saisons = trimestres scolaires : septembre–décembre, janvier–mars, avril–août. */
+export function seasonKey(now = new Date()): string {
+  const p = parisDate(now);
+  const m = p.getMonth() + 1;
+  const y = p.getFullYear();
+  return m >= 9 ? `${y}-S1` : m <= 3 ? `${y - 1}-S2` : `${y - 1}-S3`;
+}
+export function seasonLabel(key: string): string {
+  const [y, s] = key.split("-S");
+  const year = Number(y);
+  return s === "1" ? `Saison 1 · ${year}-${year + 1}` : s === "2" ? `Saison 2 · ${year}-${year + 1}` : `Saison 3 · ${year}-${year + 1}`;
+}
+
+// ─────────────────────────── Profil classé ───────────────────────────
+
+export type WeekZone = "promotion" | "objective" | "safe" | "relegation" | "unranked" | "inactive";
+
+export interface WeekResult {
+  week: string;
+  zone: WeekZone;
+  rank: number;
+  size: number;
+  total: number;
+  from: number;
+  to: number;
+  seen: boolean;
+}
+
+export interface SubjectRank {
+  step: number;
+  /** Manches de placement jouées (rang définitif à PLACEMENT_MATCHES). */
+  placement: number[];
+  placed: boolean;
+  /** Semaine des scores ci-dessous. */
+  week: string;
+  best: number[];
+  played: number;
+  /** Dernière semaine prise en compte pour les promotions. */
+  settled?: string;
+  peak: number;
+  last?: WeekResult;
+}
+
+export interface RankedProfile {
+  pseudo: string;
+  season: string;
+  subjects: Partial<Record<RankedSubject, SubjectRank>>;
+  /** Meilleur rang de chaque saison passée, par matière. */
+  seasons?: Record<string, Partial<Record<RankedSubject, number>>>;
+  /** Manche en cours. */
+  active?: string;
+  /** Empreintes des dernières questions posées (pas de répétition d'une manche à l'autre). */
+  seen?: string[];
+}
+
+export function newSubjectRank(week: string, step = 0, placed = false): SubjectRank {
+  return { step, placement: [], placed, week, best: [], played: 0, peak: step };
+}
+
+/** Profil neuf : le rang Général reprend le rang déjà gagné (RP), les matières passent par le placement. */
+export function newRankedProfile(pseudo: string, rp: number, now = new Date()): RankedProfile {
+  const step = stepIndex(rp);
+  return { pseudo, season: seasonKey(now), subjects: { general: newSubjectRank(rankedWeek(now), step, true) } };
+}
+
+/** Changement de saison : on garde le meilleur rang, puis chacun redescend d'un palier (3 divisions). */
+export function applySeason(p: RankedProfile, now = new Date()): RankedProfile {
+  const season = seasonKey(now);
+  if (p.season === season) return p;
+  const peaks: Partial<Record<RankedSubject, number>> = {};
+  const subjects: RankedProfile["subjects"] = {};
+  for (const [s, r] of Object.entries(p.subjects) as [RankedSubject, SubjectRank][]) {
+    if (r.placed) peaks[s] = r.peak;
+    const step = r.placed ? Math.max(0, r.step - 3) : r.step;
+    subjects[s] = { ...r, step, peak: step };
+  }
+  return { ...p, season, subjects, seasons: { ...(p.seasons ?? {}), [p.season]: peaks } };
+}
+
+/** Enregistre une manche terminée dans le profil. */
+export function recordMatch(p: RankedProfile, subject: RankedSubject, score: number, now = new Date()): { profile: RankedProfile; placedNow: boolean } {
+  const week = rankedWeek(now);
+  const prev = p.subjects[subject] ?? newSubjectRank(week);
+  let r: SubjectRank = prev.week === week ? { ...prev } : { ...prev, week, best: [], played: 0 };
+  r.best = pushBest(r.best, score);
+  r.played += 1;
+  let placedNow = false;
+  if (!r.placed) {
+    r.placement = [...r.placement, score];
+    if (r.placement.length >= PLACEMENT_MATCHES) {
+      r = { ...r, placed: true, step: placementStep(r.placement) };
+      r.peak = Math.max(r.peak, r.step);
+      placedNow = true;
+    }
+  }
+  return { profile: { ...p, subjects: { ...p.subjects, [subject]: r } }, placedNow };
+}
+
+// ─────────────────────────── Groupes et promotions ───────────────────────────
+
+export interface GroupEntry {
+  id: string;
+  step: number;
+  total: number;
+  played: number;
+  avg: number;
+}
+
+/**
+ * Répartit les joueurs de la semaine en groupes de 20 au plus, de rangs voisins
+ * (tri par rang puis par points), de tailles équilibrées.
+ */
+export function formGroups<T extends GroupEntry>(entries: T[]): T[][] {
+  const sorted = [...entries].sort((a, b) => b.step - a.step || b.total - a.total || a.id.localeCompare(b.id));
+  const count = Math.max(1, Math.ceil(sorted.length / GROUP_SIZE));
+  const groups: T[][] = [];
+  let i = 0;
+  for (let g = 0; g < count; g++) {
+    const size = Math.floor(sorted.length / count) + (g < sorted.length % count ? 1 : 0);
+    groups.push(sorted.slice(i, i + size));
+    i += size;
+  }
+  return groups.filter((g) => g.length > 0);
+}
+
+/** Classement interne d'un groupe : points de la semaine, puis moyenne. */
+export const standings = <T extends GroupEntry>(group: T[]) => [...group].sort((a, b) => b.total - a.total || b.avg - a.avg || a.id.localeCompare(b.id));
+
+/** A atteint l'objectif de sa division (au moins 5 manches). */
+export const reachedObjective = (e: Pick<GroupEntry, "played" | "avg" | "step">) => e.played >= PLACEMENT_MATCHES && e.avg >= parFor(e.step);
+
+/** Zone d'un joueur à une place donnée de son groupe (les non-classés n'ont pas de zone). */
+export function zoneFor(e: GroupEntry, rank: number, classified: number): WeekZone {
+  if (e.played < MIN_MATCHES) return "unranked";
+  if (classified >= LEAGUE_MIN_SIZE && rank <= promotionSpots(classified)) return "promotion";
+  if (reachedObjective(e)) return "objective";
+  if (rank > classified - relegationSpots(classified)) return "relegation";
+  return "safe";
+}
+
+/** Résultat de la semaine pour chaque joueur d'un groupe. */
+export function settleGroup<T extends GroupEntry>(group: T[], week: string): Map<string, WeekResult> {
+  const out = new Map<string, WeekResult>();
+  const classified = standings(group.filter((e) => e.played >= MIN_MATCHES));
+  classified.forEach((e, i) => {
+    const zone = zoneFor(e, i + 1, classified.length);
+    const to = zone === "promotion" || zone === "objective" ? clampStep(e.step + 1) : zone === "relegation" ? clampStep(e.step - 1) : e.step;
+    out.set(e.id, { week, zone, rank: i + 1, size: classified.length, total: e.total, from: e.step, to, seen: false });
+  });
+  for (const e of group) {
+    if (!out.has(e.id)) out.set(e.id, { week, zone: "unranked", rank: 0, size: classified.length, total: e.total, from: e.step, to: e.step, seen: false });
+  }
+  return out;
+}
+
+export const entryOf = (id: string, r: SubjectRank): GroupEntry => ({ id, step: r.step, total: weeklyTotal(r.best), played: r.played, avg: weeklyAverage(r.best) });
+
+/**
+ * Clôt toutes les semaines terminées : promotions / relégations dans chaque
+ * groupe, et perte d'une division pour les hauts rangs inactifs.
+ * Renvoie seulement les profils modifiés.
+ */
+export function settleWeeks(profiles: Record<string, RankedProfile>, now = new Date()): Record<string, RankedProfile> {
+  const current = rankedWeek(now);
+  const changed: Record<string, RankedProfile> = {};
+  const get = (id: string) => changed[id] ?? profiles[id];
+  const put = (id: string, s: RankedSubject, r: SubjectRank) => {
+    const p = get(id);
+    changed[id] = { ...p, subjects: { ...p.subjects, [s]: r } };
+  };
+
+  for (const s of RANKED_SUBJECTS) {
+    // Semaines à clore pour cette matière.
+    const weeks = new Set<string>();
+    for (const p of Object.values(profiles)) {
+      const r = p.subjects[s];
+      if (r && r.placed && r.week < current && r.settled !== r.week && r.played > 0) weeks.add(r.week);
+    }
+    for (const week of [...weeks].sort()) {
+      const entries = Object.entries(profiles)
+        .map(([id]) => [id, get(id).subjects[s]] as const)
+        .filter((x): x is readonly [string, SubjectRank] => !!x[1] && x[1].placed && x[1].week === week && x[1].settled !== week && x[1].played > 0)
+        .map(([id, r]) => entryOf(id, r));
+      for (const group of formGroups(entries)) {
+        for (const [id, res] of settleGroup(group, week)) {
+          const r = get(id).subjects[s]!;
+          put(id, s, { ...r, step: res.to, peak: Math.max(r.peak, res.to), settled: week, last: res });
+        }
+      }
+      // Inactifs de haut rang : une division de moins.
+      for (const id of Object.keys(profiles)) {
+        const r = get(id).subjects[s];
+        if (!r || !r.placed || r.step < DECAY_FROM_STEP || r.week >= week || (r.last && r.last.week >= week)) continue;
+        put(id, s, { ...r, step: r.step - 1, last: { week, zone: "inactive", rank: 0, size: 0, total: 0, from: r.step, to: r.step - 1, seen: false } });
+      }
+    }
+  }
+  return changed;
+}
+
+/** Profil sans les semaines passées non jouées (scores remis à zéro au changement de semaine). */
+export function currentRank(r: SubjectRank | undefined, now = new Date()): SubjectRank | undefined {
+  if (!r) return r;
+  const week = rankedWeek(now);
+  return r.week === week ? r : { ...r, week, best: [], played: 0 };
+}
+
+// ─────────────────────────── Questions ───────────────────────────
+
+/** Question telle que le client la reçoit avant d'avoir répondu : sans réponse ni explication. */
+export function publicQuestion(q: Question): Question {
+  if (q.type === "mcq") return { ...q, answer: -1, explanation: "" };
+  if (q.type === "truefalse") return { ...q, answer: false, explanation: "" };
+  return { id: q.id, type: "numeric", prompt: q.prompt, unit: q.unit, difficulty: q.difficulty, answer: 0, explanation: "" };
+}

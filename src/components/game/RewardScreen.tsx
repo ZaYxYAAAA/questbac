@@ -95,9 +95,7 @@ export function RewardScreen({
 
       <div className="rounded-3xl border border-violet-500/30 bg-violet-500/10 p-5">
         <p className="text-5xl font-black text-violet-200">+{counted} <span className="text-2xl">XP</span></p>
-        <p className={clsx("mt-1 font-bold", summary.rpDelta >= 0 ? "text-cyan-300" : "text-rose-300")}>
-          {summary.rpDelta >= 0 ? "+" : ""}{summary.rpDelta} RP · {summary.rankAfter}
-        </p>
+        <p className="mt-1 text-sm font-semibold text-cyan-300">Rang : {summary.rankAfter} · il se gagne en mode classé</p>
         <div className="mt-4 text-left">
           <div className="mb-1 flex justify-between text-xs text-slate-400">
             <span>Niveau {level.level}</span>

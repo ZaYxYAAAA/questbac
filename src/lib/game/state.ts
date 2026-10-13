@@ -173,13 +173,8 @@ export function refreshPeriods(d: GameData, now = new Date()): GameData {
     const result = next.league.week !== week && next.league.week === next.weekly.week && next.weekly.xp > 0
       ? finalLeagueResult(next.league, next.weekly.xp)
       : null;
-    if (result && result.size >= LEAGUE_MIN_SIZE) {
-      last = result;
-      xp += last.rewardXp;
-      rp = Math.max(0, rp + last.rewardRp);
-      peakRp = Math.max(peakRp, rp);
-      feed = pushFeed(feed, [{ at: now.getTime(), kind: "league", ref: `${last.rank}:${last.tierId}` }]);
-    }
+    // L'ancienne ligue d'XP est remplacée par les groupes classés : plus de récompense ici.
+    void result;
     next = {
       ...next,
       xp,
@@ -248,8 +243,9 @@ function finalize(
   },
   now: Date,
 ): { data: GameData; summary: RewardSummary } {
-  let d = addXp({ ...afterBase, rp: Math.max(0, afterBase.rp + base.rp) }, base.xp, now);
-  const lines = [...base.lines];
+  // Le rang ne se gagne plus qu'en mode classé : l'entraînement rapporte de l'XP seulement.
+  let d = addXp({ ...afterBase, rp: before.rp }, base.xp, now);
+  const lines = base.lines.filter((l) => l.label !== "Points de rang");
   let xpGained = base.xp;
 
   const q = progressQuests(d, base.events);

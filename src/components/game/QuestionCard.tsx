@@ -7,15 +7,17 @@ import { Markdown } from "@/components/ui/Markdown";
 import { type GivenAnswer, isCorrect } from "@/lib/game/session";
 import type { Question } from "@/lib/types";
 
-type Status = "answering" | "correct" | "wrong" | "timeout";
+type Status = "answering" | "checking" | "correct" | "wrong" | "timeout";
 
 export function QuestionCard({
-  question,
+  question: incoming,
   onAnswered,
   onNext,
   timedOut = false,
   nextLabel = "Continuer",
   number,
+  grade,
+  noCopy = false,
 }: {
   question: Question;
   /** Appelé une seule fois quand l'élève valide. */
@@ -26,16 +28,39 @@ export function QuestionCard({
   nextLabel?: string;
   /** Numéro affiché dans l'en-tête de la carte. */
   number?: number;
+  /**
+   * Correction par le serveur (mode classé) : la question reçue n'a pas sa
+   * réponse, le serveur renvoie la question complète après validation.
+   */
+  grade?: (given: GivenAnswer) => Promise<{ correct: boolean; question: Question }>;
+  /** Texte non sélectionnable (mode classé). */
+  noCopy?: boolean;
 }) {
   const [status, setStatus] = useState<Status>("answering");
+  const [revealedQuestion, setRevealedQuestion] = useState<Question | null>(null);
+  // Une fois corrigée par le serveur, on affiche la question complète (réponse et explication).
+  const question = revealedQuestion ?? incoming;
   const [given, setGiven] = useState<GivenAnswer | null>(null);
   const [numeric, setNumeric] = useState("");
   const nextRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (timedOut && status === "answering") setStatus("timeout");
-  }, [timedOut, status]);
+    if (!timedOut || status !== "answering") return;
+    if (!grade) {
+      setStatus("timeout");
+      return;
+    }
+    setStatus("checking");
+    grade("")
+      .then((res) => {
+        setRevealedQuestion(res.question);
+        setStatus("timeout");
+        onAnswered(false, "");
+      })
+      // Réseau coupé : on réessaie un peu plus tard plutôt qu'en boucle.
+      .catch(() => setTimeout(() => setStatus("answering"), 2000));
+  }, [timedOut, status, grade, onAnswered]);
 
   useEffect(() => {
     if (status !== "answering") nextRef.current?.focus();
@@ -43,6 +68,21 @@ export function QuestionCard({
 
   const submit = (answer: GivenAnswer) => {
     if (status !== "answering") return;
+    if (grade) {
+      setGiven(answer);
+      setStatus("checking");
+      grade(answer)
+        .then((res) => {
+          setRevealedQuestion(res.question);
+          setStatus(res.correct ? "correct" : "wrong");
+          onAnswered(res.correct, answer);
+        })
+        .catch(() => {
+          setGiven(null);
+          setStatus("answering");
+        });
+      return;
+    }
     const ok = isCorrect(question, answer);
     setGiven(answer);
     setStatus(ok ? "correct" : "wrong");
@@ -67,12 +107,14 @@ export function QuestionCard({
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  const revealed = status !== "answering";
+  const revealed = status !== "answering" && status !== "checking";
+  const locked = status !== "answering";
 
   const choiceClass = (isAnswer: boolean, isGiven: boolean) =>
     clsx(
       "group flex min-h-14 w-full items-center gap-3 rounded-2xl border-2 px-3.5 py-3 text-left text-base transition active:scale-[0.98]",
-      !revealed && "border-white/10 bg-slate-800/70 hover:-translate-y-0.5 hover:border-violet-400 hover:bg-slate-800",
+      !revealed && !isGiven && "border-white/10 bg-slate-800/70 hover:-translate-y-0.5 hover:border-violet-400 hover:bg-slate-800",
+      !revealed && isGiven && "animate-pulse border-violet-400 bg-violet-600/20",
       revealed && isAnswer && "border-emerald-400 bg-emerald-500/15 qb-correct",
       revealed && isGiven && !isAnswer && "border-rose-400 bg-rose-500/15 qb-shake",
       revealed && !isAnswer && !isGiven && "border-white/5 bg-slate-800/40 opacity-60",
@@ -86,7 +128,7 @@ export function QuestionCard({
   };
 
   return (
-    <div className="qb-slide-in space-y-4">
+    <div className={clsx("qb-slide-in space-y-4", noCopy && "select-none [-webkit-touch-callout:none]")} onCopy={noCopy ? (e) => e.preventDefault() : undefined} onContextMenu={noCopy ? (e) => e.preventDefault() : undefined}>
       <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
         {number !== undefined && <span className="rounded-full bg-violet-600/30 px-2.5 py-1 text-violet-200">Question {number}</span>}
         <span className="rounded-full bg-slate-800 px-2.5 py-1 text-slate-300">{typeLabel}</span>
@@ -99,7 +141,7 @@ export function QuestionCard({
       {question.type === "mcq" && (
         <div className="grid gap-2.5 sm:grid-cols-2">
           {question.choices.map((choice, i) => (
-            <button key={i} type="button" disabled={revealed} onClick={() => submit(i)} className={choiceClass(i === question.answer, given === i)}>
+            <button key={i} type="button" disabled={locked} onClick={() => submit(i)} className={choiceClass(i === question.answer, given === i)}>
               <span
                 className={clsx(
                   "grid h-8 w-8 shrink-0 place-items-center rounded-xl text-sm font-black",
@@ -119,7 +161,7 @@ export function QuestionCard({
       {question.type === "truefalse" && (
         <div className="grid grid-cols-2 gap-3">
           {[true, false].map((v) => (
-            <button key={String(v)} type="button" disabled={revealed} onClick={() => submit(v)} className={clsx(choiceClass(v === question.answer, given === v), "min-h-16 justify-center py-4 text-lg font-bold")}>
+            <button key={String(v)} type="button" disabled={locked} onClick={() => submit(v)} className={clsx(choiceClass(v === question.answer, given === v), "min-h-16 justify-center py-4 text-lg font-bold")}>
               {v ? "✅ Vrai" : "❌ Faux"}
             </button>
           ))}
@@ -139,7 +181,7 @@ export function QuestionCard({
               ref={inputRef}
               autoFocus
               value={numeric}
-              disabled={revealed}
+              disabled={locked}
               onChange={(e) => setNumeric(e.target.value)}
               inputMode="decimal"
               placeholder="Ta réponse…"
@@ -151,8 +193,8 @@ export function QuestionCard({
             {question.unit && <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500">{question.unit}</span>}
           </div>
           {!revealed && (
-            <button type="submit" className="rounded-xl bg-violet-600 px-5 font-semibold text-white hover:bg-violet-500">
-              Valider
+            <button type="submit" disabled={locked} className="rounded-xl bg-violet-600 px-5 font-semibold text-white hover:bg-violet-500 disabled:opacity-60">
+              {status === "checking" ? "…" : "Valider"}
             </button>
           )}
         </form>

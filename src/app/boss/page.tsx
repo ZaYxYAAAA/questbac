@@ -47,7 +47,6 @@ export default function BossLairPage() {
                   <span className="rounded-md bg-black/30 px-2 py-1">❤️ {boss.hp} PV</span>
                   <span className="rounded-md bg-black/30 px-2 py-1">⏱️ {boss.secondsPerQuestion} s</span>
                   <span className="rounded-md bg-black/30 px-2 py-1">✨ {boss.xpReward} XP</span>
-                  <span className="rounded-md bg-black/30 px-2 py-1">🏅 +{boss.rpReward} RP</span>
                 </div>
                 <div className="mt-auto pt-4">
                   {status.unlocked ? (

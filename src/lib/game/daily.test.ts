@@ -23,7 +23,7 @@ describe("coffre de connexion quotidienne", () => {
   it("donne le grand coffre au 7e jour puis recommence le cycle", () => {
     const day7 = claimDaily({ lastClaim: "2026-10-11", count: 6 }, "2026-10-12")!;
     expect(day7.reward).toEqual(DAILY_REWARDS[6]);
-    expect(day7.reward.rp).toBeGreaterThan(0);
+    expect(day7.reward.xp).toBeGreaterThan(DAILY_REWARDS[5].xp);
     expect(claimDaily(day7.state, "2026-10-13")!.reward.day).toBe(1);
   });
 });

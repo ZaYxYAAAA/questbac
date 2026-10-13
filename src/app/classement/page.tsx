@@ -1,49 +1,96 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
+import { Clock, Lock, Play, Swords } from "lucide-react";
 import { Avatar } from "@/components/game/Avatar";
 import { FriendsBoard } from "@/components/game/FriendsBoard";
-import { PlayerTitle } from "@/components/game/PlayerTitle";
-import { RankBadge } from "@/components/game/RankBadge";
 import { RankLadder } from "@/components/game/RankLadder";
-import { WeeklyLeague } from "@/components/game/WeeklyLeague";
+import { type MatchStart, RankedMatch } from "@/components/ranked/RankedMatch";
+import { RankedBadge } from "@/components/ranked/RankedBadge";
+import { WeekResults } from "@/components/ranked/WeekResults";
+import { Button } from "@/components/ui/Button";
 import { Tabs } from "@/components/ui/Tabs";
-import { levelLabel } from "@/lib/content/curriculum";
-import { type LeaderboardScope, buildLeaderboard, realEntries } from "@/lib/game/leaderboard";
-import { levelFromXp, rankFromRp } from "@/lib/game/progression";
+import { buildLeaderboard, realEntries } from "@/lib/game/leaderboard";
+import { formatCountdown } from "@/lib/game/league";
+import { levelFromXp } from "@/lib/game/progression";
+import { COUNTED_MATCHES, MATCH_SIZE, MIN_MATCHES, PLACEMENT_MATCHES, type RankedSubject, type WeekZone, rankedSubjectMeta } from "@/lib/game/ranked";
 import { activeTierReward, playerFrame } from "@/lib/game/ranks";
 import { useCloud } from "@/lib/store/cloud-sync";
 import { useGame } from "@/lib/store/game-store";
 import { loadPlayers, usePlayers } from "@/lib/store/players-store";
+import { type GroupRow, type RankView, loadRanked, nextRanked, startRanked, useRanked } from "@/lib/store/ranked-store";
+import { useToasts } from "@/lib/store/toast-store";
 
-const PODIUM = ["🥇", "🥈", "🥉"];
+type View = "jouer" | "groupe" | "rangs" | "amis";
+const VIEWS: View[] = ["jouer", "groupe", "rangs", "amis"];
 
-type View = "ligue" | "amis" | "classement" | "rangs";
-const VIEWS: View[] = ["ligue", "amis", "classement", "rangs"];
+const ZONE_STYLE: Record<WeekZone, { row: string; label: string }> = {
+  promotion: { row: "border-l-emerald-400 bg-emerald-500/10", label: "⬆️ Promotion" },
+  objective: { row: "border-l-emerald-400 bg-emerald-500/10", label: "🎯 Objectif atteint" },
+  safe: { row: "border-l-slate-600", label: "Maintien" },
+  relegation: { row: "border-l-rose-500 bg-rose-500/10", label: "⬇️ Relégation" },
+  unranked: { row: "border-l-slate-800 opacity-70", label: `Moins de ${MIN_MATCHES} manches` },
+  inactive: { row: "border-l-slate-800", label: "Inactif" },
+};
 
-export default function LeaderboardPage() {
+export default function RankedPage() {
   const game = useGame();
   const profile = game.profile!;
-  const [view, setView] = useState<View>("ligue");
-  const [scope, setScope] = useState<LeaderboardScope>("hebdo");
+  const { user, checked } = useCloud();
+  const { overview, error, fetchedAt } = useRanked();
+  const [view, setView] = useState<View>("jouer");
+  const [subject, setSubject] = useState<RankedSubject>("general");
+  const [match, setMatch] = useState<MatchStart | null>(null);
+  const [starting, setStarting] = useState<RankedSubject | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
-  // Vue demandée par lien (?vue=rangs), lue après le montage pour rester statique.
   useEffect(() => {
     const asked = new URLSearchParams(window.location.search).get("vue") as View | null;
     if (asked && VIEWS.includes(asked)) setView(asked);
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    if (user) void loadRanked(subject);
+  }, [user, subject]);
 
   const changeView = (v: View) => {
     setView(v);
-    window.history.replaceState(null, "", v === "ligue" ? "/classement" : `/classement?vue=${v}`);
+    window.history.replaceState(null, "", v === "jouer" ? "/classement" : `/classement?vue=${v}`);
   };
+
+  const play = useCallback(async (s: RankedSubject) => {
+    setStarting(s);
+    try {
+      setMatch(await startRanked(s));
+    } catch (e) {
+      useToasts.getState().push({ emoji: "⚠️", title: "Manche impossible", body: e instanceof Error ? e.message : undefined, tone: "rose" });
+    } finally {
+      setStarting(null);
+    }
+  }, []);
+
+  const resume = async () => {
+    const active = overview?.active;
+    if (!active) return;
+    try {
+      const served = await nextRanked(active.id);
+      setMatch({ ...served, id: active.id, subject: active.subject });
+    } catch (e) {
+      useToasts.getState().push({ emoji: "⚠️", title: e instanceof Error ? e.message : "Erreur", tone: "rose" });
+      void loadRanked(subject);
+    }
+  };
+
+  // Classement des amis et échelle des rangs (profils publics).
   const selfId = useCloud((s) => s.user?.id ?? null);
   const players = usePlayers((s) => s.players);
   useEffect(() => {
     void loadPlayers(true);
   }, []);
-
   const player = useMemo(
     () => ({
       pseudo: profile.pseudo,
@@ -58,98 +105,228 @@ export default function LeaderboardPage() {
     }),
     [profile, game.xp, game.weekly.xp, game.rp, game.peakRp],
   );
-  const others = useMemo(() => realEntries(players, selfId), [players, selfId]);
-  const entries = useMemo(() => buildLeaderboard(player, scope, others), [player, scope, others]);
-  const globalEntries = useMemo(() => buildLeaderboard(player, "global", others), [player, others]);
-  const realCount = players.filter((p) => p.id !== selfId).length;
-  const position = entries.findIndex((e) => e.isPlayer) + 1;
-  const above = entries[position - 2];
-  const valueOf = (e: (typeof entries)[number]) => (scope === "hebdo" ? `${e.weeklyXp} XP` : `${e.rp} RP`);
-  const gap = above ? (scope === "hebdo" ? above.weeklyXp - game.weekly.xp : above.rp - game.rp) : 0;
+  const globalEntries = useMemo(() => buildLeaderboard(player, "global", realEntries(players, selfId)), [player, players, selfId]);
+
+  if (match) {
+    return (
+      <RankedMatch
+        key={match.id}
+        start={match}
+        onClose={() => {
+          setMatch(null);
+          void loadRanked(subject);
+        }}
+        onReplay={(s) => {
+          setMatch(null);
+          void play(s);
+        }}
+      />
+    );
+  }
+
+  const general = overview?.ranks.find((r) => r.subject === "general");
+  const endsIn = overview ? overview.endsInMs - (now - fetchedAt) : 0;
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-3">
-        <h1 className="text-3xl font-black text-white">🏆 Classement</h1>
-        <Tabs<View>
-          value={view}
-          onChange={changeView}
-          className="w-full flex-nowrap sm:w-auto [&>button]:flex-1 [&>button]:whitespace-nowrap [&>button]:px-2 sm:[&>button]:flex-none sm:[&>button]:px-3"
-          options={[
-            { value: "ligue", label: "Ligue" },
-            { value: "amis", label: "Amis" },
-            { value: "classement", label: "Classement" },
-            { value: "rangs", label: "Ligues & rangs" },
-          ]}
-        />
-      </div>
-
-      {view === "ligue" && <WeeklyLeague />}
-      {view === "amis" && <FriendsBoard player={player} />}
-      {view === "rangs" && <RankLadder entries={globalEntries} />}
-      {view === "classement" && (
-        <>
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <p className="text-slate-400">
-                Tu es <b className="text-white">{position}<sup>e</sup></b> sur {entries.length}
-                {above && <> · encore <b className="text-violet-300">{gap + 1} {scope === "hebdo" ? "XP" : "RP"}</b> pour dépasser {above.pseudo}</>}
-              </p>
+    <div className="space-y-5">
+      {/* En-tête : ambiance compétition, distincte de l'entraînement */}
+      <section className="relative overflow-hidden rounded-3xl border border-amber-400/30 bg-gradient-to-br from-amber-500/20 via-slate-900 to-slate-950 p-5 sm:p-6">
+        <div aria-hidden className="absolute -right-6 -top-8 text-[8rem] opacity-10">⚔️</div>
+        <div className="relative flex flex-wrap items-end justify-between gap-4">
+          <div className="space-y-1">
+            <p className="text-xs font-bold uppercase tracking-wider text-amber-300">Mode classé</p>
+            <h1 className="text-3xl font-black text-white">Chaque manche compte</h1>
+            <p className="max-w-md text-sm text-slate-300">
+              Ton rang ne monte qu&apos;ici. Les missions de l&apos;onglet Entraînement rapportent de l&apos;XP, pas de rang.
+            </p>
+          </div>
+          {general && (
+            <div className="space-y-1 sm:text-right">
+              <p className="text-xs text-slate-400">Rang général</p>
+              <RankedBadge step={general.step} size="lg" />
+              <p className="flex items-center gap-1 text-xs text-amber-200 sm:justify-end"><Clock size={12} /> Promotions dans {formatCountdown(endsIn)}</p>
             </div>
-            <Tabs<LeaderboardScope>
-              value={scope}
-              onChange={setScope}
-              options={[
-                { value: "hebdo", label: "Cette semaine" },
-                { value: "global", label: "Rang global" },
-                { value: "niveau", label: levelLabel(profile.level) },
-              ]}
-            />
-          </div>
+          )}
+        </div>
+      </section>
 
-          {/* Podium */}
-          <div className="grid grid-cols-3 items-end gap-3">
-            {[1, 0, 2].map((i) => {
-              const e = entries[i];
-              if (!e) return <div key={i} />;
-              return (
-                <div key={e.id} className={clsx("rounded-3xl border p-4 text-center", e.isPlayer ? "border-violet-400 bg-violet-600/20" : "border-white/10 bg-slate-900/70", i === 0 ? "pb-8" : "pb-4")}>
-                  <div className="text-3xl">{PODIUM[i]}</div>
-                  <Avatar emoji={e.avatar} photo={e.photo} name={e.pseudo} size={i === 0 ? "lg" : "md"} rp={e.rp} frame={e.frameId} className="mx-auto my-2" />
-                  <p className="truncate font-bold text-white">{e.pseudo}</p>
-                  <PlayerTitle titleId={e.titleId ?? rankFromRp(e.rp).tier.id} className="justify-center text-[10px]" />
-                  <p className="text-sm text-violet-300">{valueOf(e)}</p>
-                </div>
-              );
-            })}
-          </div>
+      {checked && !user ? (
+        <div className="space-y-3 rounded-3xl border border-white/10 bg-slate-900/70 p-6 text-center">
+          <p className="text-4xl">🔐</p>
+          <p className="text-slate-200">Le mode classé se joue avec un compte : tes manches sont corrigées par le serveur pour que le classement reste juste.</p>
+          <Link href="/profil" className="inline-flex rounded-xl bg-violet-600 px-4 py-2 font-semibold text-white">Créer mon compte</Link>
+        </div>
+      ) : (
+        <>
+          {overview && <WeekResults ranks={overview.ranks} />}
 
-          <div className="overflow-hidden rounded-3xl border border-white/10 bg-slate-900/70">
-            {entries.map((e, i) => (
-              <div key={e.id} className={clsx("flex items-center gap-3 border-b border-white/5 px-4 py-2.5 last:border-0", e.isPlayer && "bg-violet-600/20")}>
-                <span className={clsx("w-8 text-center font-black", i < 3 ? "text-amber-300" : "text-slate-500")}>{i + 1}</span>
-                <Avatar emoji={e.avatar} photo={e.photo} name={e.pseudo} size="sm" rp={e.rp} frame={e.frameId} />
-                <div className="min-w-0 flex-1">
-                  <p className={clsx("flex items-center gap-1.5 font-semibold", e.isPlayer ? "text-violet-200" : "text-white")}>
-                    <span className="truncate">{e.pseudo}{e.isPlayer && " (toi)"}</span>
-                  </p>
-                  <p className="flex flex-wrap items-center gap-x-2 text-xs text-slate-500">
-                    <PlayerTitle titleId={e.titleId ?? rankFromRp(e.rp).tier.id} className="text-[10px]" />
-                    <span>Niv. {e.playerLevel} · {levelLabel(e.level)}</span>
-                  </p>
-                </div>
-                <span className="hidden sm:block"><RankBadge rp={e.rp} size="sm" /></span>
-                <span className="w-24 text-right font-mono text-sm font-bold text-slate-200">{valueOf(e)}</span>
-              </div>
-            ))}
-          </div>
-          <p className="text-center text-xs text-slate-500">
-            Rang actuel : {rankFromRp(game.rp).label}. Le classement hebdomadaire repart à zéro chaque lundi. {realCount > 0
-              ? `${realCount + 1} joueurs inscrits.`
-              : "Tu es le premier inscrit : invite tes amis depuis la page Amis !"}
-          </p>
+          {overview?.active && (
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-amber-400/40 bg-amber-500/10 p-4">
+              <p className="flex-1 text-sm text-amber-100">
+                Manche en cours en <b>{rankedSubjectMeta(overview.active.subject).name}</b> (question {overview.active.index + 1}/{overview.active.total}).
+              </p>
+              <Button variant="gold" onClick={resume}><Play size={16} /> Reprendre</Button>
+            </div>
+          )}
+
+          <Tabs<View>
+            value={view}
+            onChange={changeView}
+            className="w-full flex-nowrap sm:w-auto [&>button]:flex-1 [&>button]:whitespace-nowrap [&>button]:px-2 sm:[&>button]:flex-none sm:[&>button]:px-3"
+            options={[
+              { value: "jouer", label: "Jouer" },
+              { value: "groupe", label: "Mon groupe" },
+              { value: "rangs", label: "Rangs" },
+              { value: "amis", label: "Amis" },
+            ]}
+          />
+
+          {error && !overview && <p className="rounded-xl bg-rose-500/15 p-3 text-sm text-rose-300">{error}</p>}
+          {!overview && !error && <div className="h-48 animate-pulse rounded-3xl bg-slate-900/60" />}
+
+          {overview && view === "jouer" && <PlayView ranks={overview.ranks} starting={starting} onPlay={play} />}
+          {overview && view === "groupe" && (
+            <>
+              <SubjectChips ranks={overview.ranks} value={subject} onChange={setSubject} />
+              <GroupView rank={overview.ranks.find((r) => r.subject === subject)} rows={overview.subject === subject ? overview.group : []} endsIn={endsIn} onPlay={() => play(subject)} />
+            </>
+          )}
+          {overview && view === "rangs" && (
+            <>
+              <SubjectChips ranks={overview.ranks} value={subject} onChange={setSubject} />
+              <TopView rows={overview.subject === subject ? overview.top : []} players={overview.players} />
+              <RankLadder entries={globalEntries} />
+            </>
+          )}
+          {view === "amis" && <FriendsBoard player={player} />}
         </>
       )}
+    </div>
+  );
+}
+
+function SubjectChips({ ranks, value, onChange }: { ranks: RankView[]; value: RankedSubject; onChange: (s: RankedSubject) => void }) {
+  return (
+    <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none]">
+      {ranks.map((r) => {
+        const m = rankedSubjectMeta(r.subject);
+        return (
+          <button
+            key={r.subject}
+            type="button"
+            onClick={() => onChange(r.subject)}
+            className={clsx("flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition", value === r.subject ? "bg-amber-400 text-slate-950" : "bg-slate-800/70 text-slate-300")}
+          >
+            <span>{m.emoji}</span>
+            {m.name}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function PlayView({ ranks, starting, onPlay }: { ranks: RankView[]; starting: RankedSubject | null; onPlay: (s: RankedSubject) => void }) {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-2 text-center text-xs text-slate-300">
+        <p className="rounded-2xl bg-slate-900/70 p-3"><b className="block text-lg text-white">{MATCH_SIZE}</b>questions chronométrées</p>
+        <p className="rounded-2xl bg-slate-900/70 p-3"><b className="block text-lg text-white">{COUNTED_MATCHES}</b>meilleures manches comptent</p>
+        <p className="rounded-2xl bg-slate-900/70 p-3"><b className="block text-lg text-white">Dimanche</b>promotions à minuit</p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {ranks.map((r) => {
+          const m = rankedSubjectMeta(r.subject);
+          return (
+            <div key={r.subject} className={clsx("rounded-3xl border bg-slate-900/70 p-4", r.subject === "general" ? "border-amber-400/40 sm:col-span-2" : "border-white/10")}>
+              <div className="flex items-center gap-3">
+                <span className={clsx("grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br text-2xl", m.gradient)}>{m.emoji}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-black text-white">{m.name}{r.subject === "general" && <span className="ml-1 text-xs font-normal text-slate-400">toutes les matières</span>}</p>
+                  <RankedBadge step={r.step} placementLeft={r.placed ? 0 : r.placementLeft} size="sm" />
+                </div>
+                <Button variant="gold" disabled={starting !== null} onClick={() => onPlay(r.subject)} className="shrink-0">
+                  {starting === r.subject ? "…" : <><Swords size={16} /> Jouer</>}
+                </Button>
+              </div>
+              <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
+                {r.placed ? (
+                  <>
+                    <span>{r.played} manche{r.played > 1 ? "s" : ""} cette semaine · {r.total} pts</span>
+                    <span className={r.played >= PLACEMENT_MATCHES && r.avg >= r.par ? "font-bold text-emerald-300" : ""}>moyenne {r.avg} / objectif {r.par}</span>
+                  </>
+                ) : (
+                  <span>{r.placementLeft} manche{r.placementLeft > 1 ? "s" : ""} de placement pour obtenir ton rang (jusqu&apos;à Or III)</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="flex items-center gap-2 rounded-2xl bg-slate-900/70 p-3 text-xs text-slate-400">
+        <Lock size={14} className="shrink-0 text-amber-300" />
+        Les questions arrivent une par une et sont corrigées par le serveur. Ne quitte pas l&apos;appli pendant une manche.
+      </p>
+    </div>
+  );
+}
+
+function GroupView({ rank, rows, endsIn, onPlay }: { rank?: RankView; rows: GroupRow[]; endsIn: number; onPlay: () => void }) {
+  if (!rank?.placed) {
+    return (
+      <div className="space-y-3 rounded-3xl border border-white/10 bg-slate-900/70 p-6 text-center">
+        <p className="text-4xl">🎯</p>
+        <p className="text-slate-300">Termine tes {PLACEMENT_MATCHES} manches de placement dans cette matière pour rejoindre un groupe.</p>
+        <Button variant="gold" onClick={onPlay}><Swords size={16} /> Jouer une manche</Button>
+      </div>
+    );
+  }
+  const me = rows.find((r) => r.isMe);
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+        <p className="text-slate-300">
+          Groupe de <b className="text-white">{rows.length}</b> joueur{rows.length > 1 ? "s" : ""} · fin dans <b className="text-amber-200">{formatCountdown(endsIn)}</b>
+        </p>
+        {me && me.played === 0 && <Button variant="gold" onClick={onPlay}><Swords size={16} /> Entrer dans la course</Button>}
+      </div>
+      <div className="overflow-hidden rounded-3xl border border-white/10 bg-slate-900/70">
+        {rows.map((r, i) => (
+          <div key={r.id} className={clsx("flex items-center gap-3 border-b border-l-4 border-b-white/5 px-3 py-2.5 last:border-b-0", ZONE_STYLE[r.zone].row, r.isMe && "ring-1 ring-inset ring-amber-400/60")}>
+            <span className="w-6 text-center font-black text-slate-400">{i + 1}</span>
+            <Avatar emoji={r.avatar} photo={r.photoThumb} name={r.pseudo} size="sm" />
+            <div className="min-w-0 flex-1">
+              <p className={clsx("truncate font-semibold", r.isMe ? "text-amber-200" : "text-white")}>{r.pseudo}{r.isMe && " (toi)"}</p>
+              <p className="text-xs text-slate-500">{r.label} · {r.played} manche{r.played > 1 ? "s" : ""} · {ZONE_STYLE[r.zone].label}</p>
+            </div>
+            <span className="font-mono text-sm font-bold text-slate-100">{r.total}</span>
+          </div>
+        ))}
+      </div>
+      <div className="grid gap-2 text-xs text-slate-400 sm:grid-cols-3">
+        <p className="rounded-xl bg-emerald-500/10 p-2.5"><b className="text-emerald-300">Vert</b> : tu montes d&apos;une division dimanche soir. Atteindre l&apos;objectif (moyenne ≥ {rank.par} sur {PLACEMENT_MATCHES} manches) fait aussi monter.</p>
+        <p className="rounded-xl bg-slate-800/60 p-2.5"><b className="text-slate-200">Gris</b> : tu restes. Il faut au moins {MIN_MATCHES} manches dans la semaine pour être classé.</p>
+        <p className="rounded-xl bg-rose-500/10 p-2.5"><b className="text-rose-300">Rouge</b> : tu descends d&apos;une division (groupes de 6 joueurs ou plus).</p>
+      </div>
+    </div>
+  );
+}
+
+function TopView({ rows, players }: { rows: GroupRow[]; players: number }) {
+  if (rows.length === 0) return <p className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-slate-500">Personne n&apos;est encore classé dans cette matière : sois le premier !</p>;
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-slate-400">{players} joueur{players > 1 ? "s" : ""} classé{players > 1 ? "s" : ""} dans cette matière.</p>
+      <div className="overflow-hidden rounded-3xl border border-white/10 bg-slate-900/70">
+        {rows.map((r, i) => (
+          <div key={r.id} className={clsx("flex items-center gap-3 border-b border-white/5 px-3 py-2.5 last:border-0", r.isMe && "bg-amber-500/10")}>
+            <span className={clsx("w-6 text-center font-black", i < 3 ? "text-amber-300" : "text-slate-500")}>{i + 1}</span>
+            <Avatar emoji={r.avatar} photo={r.photoThumb} name={r.pseudo} size="sm" />
+            <p className={clsx("min-w-0 flex-1 truncate font-semibold", r.isMe ? "text-amber-200" : "text-white")}>{r.pseudo}{r.isMe && " (toi)"}</p>
+            <span className="text-xs font-bold text-slate-300">{r.label}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

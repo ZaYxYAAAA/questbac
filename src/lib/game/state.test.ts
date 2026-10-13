@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { finalLeagueResult } from "./league";
 import { acknowledgeLeague, applyActivity, applyDailyClaim, applySession, createInitialData, refreshPeriods } from "./state";
 
 const now = new Date(2026, 9, 12, 10);
@@ -17,7 +16,8 @@ describe("applySession", () => {
     expect(data.xp).toBe(summary.xpGained);
     expect(data.weekly.xp).toBe(summary.xpGained);
     expect(summary.achievements.map((a) => a.id)).toEqual(expect.arrayContaining(["premiers-pas", "sans-faute", "combo-5"]));
-    expect(data.rp).toBeGreaterThan(0);
+    // Le rang ne se gagne qu'en mode classé.
+    expect(data.rp).toBe(0);
   });
 
   it("ne baisse jamais les étoiles d'un chapitre", () => {
@@ -32,10 +32,11 @@ describe("applySession", () => {
     const d0 = createInitialData(now);
     const win = applySession(d0, { kind: "boss", bossId: "derivatus", subject: "maths", result: perfect, won: true, xpReward: 350, rpReward: 80, bossHpLeft: 0 }, now);
     expect(win.data.bosses.derivatus.victories).toBe(1);
-    expect(win.data.rp).toBe(80);
+    expect(win.data.rp).toBe(0);
     const lose = applySession(win.data, { kind: "boss", bossId: "derivatus", subject: "maths", result: perfect, won: false, xpReward: 350, rpReward: 80, bossHpLeft: 0.5 }, now);
-    expect(lose.data.rp).toBe(65);
+    expect(lose.data.rp).toBe(0);
     expect(lose.data.bosses.derivatus.attempts).toBe(2);
+    expect(win.summary.lines.some((l) => l.label === "Points de rang")).toBe(false);
   });
 
   it("réinitialise les quêtes quand le jour change", () => {
@@ -54,25 +55,18 @@ describe("ligue hebdomadaire", () => {
   const monday = new Date(2026, 9, 12, 9); // semaine 2026-W42
   const nextMonday = new Date(2026, 9, 19, 9);
 
-  it("clôt la semaine écoulée : place, récompense et nouveau groupe", () => {
+  it("change de semaine sans récompense de ligue (remplacée par le classé)", () => {
     const d0 = { ...createInitialData(monday), profile, rp: 250, peakRp: 250 };
     const rivals = [1, 2, 3, 4].map((i) => ({ id: `real-${i}`, pseudo: `J${i}`, avatar: "🐼", weeklyXp: i * 100 }));
     const played = { ...d0, weekly: { ...d0.weekly, xp: 1_000_000 }, league: { ...d0.league, rivals } };
     const next = refreshPeriods(played, nextMonday);
     expect(next.league.week).toBe("2026-W43");
     expect(next.weekly).toEqual({ week: "2026-W43", xp: 0 });
-    expect(next.league.last).toMatchObject({ week: "2026-W42", rank: 1, size: 5, zone: "promotion", seen: false });
-    expect(next.league.rivals).toEqual([]);
-    expect(next.rp).toBe(310);
-    expect(next.peakRp).toBe(310);
-    expect(next.xp).toBe(300);
-    // Le nouveau groupe est tiré au palier atteint grâce au bonus.
-    expect(next.league.tierId).toBe("argent");
-    expect(next.feed[0]).toMatchObject({ kind: "league", ref: "1:bronze" });
-    // Déterministe et appliqué une seule fois.
+    expect(next.league.last).toBeNull();
+    expect(next.rp).toBe(250);
+    expect(next.xp).toBe(0);
     expect(refreshPeriods(next, nextMonday)).toBe(next);
-    expect(next.league.last).toEqual({ ...finalLeagueResult(played.league, 1_000_000) });
-    expect(acknowledgeLeague(next).league.last?.seen).toBe(true);
+    expect(acknowledgeLeague(next)).toBe(next);
   });
 
   it("pas de résultat de ligue sans au moins 3 vrais joueurs", () => {
@@ -90,15 +84,6 @@ describe("ligue hebdomadaire", () => {
     expect(next.rp).toBe(40);
     expect(next.league.week).toBe("2026-W43");
   });
-
-  it("la relégation coûte quelques RP sans descendre sous 0", () => {
-    const d0 = { ...createInitialData(monday), profile, rp: 4, peakRp: 4 };
-    const rivals = Array.from({ length: 9 }, (_, i) => ({ id: `real-${i}`, pseudo: `J${i}`, avatar: "🐼", weeklyXp: 100 + i }));
-    const next = refreshPeriods({ ...d0, weekly: { ...d0.weekly, xp: 1 }, league: { ...d0.league, rivals } }, nextMonday);
-    expect(next.league.last?.zone).toBe("relegation");
-    expect(next.rp).toBe(0);
-    expect(next.peakRp).toBe(4);
-  });
 });
 
 describe("coffre quotidien, meilleur rang et fil", () => {
@@ -112,15 +97,12 @@ describe("coffre quotidien, meilleur rang et fil", () => {
     expect(applyDailyClaim(claimed.data, now)).toBeNull();
   });
 
-  it("note la promotion, le boss vaincu et garde le meilleur RP", () => {
+  it("note le boss vaincu sans toucher au rang (gagné en classé)", () => {
     const d0 = { ...createInitialData(now), rp: 280, peakRp: 280 };
     const win = applySession(d0, { kind: "boss", bossId: "derivatus", subject: "maths", result: perfect, won: true, xpReward: 350, rpReward: 80, bossHpLeft: 0 }, now);
-    expect(win.summary.promotion).toMatchObject({ step: { label: "Argent III" }, newTier: true });
-    expect(win.data.peakRp).toBe(360);
-    expect(win.data.feed.map((e) => e.kind)).toEqual(expect.arrayContaining(["boss", "rank", "achievement"]));
-    const lose = applySession(win.data, { kind: "boss", bossId: "derivatus", subject: "maths", result: perfect, won: false, xpReward: 350, rpReward: 80, bossHpLeft: 0.5 }, now);
-    expect(lose.data.rp).toBe(345);
-    expect(lose.data.peakRp).toBe(360);
-    expect(lose.summary.promotion).toBeNull();
+    expect(win.summary.promotion).toBeNull();
+    expect(win.data.rp).toBe(280);
+    expect(win.data.peakRp).toBe(280);
+    expect(win.data.feed.map((e) => e.kind)).toEqual(expect.arrayContaining(["boss", "achievement"]));
   });
 });

@@ -53,7 +53,7 @@ export function RankLadder({ entries }: { entries: LeaderboardEntry[] }) {
             <p className="text-xs font-bold uppercase tracking-wider text-violet-200">Ton rang</p>
             <p className="text-2xl font-black text-white">{rank.label}</p>
             <p className="text-sm text-slate-300">
-              {game.rp} RP{others.length > 0 && <> · tu fais mieux que <b className="text-white">{formatShare(better)}</b> des autres joueurs</>}
+              Rang général du mode classé{others.length > 0 && <> · tu fais mieux que <b className="text-white">{formatShare(better)}</b> des autres joueurs</>}
             </p>
           </div>
         </div>
@@ -61,13 +61,13 @@ export function RankLadder({ entries }: { entries: LeaderboardEntry[] }) {
           <div className="mt-3">
             <div className="mb-1 flex justify-between text-xs text-slate-300">
               <span>{rank.label}</span>
-              <span>encore <b className="text-white">{rank.rpToNext} RP</b> pour {rank.nextLabel}</span>
+              <span>prochaine division : <b className="text-white">{rank.nextLabel}</b></span>
             </div>
             <ProgressBar value={rank.progress} height="h-2.5" barClassName="bg-gradient-to-r from-cyan-400 to-violet-500" />
           </div>
         )}
         <p className="mt-3 text-xs text-slate-400">
-          {fmt(total)} joueurs classés. Chaque palier débloque un titre et un cadre d&apos;avatar, à choisir dans ton profil.
+          {fmt(total)} joueurs classés. Une division se gagne en finissant dans le haut de ton groupe de la semaine. Chaque palier débloque un titre et un cadre d&apos;avatar, à choisir dans ton profil.
         </p>
       </section>
 
@@ -111,7 +111,7 @@ export function RankLadder({ entries }: { entries: LeaderboardEntry[] }) {
                     )}
                   </div>
                   <p className="text-xs text-slate-400">
-                    {next ? `${fmt(tier.minRp)} – ${fmt(next.minRp - 1)} RP` : `${fmt(tier.minRp)} RP et plus`} · {formatShare(pop.share)} des joueurs ({fmt(pop.players)})
+                    {steps.length > 1 ? `${steps.length} divisions` : next ? "Une seule division" : "Le dernier palier"} · {formatShare(pop.share)} des joueurs ({fmt(pop.players)})
                   </p>
                   <div className="mt-1 h-1 w-full max-w-48 overflow-hidden rounded-full bg-slate-800" title={`${formatShare(pop.share)} des joueurs`}>
                     <div className="h-full rounded-full" style={{ width: `${Math.max(2, (pop.share / maxShare) * 100)}%`, background: tier.color }} />
@@ -126,7 +126,7 @@ export function RankLadder({ entries }: { entries: LeaderboardEntry[] }) {
                         return (
                           <div key={s.label} className={clsx("rounded-lg px-2 py-1 text-center text-[11px] leading-tight", here ? "bg-violet-500 font-bold text-white" : done ? "bg-white/10 text-slate-200" : "bg-slate-800/70 text-slate-500")}>
                             <span className="block font-bold">{s.division}</span>
-                            {fmt(s.minRp)} RP
+                            {here ? "toi" : done ? "✓" : "·"}
                           </div>
                         );
                       })}
@@ -135,7 +135,7 @@ export function RankLadder({ entries }: { entries: LeaderboardEntry[] }) {
                   {current && rank.nextLabel && (
                     <div className="mt-2">
                       <ProgressBar value={rank.progress} height="h-1.5" barClassName="bg-gradient-to-r from-cyan-400 to-violet-500" />
-                      <p className="mt-1 text-[11px] text-violet-200">{rank.rpToNext} RP avant {rank.nextLabel}</p>
+                      <p className="mt-1 text-[11px] text-violet-200">Monte en classé pour atteindre {rank.nextLabel}</p>
                     </div>
                   )}
 
@@ -171,7 +171,7 @@ export function RankLadder({ entries }: { entries: LeaderboardEntry[] }) {
         })}
       </ol>
       <p className="text-center text-xs text-slate-500">
-        Répartition des joueurs inscrits. Les titres et cadres restent acquis même si tu perds des RP.
+        Répartition des joueurs inscrits. Les titres et cadres restent acquis même si tu redescends.
       </p>
     </div>
   );
