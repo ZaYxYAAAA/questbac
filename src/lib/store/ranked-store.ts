@@ -14,11 +14,15 @@ export interface RankedOverview {
   ranks: RankView[];
   group: GroupRow[];
   top: GroupRow[];
+  friends: GroupRow[];
   players: number;
   active: { id: string; subject: RankedSubject; index: number; total: number } | null;
   pendingLoss: { id: string; subject: RankedSubject; reason: string; jokerAvailable: boolean } | null;
   seasons: Record<string, Partial<Record<RankedSubject, number>>>;
   season: string;
+  /** Rang Général et meilleur rang, à recopier dans la sauvegarde. */
+  rp: number;
+  peakRp: number;
   week: string;
   endsInMs: number;
 }
@@ -65,8 +69,7 @@ async function call<T>(url: string, body?: unknown): Promise<T> {
 
 /** Recopie le rang Général dans la sauvegarde locale (badge affiché partout). */
 function syncGeneral(overview: RankedOverview) {
-  const general = overview.ranks.find((r) => r.subject === "general");
-  if (general?.placed) useGame.getState().syncRankedStep(general.step);
+  useGame.getState().syncRank(overview.rp, overview.peakRp);
 }
 
 export async function loadRanked(subject: RankedSubject = "general") {

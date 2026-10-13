@@ -24,8 +24,11 @@ import {
   formGroups,
   matchScore,
   msUntilWeekEnd,
+  RANK_EPOCH,
+  MIN_MATCHES,
   newRankedProfile,
   parFor,
+  rankRewards,
   publicQuestion,
   questionPoints,
   rankedSubjectsFor,
@@ -44,6 +47,7 @@ import { isCorrect } from "@/lib/game/session";
 import type { Level, Question } from "@/lib/types";
 import { getSave } from "./accounts";
 import { publicPlayerId } from "./auth";
+import { friendIds } from "./friends";
 import { getStore } from "./store";
 
 /**
@@ -120,7 +124,11 @@ export interface GroupRow {
   pseudo: string;
   avatar: string;
   photoThumb?: string;
+  step: number;
   label: string;
+  /** Rang obtenu (sinon : en placement, `placement` manches jouées). */
+  placed: boolean;
+  placement: number;
   total: number;
   played: number;
   zone: WeekZone;
@@ -135,7 +143,27 @@ export const saveMatch = (m: StoredMatch) => getStore().set(matchKey(m.id), m);
 const putProfile = (uid: string, p: RankedProfile) => getStore().hset(HASH, uid, p);
 
 /** Clôt les semaines terminées (une fois par semaine, au premier passage). */
+let resetDone = false;
+/**
+ * Remise à zéro des rangs (une fois par époque) : profils classés effacés et
+ * rang retiré des profils publics. L'XP n'est pas touchée.
+ */
+export async function resetRanksIfNeeded() {
+  if (resetDone) return;
+  const store = getStore();
+  if (await store.create(`rk:reset:${RANK_EPOCH}`, { at: Date.now() })) {
+    await store.del(HASH);
+    const players = await store.hgetall<PublicProfile>("players");
+    for (const [uid, p] of Object.entries(players)) {
+      const { titleId: _t, frameId: _f, ...rest } = p;
+      await store.hset("players", uid, { ...rest, rp: 0 });
+    }
+  }
+  resetDone = true;
+}
+
 export async function settleIfNeeded(now = new Date()) {
+  await resetRanksIfNeeded();
   const store = getStore();
   const week = rankedWeek(now);
   if (!(await store.create(`rk:settled:${week}`, { at: now.getTime() }))) return 0;
@@ -151,9 +179,10 @@ export async function loadProfile(uid: string, pseudo: string, now = new Date())
   const [stored] = await store.hmget<RankedProfile>(HASH, [uid]);
   const save = await getSave(uid);
   const level = save?.save.profile?.level ?? "seconde";
-  let profile = stored ?? newRankedProfile(pseudo, save?.save.rp ?? 0, now);
+  const current = stored && stored.epoch === RANK_EPOCH ? stored : null;
+  let profile = current ?? newRankedProfile(pseudo, now);
   const seasoned = applySeason(profile, now);
-  if (!stored || seasoned !== profile || profile.pseudo !== pseudo) {
+  if (!current || seasoned !== profile || profile.pseudo !== pseudo) {
     profile = { ...seasoned, pseudo };
     await putProfile(uid, profile);
   }
@@ -183,9 +212,13 @@ export function rankView(subject: RankedSubject, r: SubjectRank | undefined, now
 export const profileViews = (p: RankedProfile, level: Level, now = new Date()) => rankedSubjectsFor(level).map((s) => rankView(s, p.subjects[s], now));
 
 /** Groupe de la semaine du joueur dans une matière (il y figure même sans avoir encore joué). */
-export async function groupFor(uid: string, subject: RankedSubject, now = new Date()): Promise<{ rows: GroupRow[]; top: GroupRow[]; players: number }> {
+export async function groupFor(
+  uid: string,
+  subject: RankedSubject,
+  now = new Date(),
+): Promise<{ rows: GroupRow[]; top: GroupRow[]; friends: GroupRow[]; players: number }> {
   const store = getStore();
-  const all = await store.hgetall<RankedProfile>(HASH);
+  const all = Object.fromEntries(Object.entries(await store.hgetall<RankedProfile>(HASH)).filter(([, p]) => p.epoch === RANK_EPOCH));
   const week = rankedWeek(now);
   const ranks = Object.entries(all).flatMap(([id, p]) => {
     const r = currentRank(p.subjects[subject], now);
@@ -195,18 +228,22 @@ export async function groupFor(uid: string, subject: RankedSubject, now = new Da
   const mine = all[uid]?.subjects[subject];
   if (mine?.placed && !active.some((e) => e.id === uid)) active.push(entryOf(uid, currentRank(mine, now)!));
   const group = formGroups(active).find((g) => g.some((e) => e.id === uid)) ?? [];
+  const friendList = [uid, ...(await friendIds(uid))];
 
-  const ids = [...new Set([...group.map((e) => e.id), ...ranks.map(([id]) => id)])];
+  const ids = [...new Set([...group.map((e) => e.id), ...ranks.map(([id]) => id), ...friendList])];
   const publics = await store.hmget<PublicProfile>("players", ids);
   const pub = new Map(ids.map((id, i) => [id, publics[i]]));
-  const row = (e: GroupEntry, zone: WeekZone): GroupRow => {
+  const row = (e: GroupEntry, zone: WeekZone, placed = true, placement = PLACEMENT_MATCHES): GroupRow => {
     const p = pub.get(e.id);
     return {
       id: publicPlayerId(e.id),
       pseudo: all[e.id]?.pseudo ?? p?.pseudo ?? "?",
       avatar: p?.avatar ?? "🙂",
       ...(p?.photoThumb ? { photoThumb: p.photoThumb } : {}),
+      step: e.step,
       label: stepLabel(e.step),
+      placed,
+      placement,
       total: e.total,
       played: e.played,
       zone,
@@ -214,14 +251,21 @@ export async function groupFor(uid: string, subject: RankedSubject, now = new Da
     };
   };
   const ordered = standings(group);
-  const classified = ordered.filter((e) => e.played >= 3);
+  const classified = ordered.filter((e) => e.played >= MIN_MATCHES);
   const rows = ordered.map((e) => row(e, zoneFor(e, classified.indexOf(e) + 1, classified.length)));
   const top = ranks
     .map(([id, r]) => entryOf(id, r))
     .sort((a, b) => b.step - a.step || b.total - a.total)
     .slice(0, 50)
     .map((e) => row(e, "safe"));
-  return { rows, top, players: ranks.length };
+  // Amis : classés d'abord (rang puis points de la semaine), puis ceux en placement.
+  const friends = friendList
+    .map((id) => {
+      const r = currentRank(all[id]?.subjects[subject], now);
+      return row(r ? entryOf(id, r) : { id, step: 0, total: 0, played: 0, avg: 0 }, "safe", r?.placed ?? false, r?.placement.length ?? 0);
+    })
+    .sort((a, b) => Number(b.placed) - Number(a.placed) || b.step - a.step || b.total - a.total || b.placement - a.placement);
+  return { rows, top, friends, players: ranks.length };
 }
 
 // ─────────────────────────── Manches ───────────────────────────
@@ -371,10 +415,11 @@ export async function acknowledgeWeek(uid: string, pseudo: string, subject: Rank
   await putProfile(uid, { ...profile, subjects: { ...profile.subjects, [subject]: { ...r, last: { ...r.last, seen: true } } } });
 }
 
-/** Rang Général à recopier dans la sauvegarde (le badge affiché partout). */
-export async function generalStep(uid: string): Promise<number | null> {
+/** Rang à recopier dans la sauvegarde (le badge affiché partout) : c'est le serveur qui fait foi. */
+export async function rankForSave(uid: string): Promise<{ rp: number; peakRp: number }> {
+  await resetRanksIfNeeded();
   const [p] = await getStore().hmget<RankedProfile>(HASH, [uid]);
-  return p?.subjects.general?.step ?? null;
+  return rankRewards(p && p.epoch === RANK_EPOCH ? p : null);
 }
 
 export { MATCH_SIZE };

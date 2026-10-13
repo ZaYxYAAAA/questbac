@@ -3,55 +3,45 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
-import { Clock, Flag, Play, Swords } from "lucide-react";
-import { Avatar } from "@/components/game/Avatar";
-import { FriendsBoard } from "@/components/game/FriendsBoard";
+import { ChevronDown, Play, Swords } from "lucide-react";
 import { RankLadder } from "@/components/game/RankLadder";
+import { HelpSheet } from "@/components/ranked/HelpSheet";
 import { type MatchStart, RankedMatch } from "@/components/ranked/RankedMatch";
 import { RankedBadge } from "@/components/ranked/RankedBadge";
+import { FriendsStandings, GroupStandings, TopStandings } from "@/components/ranked/Standings";
+import { StatusCard } from "@/components/ranked/StatusCard";
 import { WeekResults } from "@/components/ranked/WeekResults";
 import { Button } from "@/components/ui/Button";
 import { Tabs } from "@/components/ui/Tabs";
 import { buildLeaderboard, realEntries } from "@/lib/game/leaderboard";
-import { formatCountdown } from "@/lib/game/league";
 import { levelFromXp } from "@/lib/game/progression";
-import { COUNTED_MATCHES, MATCH_SIZE, MIN_MATCHES, PLACEMENT_MATCHES, type RankedSubject, type WeekZone, rankedSubjectMeta } from "@/lib/game/ranked";
+import { MATCH_SIZE, PLACEMENT_MATCHES, type RankedSubject, rankedSubjectMeta } from "@/lib/game/ranked";
 import { activeTierReward, playerFrame } from "@/lib/game/ranks";
 import { useCloud } from "@/lib/store/cloud-sync";
 import { useGame } from "@/lib/store/game-store";
 import { loadPlayers, usePlayers } from "@/lib/store/players-store";
-import { type GroupRow, type RankView, type RankedOverview, jokerRanked, loadRanked, nextRanked, reportRanked, startRanked, useRanked } from "@/lib/store/ranked-store";
+import { type RankView, type RankedOverview, jokerRanked, loadRanked, nextRanked, startRanked, useRanked } from "@/lib/store/ranked-store";
 import { useToasts } from "@/lib/store/toast-store";
 
-type View = "jouer" | "groupe" | "rangs" | "amis";
-const VIEWS: View[] = ["jouer", "groupe", "rangs", "amis"];
-
-const ZONE_STYLE: Record<WeekZone, { row: string; label: string }> = {
-  promotion: { row: "border-l-emerald-400 bg-emerald-500/10", label: "⬆️ Promotion" },
-  objective: { row: "border-l-emerald-400 bg-emerald-500/10", label: "🎯 Objectif atteint" },
-  safe: { row: "border-l-slate-600", label: "Maintien" },
-  relegation: { row: "border-l-rose-500 bg-rose-500/10", label: "⬇️ Relégation" },
-  unranked: { row: "border-l-slate-800 opacity-70", label: `Moins de ${MIN_MATCHES} manches` },
-  inactive: { row: "border-l-slate-800", label: "Inactif" },
-  review: { row: "border-l-slate-600", label: "En vérification" },
-};
+type View = "jouer" | "classement";
+type Board = "groupe" | "amis" | "top";
 
 export default function RankedPage() {
-  const game = useGame();
-  const profile = game.profile!;
   const { user, checked } = useCloud();
   const { overview, error, fetchedAt } = useRanked();
   const [view, setView] = useState<View>("jouer");
+  const [board, setBoard] = useState<Board>("groupe");
   const [subject, setSubject] = useState<RankedSubject>("general");
   const [match, setMatch] = useState<MatchStart | null>(null);
   const [starting, setStarting] = useState<RankedSubject | null>(null);
   /** Matière choisie, en attente de confirmation des règles. */
   const [ready, setReady] = useState<RankedSubject | null>(null);
+  const [help, setHelp] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    const asked = new URLSearchParams(window.location.search).get("vue") as View | null;
-    if (asked && VIEWS.includes(asked)) setView(asked);
+    const asked = new URLSearchParams(window.location.search).get("vue");
+    if (asked === "classement" || asked === "groupe" || asked === "rangs") setView("classement");
     const id = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(id);
   }, []);
@@ -59,11 +49,6 @@ export default function RankedPage() {
   useEffect(() => {
     if (user) void loadRanked(subject);
   }, [user, subject]);
-
-  const changeView = (v: View) => {
-    setView(v);
-    window.history.replaceState(null, "", v === "jouer" ? "/classement" : `/classement?vue=${v}`);
-  };
 
   const play = useCallback(async (s: RankedSubject) => {
     setStarting(s);
@@ -93,28 +78,6 @@ export default function RankedPage() {
     }
   };
 
-  // Classement des amis et échelle des rangs (profils publics).
-  const selfId = useCloud((s) => s.user?.id ?? null);
-  const players = usePlayers((s) => s.players);
-  useEffect(() => {
-    void loadPlayers(true);
-  }, []);
-  const player = useMemo(
-    () => ({
-      pseudo: profile.pseudo,
-      avatar: profile.avatar,
-      photo: profile.photo ?? profile.photoThumb,
-      titleId: activeTierReward(profile.titleId, game.peakRp).tierId,
-      frameId: playerFrame(profile, game.peakRp) ?? undefined,
-      level: profile.level,
-      playerLevel: levelFromXp(game.xp).level,
-      weeklyXp: game.weekly.xp,
-      rp: game.rp,
-    }),
-    [profile, game.xp, game.weekly.xp, game.rp, game.peakRp],
-  );
-  const globalEntries = useMemo(() => buildLeaderboard(player, "global", realEntries(players, selfId)), [player, players, selfId]);
-
   if (match) {
     return (
       <RankedMatch
@@ -132,113 +95,133 @@ export default function RankedPage() {
     );
   }
 
-  const general = overview?.ranks.find((r) => r.subject === "general");
-  const rulesModal = ready && (
-    <div className="fixed inset-0 z-[60] grid place-items-end bg-slate-950/80 p-3 backdrop-blur-sm sm:place-items-center" onClick={() => setReady(null)}>
-      <div className="qb-pop w-full max-w-md space-y-4 rounded-3xl border border-amber-400/40 bg-slate-900 p-5" onClick={(e) => e.stopPropagation()}>
-        <p className="text-xs font-bold uppercase tracking-wider text-amber-300">{rankedSubjectMeta(ready).emoji} {rankedSubjectMeta(ready).name} · manche classée</p>
-        <p className="text-2xl font-black text-white">Reste dans l&apos;appli jusqu&apos;à la fin</p>
-        <ul className="space-y-2 text-sm text-slate-300">
-          <li>⏱️ {MATCH_SIZE} questions, une à la fois, avec un chrono. Plus tu réponds vite, plus tu marques.</li>
-          <li>⚠️ <b className="text-white">1re sortie</b> de l&apos;appli : la question en cours compte fausse.</li>
-          <li>🚪 <b className="text-white">2e sortie</b>, ou plus de 10 s dehors : la manche est perdue (0 point).</li>
-          <li>🃏 Un appel, une fausse manip ? Un <b className="text-white">joker par jour</b> annule une manche perdue.</li>
-          <li>🔒 Texte non copiable, réponses corrigées par le serveur.</li>
-        </ul>
-        <div className="flex gap-2">
-          <Button variant="secondary" className="flex-1" onClick={() => setReady(null)}>Plus tard</Button>
-          <Button
-            variant="gold"
-            className="flex-1 py-3"
-            disabled={starting !== null}
-            onClick={() => {
-              const s = ready;
-              setReady(null);
-              void play(s);
-            }}
-          >
-            <Swords size={16} /> C&apos;est parti
-          </Button>
-        </div>
+  if (checked && !user) {
+    return (
+      <div className="space-y-3 rounded-3xl border border-amber-400/30 bg-gradient-to-br from-amber-500/15 to-slate-900 p-6 text-center">
+        <p className="text-5xl">⚔️</p>
+        <p className="text-xl font-black text-white">Mode classé</p>
+        <p className="text-sm text-slate-300">Un rang par matière, des groupes chaque semaine. Il faut un compte : tes manches sont corrigées par le serveur pour que le classement reste juste.</p>
+        <Link href="/profil?onglet=compte" className="inline-flex rounded-xl bg-violet-600 px-4 py-2 font-semibold text-white">Créer mon compte</Link>
       </div>
-    </div>
-  );
+    );
+  }
+
+  const loaded = overview && overview.subject === subject ? overview : null;
+  const rank = overview?.ranks.find((r) => r.subject === subject);
   const endsIn = overview ? overview.endsInMs - (now - fetchedAt) : 0;
+  const choose = (s: RankedSubject) => {
+    setSubject(s);
+    setReady(s);
+  };
 
   return (
-    <div className="space-y-5">
-      {rulesModal}
-      {/* En-tête : ambiance compétition, distincte de l'entraînement */}
-      <section className="relative overflow-hidden rounded-3xl border border-amber-400/30 bg-gradient-to-br from-amber-500/20 via-slate-900 to-slate-950 p-4">
-        <div aria-hidden className="absolute -right-4 -top-6 text-[6rem] opacity-10">⚔️</div>
-        <div className="relative flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-wider text-amber-300">⚔️ Mode classé</p>
-            <h1 className="text-xl font-black text-white">Ici, chaque manche compte</h1>
-            <p className="text-xs text-slate-400">Seul le classé fait monter ton rang.</p>
-          </div>
-          {general && (
-            <div className="shrink-0 space-y-1 text-right">
-              <RankedBadge step={general.step} size="md" />
-              <p className="flex items-center justify-end gap-1 text-[11px] text-amber-200"><Clock size={11} /> {formatCountdown(endsIn)}</p>
-            </div>
-          )}
-        </div>
-      </section>
+    <div className="space-y-4">
+      {ready && <RulesSheet subject={ready} busy={starting !== null} onCancel={() => setReady(null)} onGo={() => { const s = ready; setReady(null); void play(s); }} />}
+      {help && <HelpSheet onClose={() => setHelp(false)} />}
 
-      {checked && !user ? (
-        <div className="space-y-3 rounded-3xl border border-white/10 bg-slate-900/70 p-6 text-center">
-          <p className="text-4xl">🔐</p>
-          <p className="text-slate-200">Le mode classé se joue avec un compte : tes manches sont corrigées par le serveur pour que le classement reste juste.</p>
-          <Link href="/profil?onglet=compte" className="inline-flex rounded-xl bg-violet-600 px-4 py-2 font-semibold text-white">Créer mon compte</Link>
-        </div>
-      ) : (
+      {error && !overview && <p className="rounded-xl bg-rose-500/15 p-3 text-sm text-rose-300">{error}</p>}
+      {!overview && !error && <div className="h-64 animate-pulse rounded-3xl bg-slate-900/60" />}
+
+      {overview && (
         <>
-          {overview && <WeekResults ranks={overview.ranks} />}
-
-          {overview?.pendingLoss && <PendingLoss loss={overview.pendingLoss} onDone={() => loadRanked(subject)} />}
-
-          {overview?.active && (
-            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-amber-400/40 bg-amber-500/10 p-4">
+          <WeekResults ranks={overview.ranks} />
+          {overview.pendingLoss && <PendingLoss loss={overview.pendingLoss} onDone={() => loadRanked(subject)} />}
+          {overview.active && (
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-amber-400/40 bg-amber-500/10 p-3">
               <p className="flex-1 text-sm text-amber-100">
-                Manche en cours en <b>{rankedSubjectMeta(overview.active.subject).name}</b> (question {overview.active.index + 1}/{overview.active.total}).
+                Manche en cours : <b>{rankedSubjectMeta(overview.active.subject).name}</b> (question {overview.active.index + 1}/{overview.active.total})
               </p>
               <Button variant="gold" onClick={resume}><Play size={16} /> Reprendre</Button>
             </div>
           )}
 
+          {rank && (
+            <StatusCard
+              subject={subject}
+              rank={rank}
+              rows={loaded?.group ?? []}
+              endsIn={endsIn}
+              busy={starting !== null}
+              onPlay={() => setReady(subject)}
+              onHelp={() => setHelp(true)}
+            />
+          )}
+
           <Tabs<View>
             value={view}
-            onChange={changeView}
-            className="w-full flex-nowrap sm:w-auto [&>button]:flex-1 [&>button]:whitespace-nowrap [&>button]:px-2 sm:[&>button]:flex-none sm:[&>button]:px-3"
+            onChange={setView}
+            className="w-full [&>button]:flex-1"
             options={[
-              { value: "jouer", label: "Jouer" },
-              { value: "groupe", label: "Mon groupe" },
-              { value: "rangs", label: "Rangs" },
-              { value: "amis", label: "Amis" },
+              { value: "jouer", label: "🎮 Matières" },
+              { value: "classement", label: "🏆 Classements" },
             ]}
           />
 
-          {error && !overview && <p className="rounded-xl bg-rose-500/15 p-3 text-sm text-rose-300">{error}</p>}
-          {!overview && !error && <div className="h-48 animate-pulse rounded-3xl bg-slate-900/60" />}
+          {view === "jouer" && <SubjectList ranks={overview.ranks} current={subject} onChoose={choose} onSelect={setSubject} />}
 
-          {overview && view === "jouer" && <PlayView ranks={overview.ranks} starting={starting} onPlay={setReady} />}
-          {overview && view === "groupe" && (
-            <>
+          {view === "classement" && (
+            <div className="space-y-3">
               <SubjectChips ranks={overview.ranks} value={subject} onChange={setSubject} />
-              <GroupView rank={overview.ranks.find((r) => r.subject === subject)} rows={overview.subject === subject ? overview.group : []} endsIn={endsIn} onPlay={() => setReady(subject)} />
-            </>
+              <div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-900/80 p-1 text-sm font-semibold">
+                {([["groupe", "Mon groupe"], ["amis", "Amis"], ["top", "Top"]] as const).map(([b, label]) => (
+                  <button key={b} type="button" onClick={() => setBoard(b)} className={clsx("rounded-lg py-1.5 transition", board === b ? "bg-amber-400 text-slate-950" : "text-slate-400")}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {!loaded ? (
+                <div className="h-40 animate-pulse rounded-2xl bg-slate-900/60" />
+              ) : board === "groupe" ? (
+                rank?.placed ? (
+                  <GroupStandings rows={loaded.group} par={rank.par} />
+                ) : (
+                  <p className="rounded-2xl border border-dashed border-white/10 p-5 text-center text-sm text-slate-400">
+                    Termine tes {PLACEMENT_MATCHES} manches de placement en {rankedSubjectMeta(subject).name} pour rejoindre un groupe.
+                  </p>
+                )
+              ) : board === "amis" ? (
+                <FriendsStandings rows={loaded.friends} />
+              ) : (
+                <>
+                  <TopStandings rows={loaded.top} players={loaded.players} />
+                  <Ladder />
+                </>
+              )}
+            </div>
           )}
-          {overview && view === "rangs" && (
-            <>
-              <SubjectChips ranks={overview.ranks} value={subject} onChange={setSubject} />
-              <TopView rows={overview.subject === subject ? overview.top : []} players={overview.players} />
-              <RankLadder entries={globalEntries} />
-            </>
-          )}
-          {view === "amis" && <FriendsBoard player={player} />}
         </>
       )}
+    </div>
+  );
+}
+
+/** Toutes les matières : rang, avancement de la semaine, et un bouton pour jouer. */
+function SubjectList({ ranks, current, onChoose, onSelect }: { ranks: RankView[]; current: RankedSubject; onChoose: (s: RankedSubject) => void; onSelect: (s: RankedSubject) => void }) {
+  return (
+    <div className="divide-y divide-white/5 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70">
+      {ranks.map((r) => {
+        const m = rankedSubjectMeta(r.subject);
+        const line = !r.placed
+          ? `Placement ${PLACEMENT_MATCHES - r.placementLeft}/${PLACEMENT_MATCHES}`
+          : r.played === 0
+            ? "Pas joué cette semaine"
+            : `${r.played} manche${r.played > 1 ? "s" : ""} · moyenne ${r.avg}/${r.par}`;
+        return (
+          <div key={r.subject} className={clsx("flex items-center gap-3 px-3 py-2.5", current === r.subject && "bg-amber-400/[0.07]")}>
+            <button type="button" onClick={() => onSelect(r.subject)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+              <span className={clsx("grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br text-xl", m.gradient)}>{m.emoji}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-bold text-white">{m.name}</span>
+                <span className="block truncate text-xs text-slate-500">{line}</span>
+              </span>
+              {r.placed && <RankedBadge step={r.step} size="sm" />}
+            </button>
+            <button type="button" onClick={() => onChoose(r.subject)} aria-label={`Jouer en ${m.name}`} className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-amber-300 to-orange-500 text-slate-950 active:scale-95">
+              <Play size={15} className="ml-0.5" fill="currentColor" />
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -253,7 +236,7 @@ function SubjectChips({ ranks, value, onChange }: { ranks: RankView[]; value: Ra
             key={r.subject}
             type="button"
             onClick={() => onChange(r.subject)}
-            className={clsx("flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition", value === r.subject ? "bg-amber-400 text-slate-950" : "bg-slate-800/70 text-slate-300")}
+            className={clsx("flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition", value === r.subject ? "bg-white text-slate-950" : "bg-slate-800/70 text-slate-300")}
           >
             <span>{m.emoji}</span>
             {m.name}
@@ -264,142 +247,66 @@ function SubjectChips({ ranks, value, onChange }: { ranks: RankView[]; value: Ra
   );
 }
 
-function PlayView({ ranks, starting, onPlay }: { ranks: RankView[]; starting: RankedSubject | null; onPlay: (s: RankedSubject) => void }) {
-  const [general, ...subjects] = ranks;
-  const weekLine = (r: RankView) =>
-    !r.placed
-      ? `Placement : ${PLACEMENT_MATCHES - r.placementLeft}/${PLACEMENT_MATCHES}`
-      : r.played === 0
-        ? "Pas encore joué cette semaine"
-        : `${r.played} manche${r.played > 1 ? "s" : ""} · moyenne ${r.avg} / ${r.par}`;
+/** Échelle complète des rangs (repliée par défaut). */
+function Ladder() {
+  const [open, setOpen] = useState(false);
+  const game = useGame();
+  const profile = game.profile!;
+  const selfId = useCloud((s) => s.user?.id ?? null);
+  const players = usePlayers((s) => s.players);
+  useEffect(() => {
+    if (open) void loadPlayers(true);
+  }, [open]);
+  const entries = useMemo(
+    () =>
+      buildLeaderboard(
+        {
+          pseudo: profile.pseudo,
+          avatar: profile.avatar,
+          photo: profile.photo ?? profile.photoThumb,
+          titleId: activeTierReward(profile.titleId, game.peakRp).tierId,
+          frameId: playerFrame(profile, game.peakRp) ?? undefined,
+          level: profile.level,
+          playerLevel: levelFromXp(game.xp).level,
+          weeklyXp: game.weekly.xp,
+          rp: game.rp,
+        },
+        "global",
+        realEntries(players, selfId),
+      ),
+    [profile, game.xp, game.weekly.xp, game.rp, game.peakRp, players, selfId],
+  );
   return (
-    <div className="space-y-3">
-      {/* Général en vedette */}
-      <button
-        type="button"
-        disabled={starting !== null}
-        onClick={() => onPlay(general.subject)}
-        className="flex w-full items-center gap-3 rounded-3xl border border-amber-400/40 bg-gradient-to-r from-amber-500/20 to-orange-600/10 p-4 text-left transition active:scale-[0.99] disabled:opacity-60"
-      >
-        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 text-3xl">⭐</span>
-        <div className="min-w-0 flex-1">
-          <p className="font-black text-white">Général <span className="text-xs font-normal text-slate-400">toutes les matières</span></p>
-          <RankedBadge step={general.step} size="sm" />
-          <p className="mt-1 text-xs text-slate-400">{weekLine(general)}</p>
-        </div>
-        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-gradient-to-br from-amber-300 to-orange-500 text-slate-950">
-          {starting === general.subject ? "…" : <Play size={20} className="ml-0.5" fill="currentColor" />}
-        </span>
+    <div>
+      <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-center gap-1 py-2 text-sm font-semibold text-slate-400 hover:text-white">
+        Échelle des rangs, titres et cadres <ChevronDown size={16} className={clsx("transition", open && "rotate-180")} />
       </button>
-
-      {/* Une ligne par matière */}
-      <div className="overflow-hidden rounded-3xl border border-white/10 bg-slate-900/70">
-        {subjects.map((r) => {
-          const m = rankedSubjectMeta(r.subject);
-          return (
-            <button
-              key={r.subject}
-              type="button"
-              disabled={starting !== null}
-              onClick={() => onPlay(r.subject)}
-              className="flex w-full items-center gap-3 border-b border-white/5 px-3 py-2.5 text-left transition last:border-0 hover:bg-white/5 active:bg-white/10 disabled:opacity-60"
-            >
-              <span className={clsx("grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br text-xl", m.gradient)}>{m.emoji}</span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-bold text-white">{m.name}</p>
-                <p className="truncate text-xs text-slate-500">{weekLine(r)}</p>
-              </div>
-              {r.placed && <RankedBadge step={r.step} size="sm" />}
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-amber-400/15 text-amber-300">
-                {starting === r.subject ? "…" : <Play size={14} className="ml-0.5" fill="currentColor" />}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-      <p className="text-center text-xs text-slate-500">
-        {MATCH_SIZE} questions chronométrées · tes {COUNTED_MATCHES} meilleures manches comptent · promotions dimanche à minuit
-      </p>
+      {open && <RankLadder entries={entries} />}
     </div>
   );
 }
 
-function GroupView({ rank, rows, endsIn, onPlay }: { rank?: RankView; rows: GroupRow[]; endsIn: number; onPlay: () => void }) {
-  if (!rank?.placed) {
-    return (
-      <div className="space-y-3 rounded-3xl border border-white/10 bg-slate-900/70 p-6 text-center">
-        <p className="text-4xl">🎯</p>
-        <p className="text-slate-300">Termine tes {PLACEMENT_MATCHES} manches de placement dans cette matière pour rejoindre un groupe.</p>
-        <Button variant="gold" onClick={onPlay}><Swords size={16} /> Jouer une manche</Button>
-      </div>
-    );
-  }
-  const me = rows.find((r) => r.isMe);
+function RulesSheet({ subject, busy, onCancel, onGo }: { subject: RankedSubject; busy: boolean; onCancel: () => void; onGo: () => void }) {
+  const m = rankedSubjectMeta(subject);
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-        <p className="text-slate-300">
-          Groupe de <b className="text-white">{rows.length}</b> joueur{rows.length > 1 ? "s" : ""} · fin dans <b className="text-amber-200">{formatCountdown(endsIn)}</b>
-        </p>
-        {me && me.played === 0 && <Button variant="gold" onClick={onPlay}><Swords size={16} /> Entrer dans la course</Button>}
-      </div>
-      <div className="overflow-hidden rounded-3xl border border-white/10 bg-slate-900/70">
-        {rows.map((r, i) => (
-          <div key={r.id} className={clsx("flex items-center gap-3 border-b border-l-4 border-b-white/5 px-3 py-2.5 last:border-b-0", ZONE_STYLE[r.zone].row, r.isMe && "ring-1 ring-inset ring-amber-400/60")}>
-            <span className="w-6 text-center font-black text-slate-400">{i + 1}</span>
-            <Avatar emoji={r.avatar} photo={r.photoThumb} name={r.pseudo} size="sm" />
-            <div className="min-w-0 flex-1">
-              <p className={clsx("truncate font-semibold", r.isMe ? "text-amber-200" : "text-white")}>{r.pseudo}{r.isMe && " (toi)"}</p>
-              <p className="text-xs text-slate-500">{r.label} · {r.played} manche{r.played > 1 ? "s" : ""} · {ZONE_STYLE[r.zone].label}</p>
-            </div>
-            <span className="font-mono text-sm font-bold text-slate-100">{r.total}</span>
-            {!r.isMe && <ReportButton row={r} />}
-          </div>
-        ))}
-      </div>
-      <div className="grid gap-2 text-xs text-slate-400 sm:grid-cols-3">
-        <p className="rounded-xl bg-emerald-500/10 p-2.5"><b className="text-emerald-300">Vert</b> : tu montes d&apos;une division dimanche soir. Atteindre l&apos;objectif (moyenne ≥ {rank.par} sur {PLACEMENT_MATCHES} manches) fait aussi monter.</p>
-        <p className="rounded-xl bg-slate-800/60 p-2.5"><b className="text-slate-200">Gris</b> : tu restes. Il faut au moins {MIN_MATCHES} manches dans la semaine pour être classé.</p>
-        <p className="rounded-xl bg-rose-500/10 p-2.5"><b className="text-rose-300">Rouge</b> : tu descends d&apos;une division (groupes de 6 joueurs ou plus).</p>
+    <div className="fixed inset-0 z-[60] grid place-items-end bg-slate-950/80 p-3 backdrop-blur-sm sm:place-items-center" onClick={onCancel}>
+      <div className="qb-pop w-full max-w-md space-y-4 rounded-3xl border border-amber-400/40 bg-slate-900 p-5" onClick={(e) => e.stopPropagation()}>
+        <p className="text-xs font-bold uppercase tracking-wider text-amber-300">{m.emoji} {m.name} · manche classée</p>
+        <p className="text-2xl font-black text-white">Reste dans l&apos;appli jusqu&apos;à la fin</p>
+        <ul className="space-y-2 text-sm text-slate-300">
+          <li>⏱️ {MATCH_SIZE} questions avec un chrono : plus tu réponds vite, plus tu marques.</li>
+          <li>⚠️ <b className="text-white">1re sortie</b> de l&apos;appli : la question en cours compte fausse.</li>
+          <li>🚪 <b className="text-white">2e sortie</b> ou plus de 10 s dehors : manche perdue (0 point).</li>
+          <li>🃏 Un appel, une fausse manip ? <b className="text-white">1 joker par jour</b>.</li>
+        </ul>
+        <div className="flex gap-2">
+          <Button variant="secondary" className="flex-1" onClick={onCancel}>Plus tard</Button>
+          <Button variant="gold" className="flex-1 py-3" disabled={busy} onClick={onGo}>
+            <Swords size={16} /> C&apos;est parti
+          </Button>
+        </div>
       </div>
     </div>
-  );
-}
-
-function TopView({ rows, players }: { rows: GroupRow[]; players: number }) {
-  if (rows.length === 0) return <p className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-slate-500">Personne n&apos;est encore classé dans cette matière : sois le premier !</p>;
-  return (
-    <div className="space-y-2">
-      <p className="text-sm text-slate-400">{players} joueur{players > 1 ? "s" : ""} classé{players > 1 ? "s" : ""} dans cette matière.</p>
-      <div className="overflow-hidden rounded-3xl border border-white/10 bg-slate-900/70">
-        {rows.map((r, i) => (
-          <div key={r.id} className={clsx("flex items-center gap-3 border-b border-white/5 px-3 py-2.5 last:border-0", r.isMe && "bg-amber-500/10")}>
-            <span className={clsx("w-6 text-center font-black", i < 3 ? "text-amber-300" : "text-slate-500")}>{i + 1}</span>
-            <Avatar emoji={r.avatar} photo={r.photoThumb} name={r.pseudo} size="sm" />
-            <p className={clsx("min-w-0 flex-1 truncate font-semibold", r.isMe ? "text-amber-200" : "text-white")}>{r.pseudo}{r.isMe && " (toi)"}</p>
-            <span className="text-xs font-bold text-slate-300">{r.label}</span>
-            {!r.isMe && <ReportButton row={r} />}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ReportButton({ row }: { row: GroupRow }) {
-  const report = async () => {
-    if (!window.confirm(`Signaler ${row.pseudo} pour triche ? Après 3 signalements de joueurs différents, ses promotions sont bloquées le temps d'une vérification.`)) return;
-    try {
-      const r = await reportRanked(row.id);
-      useToasts.getState().push({ emoji: "🚩", title: r.already ? "Déjà signalé" : "Signalement envoyé", body: r.already ? undefined : "Merci, c'est pris en compte.", tone: "emerald" });
-    } catch (e) {
-      useToasts.getState().push({ emoji: "⚠️", title: e instanceof Error ? e.message : "Erreur", tone: "rose" });
-    }
-  };
-  return (
-    <button type="button" onClick={report} aria-label={`Signaler ${row.pseudo}`} className="rounded-lg p-1.5 text-slate-600 hover:bg-rose-600/20 hover:text-rose-300">
-      <Flag size={14} />
-    </button>
   );
 }
 

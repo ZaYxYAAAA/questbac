@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { create } from "zustand";
-import { stepMinRp } from "@/lib/game/ranked";
+import { RANK_EPOCH } from "@/lib/game/ranked";
+
+const RANK_EPOCH_KEY = "questbac-rank-epoch";
 import { persist } from "zustand/middleware";
 import type { CustomMission, Level } from "@/lib/types";
 import type { DailyReward } from "@/lib/game/daily";
@@ -40,8 +42,10 @@ interface GameActions {
   /** Mémorise les derniers scores connus des adversaires de la ligue. */
   setLeagueRivals: (rivals: LeagueRow[]) => void;
   refresh: () => void;
-  /** Rang Général du mode classé (tenu par le serveur) recopié localement. */
-  syncRankedStep: (step: number) => void;
+  /** Rang Général du mode classé et meilleur rang (tenus par le serveur) recopiés localement. */
+  syncRank: (rp: number, peakRp: number) => void;
+  /** Remise à zéro locale des rangs quand l'époque des rangs change (l'XP reste). */
+  applyRankEpoch: () => void;
   /** Remet la progression à zéro en gardant le profil. */
   resetAll: () => void;
   /** Remplace tout l'état (sauvegarde serveur ou fichier importé), sans toucher à `updatedAt` ; quêtes remises au jour. */
@@ -111,12 +115,20 @@ export const useGame = create<GameStore>()(
           useCelebration.getState().show(promotionBetween(current.peakRp, next.rp));
         },
         // Donnée du serveur : `updatedAt` reste inchangé.
-        syncRankedStep: (step) => {
-          const { rp, peakRp } = get();
-          const next = stepMinRp(step);
-          if (next === rp) return;
-          set({ rp: next, peakRp: Math.max(peakRp, next) });
-          useCelebration.getState().show(promotionBetween(peakRp, next));
+        syncRank: (rp, peakRp) => {
+          const before = get();
+          if (before.rp === rp && before.peakRp === peakRp) return;
+          set({ rp, peakRp });
+          if (rp > before.peakRp) useCelebration.getState().show(promotionBetween(before.peakRp, rp));
+        },
+        applyRankEpoch: () => {
+          try {
+            if (localStorage.getItem(RANK_EPOCH_KEY) === String(RANK_EPOCH)) return;
+            set({ rp: 0, peakRp: 0 });
+            localStorage.setItem(RANK_EPOCH_KEY, String(RANK_EPOCH));
+          } catch {
+            // Stockage indisponible : le serveur recopiera le bon rang à la prochaine synchro.
+          }
         },
         resetAll: () => commit({ ...createInitialData(), profile: get().profile }),
         replaceAll: (next) => set(refreshPeriods(toGameData(next))),

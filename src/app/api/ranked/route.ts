@@ -1,4 +1,4 @@
-import { isRankedSubject } from "@/lib/game/ranked";
+import { isRankedSubject, rankRewards } from "@/lib/game/ranked";
 import { currentSession, jsonError, storageDown } from "@/lib/server/accounts";
 import { activeMatch, groupFor, loadProfile, pendingLossInfo, profileViews, settleIfNeeded, weekInfo } from "@/lib/server/ranked";
 
@@ -25,10 +25,12 @@ export async function GET(req: Request) {
         ranks: profileViews(profile, level),
         group: group.rows,
         top: group.top,
+        friends: group.friends,
         players: group.players,
         pendingLoss,
         active: active ? { id: active.id, subject: active.subject, index: active.index, total: active.questions.length } : null,
         seasons: profile.seasons ?? {},
+        ...rankRewards(profile),
         season: profile.season,
         ...weekInfo(),
       },

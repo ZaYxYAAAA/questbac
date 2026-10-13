@@ -65,6 +65,12 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (hydrated) refresh();
   }, [hydrated, refresh, pathname]);
 
+  // Remise à zéro des rangs (nouvelle époque) : une seule fois par appareil.
+  const applyRankEpoch = useGame((s) => s.applyRankEpoch);
+  useEffect(() => {
+    if (hydrated) applyRankEpoch();
+  }, [hydrated, applyRankEpoch]);
+
   // Service worker + état des notifications (une fois la session connue).
   const userId = useCloud((s) => s.user?.id ?? null);
   useEffect(() => {

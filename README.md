@@ -157,8 +157,10 @@ pourront tourner telles quelles côté serveur.
 - Navigation à 5 onglets : Accueil, **Entraînement** (Carte, Boss, Forge, Labo, Prof IA : XP
   seulement), **Classé** au centre, Social (Amis, Duels, fil d'actu), Profil.
 - Le rang ne se gagne qu'en classé. Un rang par matière et un rang **Général** (mélange des
-  matières du niveau). Placement en 5 manches par matière (jusqu'à Or III) ; le Général
-  reprend l'ancien rang (RP).
+  matières du niveau). Placement en 5 manches par matière, Général compris (jusqu'à
+  Or III). `RANK_EPOCH` (src/lib/game/ranked.ts) : l'augmenter remet tous les rangs à zéro
+  (profils classés, rang des sauvegardes et des profils publics, titres et cadres), sans
+  toucher à l'XP. Époque 2 : rangs gagnés trop vite quand les questions se répétaient.
 - Manche : 10 questions tirées par le serveur, envoyées une à une, chronométrées (30 s en
   Bronze → 15 s au sommet, +15 s en réponse libre) et corrigées par le serveur. 7 points par
   bonne réponse + jusqu'à 3 pour la vitesse (sur 100).

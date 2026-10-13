@@ -70,11 +70,13 @@ describe("ligue et coffre quotidien dans le store", () => {
     expect(s.updatedAt).toBe(old.updatedAt);
   });
 
-  it("recopie le rang Général du classé sans toucher à updatedAt", () => {
-    useGame.setState({ ...createInitialData(), profile, rp: 0, peakRp: 0, updatedAt: 5 });
-    useGame.getState().syncRankedStep(6);
+  it("recopie le rang du classé (même en baisse) sans toucher à updatedAt", () => {
+    useGame.setState({ ...createInitialData(), profile, rp: 900, peakRp: 1200, updatedAt: 5 });
+    useGame.getState().syncRank(0, 0);
+    expect(useGame.getState().rp).toBe(0);
+    expect(useGame.getState().peakRp).toBe(0);
+    useGame.getState().syncRank(800, 800);
     expect(useGame.getState().rp).toBe(800);
-    expect(useGame.getState().peakRp).toBe(800);
     expect(useGame.getState().updatedAt).toBe(5);
   });
 

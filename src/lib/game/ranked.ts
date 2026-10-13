@@ -145,8 +145,16 @@ export interface SubjectRank {
   last?: WeekResult;
 }
 
+/**
+ * Époque des rangs : l'augmenter remet tous les rangs à zéro (l'XP reste).
+ * 2 : remise à zéro après la période où les questions se répétaient (rangs gagnés trop vite).
+ */
+export const RANK_EPOCH = 2;
+
 export interface RankedProfile {
   pseudo: string;
+  /** Époque des rangs du profil (un profil d'une époque passée repart de zéro). */
+  epoch?: number;
   season: string;
   subjects: Partial<Record<RankedSubject, SubjectRank>>;
   /** Meilleur rang de chaque saison passée, par matière. */
@@ -166,10 +174,21 @@ export function newSubjectRank(week: string, step = 0, placed = false): SubjectR
   return { step, placement: [], placed, week, best: [], played: 0, peak: step };
 }
 
-/** Profil neuf : le rang Général reprend le rang déjà gagné (RP), les matières passent par le placement. */
-export function newRankedProfile(pseudo: string, rp: number, now = new Date()): RankedProfile {
-  const step = stepIndex(rp);
-  return { pseudo, season: seasonKey(now), subjects: { general: newSubjectRank(rankedWeek(now), step, true) } };
+/** Profil neuf : chaque matière, Général compris, passe par 5 manches de placement. */
+export function newRankedProfile(pseudo: string, now = new Date()): RankedProfile {
+  return { pseudo, epoch: RANK_EPOCH, season: seasonKey(now), subjects: {} };
+}
+
+/**
+ * Rang recopié dans la sauvegarde (badge affiché partout) : rang Général actuel,
+ * et meilleur rang Général atteint (titres et cadres), saisons passées comprises.
+ */
+export function rankRewards(p: RankedProfile | null | undefined): { rp: number; peakRp: number } {
+  const g = p?.subjects.general;
+  const rp = g?.placed ? stepMinRp(g.step) : 0;
+  const pastPeaks = Object.values(p?.seasons ?? {}).map((s) => s.general ?? 0);
+  const peakStep = Math.max(g?.placed ? g.peak : 0, ...pastPeaks, 0);
+  return { rp, peakRp: Math.max(rp, g?.placed || pastPeaks.length ? stepMinRp(peakStep) : 0) };
 }
 
 /** Changement de saison : on garde le meilleur rang, puis chacun redescend d'un palier (3 divisions). */
@@ -243,7 +262,8 @@ export function zoneFor(e: GroupEntry, rank: number, classified: number): WeekZo
   if (e.played < MIN_MATCHES) return "unranked";
   if (classified >= LEAGUE_MIN_SIZE && rank <= promotionSpots(classified)) return "promotion";
   if (reachedObjective(e)) return "objective";
-  if (rank > classified - relegationSpots(classified)) return "relegation";
+  // Personne ne descend sous Bronze III : pas de zone rouge au plus bas.
+  if (rank > classified - relegationSpots(classified) && e.step > 0) return "relegation";
   return "safe";
 }
 
@@ -416,4 +436,41 @@ export function underReview(i: Integrity | undefined, now = Date.now()): boolean
   const flags = i.flags.filter((f) => now - f.at < REVIEW_WINDOW_MS).length;
   const reporters = new Set(i.reports.filter((r) => now - r.at < REVIEW_WINDOW_MS).map((r) => r.by)).size;
   return flags >= FLAGS_FOR_REVIEW || reporters >= REPORTS_FOR_REVIEW;
+}
+
+// ─────────────────────────── Statut dans le groupe (affichage) ───────────────────────────
+
+export interface StatusRow {
+  total: number;
+  played: number;
+  zone: WeekZone;
+  isMe: boolean;
+}
+
+export type GroupStatus =
+  | { kind: "absent" }
+  | { kind: "unranked"; missing: number }
+  | { kind: "promotion" | "objective"; rank: number; size: number; lead: number | null }
+  | { kind: "safe"; rank: number; size: number; toPromotion: number | null }
+  | { kind: "relegation"; rank: number; size: number; toSafety: number };
+
+/** Où en est le joueur dans son groupe : zone, et points qui le séparent de la zone voisine. */
+export function groupStatus(rows: StatusRow[]): GroupStatus {
+  const me = rows.find((r) => r.isMe);
+  if (!me) return { kind: "absent" };
+  if (me.played < MIN_MATCHES) return { kind: "unranked", missing: MIN_MATCHES - me.played };
+  const classified = rows.filter((r) => r.played >= MIN_MATCHES);
+  const rank = classified.indexOf(me) + 1;
+  const size = classified.length;
+  const promo = classified.filter((r) => r.zone === "promotion");
+  if (me.zone === "promotion" || me.zone === "objective") {
+    const next = classified[promo.length];
+    return { kind: me.zone, rank, size, lead: me.zone === "promotion" && next ? me.total - next.total : null };
+  }
+  if (me.zone === "relegation") {
+    const lastSafe = [...classified].reverse().find((r) => r.zone !== "relegation");
+    return { kind: "relegation", rank, size, toSafety: lastSafe ? Math.max(1, lastSafe.total - me.total + 1) : 1 };
+  }
+  const lastPromo = promo[promo.length - 1];
+  return { kind: "safe", rank, size, toPromotion: lastPromo ? Math.max(1, lastPromo.total - me.total + 1) : null };
 }

@@ -2,6 +2,7 @@ import clsx from "clsx";
 import { tierById } from "@/lib/game/ranks";
 
 const SIZES = {
+  xs: "h-9 w-9 text-lg",
   sm: "h-12 w-12 text-2xl",
   md: "h-16 w-16 text-3xl",
   lg: "h-24 w-24 text-5xl",

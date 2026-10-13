@@ -15,7 +15,12 @@ import {
   seasonKey,
   settleGroup,
   settleWeeks,
+  RANK_EPOCH,
+  type WeekZone,
+  groupStatus,
+  rankRewards,
   stepLabel,
+  stepMinRp,
   suspicion,
   underReview,
 } from "./ranked";
@@ -45,7 +50,7 @@ describe("semaines classées", () => {
   });
 
   it("garde les 10 meilleures manches et termine le placement à 5", () => {
-    let p = newRankedProfile("Lina", 0, monday);
+    let p = newRankedProfile("Lina", monday);
     let placed = false;
     for (const s of [80, 80, 80, 80, 80]) ({ profile: p, placedNow: placed } = recordMatch(p, "maths", s, monday));
     expect(placed).toBe(true);
@@ -78,7 +83,7 @@ describe("semaines classées", () => {
   });
 
   it("clôt la semaine une seule fois et fait baisser les hauts rangs inactifs", () => {
-    const base = () => newRankedProfile("x", 0, monday);
+    const base = () => newRankedProfile("x", monday);
     const profiles: Record<string, RankedProfile> = {};
     for (let i = 0; i < 4; i++) {
       let p = base();
@@ -95,12 +100,31 @@ describe("semaines classées", () => {
   });
 });
 
+describe("remise à zéro des rangs", () => {
+  it("un profil neuf repasse par le placement, Général compris", () => {
+    const p = newRankedProfile("x", monday);
+    expect(p.epoch).toBe(RANK_EPOCH);
+    expect(p.subjects.general).toBeUndefined();
+    expect(rankRewards(p)).toEqual({ rp: 0, peakRp: 0 });
+    expect(rankRewards(null)).toEqual({ rp: 0, peakRp: 0 });
+  });
+
+  it("recopie le rang Général et le meilleur rang atteint", () => {
+    const p: RankedProfile = {
+      ...newRankedProfile("x", monday),
+      subjects: { general: { step: 4, placement: [], placed: true, week: "2026-W42", best: [], played: 0, peak: 7 } },
+      seasons: { "2025-S3": { general: 9 } },
+    };
+    expect(rankRewards(p)).toEqual({ rp: stepMinRp(4), peakRp: stepMinRp(9) });
+  });
+});
+
 describe("saisons", () => {
   it("suit les trimestres et redescend d'un palier en gardant le meilleur rang", () => {
     expect(seasonKey(new Date("2026-10-12T12:00:00Z"))).toBe("2026-S1");
     expect(seasonKey(new Date("2027-02-01T12:00:00Z"))).toBe("2026-S2");
     expect(seasonKey(new Date("2027-05-01T12:00:00Z"))).toBe("2026-S3");
-    const p: RankedProfile = { ...newRankedProfile("x", 900, monday) };
+    const p: RankedProfile = { ...newRankedProfile("x", monday), subjects: { general: { step: 6, placement: [], placed: true, week: "2026-W42", best: [], played: 0, peak: 6 } } };
     const next = applySeason(p, new Date("2027-01-05T12:00:00Z"));
     expect(next.season).toBe("2026-S2");
     expect(next.seasons?.["2026-S1"]?.general).toBe(p.subjects.general!.step);
@@ -164,5 +188,19 @@ describe("anti-triche", () => {
     expect(underReview({ flags: [], reports: [{ by: "a", at: now }, { by: "a", at: now }, { by: "b", at: now }] }, now)).toBe(false);
     expect(underReview({ flags: [], reports: ["a", "b", "c"].map((by) => ({ by, at: now })) }, now)).toBe(true);
     expect(underReview({ flags: [1, 2, 3].map(() => ({ at: now - 20 * 86_400_000, reason: "x" })), reports: [] }, now)).toBe(false);
+  });
+});
+
+describe("statut dans le groupe", () => {
+  const row = (total: number, zone: WeekZone, isMe = false, played = 4) => ({ total, played, zone, isMe });
+  it("indique l'avance, le retard sur la promotion ou sur le maintien", () => {
+    const rows = [row(500, "promotion"), row(400, "promotion", true), row(380, "safe"), row(200, "safe"), row(100, "relegation")];
+    expect(groupStatus(rows)).toEqual({ kind: "promotion", rank: 2, size: 5, lead: 20 });
+    const safe = [row(500, "promotion"), row(400, "promotion"), row(380, "safe", true), row(100, "relegation")];
+    expect(groupStatus(safe)).toEqual({ kind: "safe", rank: 3, size: 4, toPromotion: 21 });
+    const releg = [row(500, "promotion"), row(380, "safe"), row(100, "relegation", true)];
+    expect(groupStatus(releg)).toEqual({ kind: "relegation", rank: 3, size: 3, toSafety: 281 });
+    expect(groupStatus([row(50, "unranked", true, 1)])).toEqual({ kind: "unranked", missing: 2 });
+    expect(groupStatus([])).toEqual({ kind: "absent" });
   });
 });
