@@ -17,6 +17,7 @@ import { useToasts } from "./toast-store";
 export type SyncStatus = "checking" | "guest" | "saving" | "saved" | "offline" | "error";
 
 export interface CloudUser {
+  /** Identifiant public du joueur (le même que dans le classement). */
   id: string;
   pseudo: string;
 }
@@ -29,9 +30,12 @@ interface CloudState {
   /** Date (updatedAt) de la version enregistrée sur le serveur. */
   savedAt: number | null;
   error: string | null;
+  /** Pseudo du compte dont la session a expiré (le joueur doit se reconnecter). */
+  expired: string | null;
 }
 
 const ACCOUNT_KEY = "questbac-account";
+const EXPIRED_KEY = "questbac-session-expired";
 const DEBOUNCE_MS = 2500;
 /** Au-delà, `keepalive` est refusé par les navigateurs : envoi classique. */
 const KEEPALIVE_MAX = 60_000;
@@ -54,7 +58,24 @@ function writeHint(user: CloudUser | null) {
   }
 }
 
-export const useCloud = create<CloudState>(() => ({ status: "checking", user: null, checked: false, savedAt: null, error: null }));
+function readExpired(): string | null {
+  try {
+    return localStorage.getItem(EXPIRED_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeExpired(pseudo: string | null) {
+  try {
+    if (pseudo) localStorage.setItem(EXPIRED_KEY, pseudo);
+    else localStorage.removeItem(EXPIRED_KEY);
+  } catch {
+    // Stockage indisponible : sans conséquence.
+  }
+}
+
+export const useCloud = create<CloudState>(() => ({ status: "checking", user: null, checked: false, savedAt: null, error: null, expired: null }));
 
 /** `updatedAt` de la dernière version connue du serveur. */
 let serverUpdatedAt = 0;
@@ -71,7 +92,16 @@ function markServer(updatedAt: number) {
 
 function setUser(user: CloudUser | null) {
   writeHint(user);
-  set({ user, status: user ? "saved" : "guest", error: null });
+  writeExpired(null);
+  set({ user, status: user ? "saved" : "guest", error: null, expired: null });
+}
+
+/** Le serveur ne reconnaît plus la session : on prévient le joueur, sans rien effacer en local. */
+function sessionExpired(pseudo: string | null) {
+  writeHint(null);
+  writeExpired(pseudo);
+  set({ user: null, status: "guest", expired: pseudo, error: "Session expirée : reconnecte-toi pour continuer à sauvegarder." });
+  useToasts.getState().push({ emoji: "🔒", title: "Session expirée", body: "Reconnecte-toi depuis ton profil pour sauvegarder.", tone: "rose" });
 }
 
 /** Remplace l'état local par une sauvegarde serveur. */
@@ -127,9 +157,7 @@ export function pushNow(opts: { keepalive?: boolean } = {}): Promise<void> {
         set({ status: "saved", error: null });
         useToasts.getState().push({ emoji: "☁️", title: "Progression mise à jour", body: "Une sauvegarde plus récente venait d'un autre appareil.", tone: "violet" });
       } else if (res.status === 401) {
-        setUser(null);
-        set({ error: "Session expirée : reconnecte-toi pour continuer à sauvegarder." });
-        useToasts.getState().push({ emoji: "🔒", title: "Session expirée", body: "Reconnecte-toi depuis ton profil pour sauvegarder.", tone: "rose" });
+        sessionExpired(useCloud.getState().user?.pseudo ?? readHint()?.pseudo ?? null);
       } else {
         set({ status: res.status >= 500 ? "offline" : "error", error: await readError(res) });
       }
@@ -163,7 +191,10 @@ export async function pull(): Promise<void> {
     if (!res.ok) throw new Error(await readError(res));
     const json = (await res.json()) as { user: CloudUser | null; save: unknown; updatedAt: number };
     if (!json.user) {
-      setUser(null);
+      // Le joueur était connecté sur cet appareil : sa session a été perdue (expiration, redémarrage du serveur…).
+      const hint = readHint();
+      if (hint) sessionExpired(hint.pseudo);
+      else set({ user: null, status: "guest" });
       return;
     }
     setUser(json.user);
@@ -184,13 +215,18 @@ export async function pull(): Promise<void> {
 
 type AuthResult = { ok: true } | { ok: false; error: string };
 
-async function authRequest(url: string, payload: object): Promise<AuthResult> {
+async function authRequest(url: string, payload: object, keepNewerLocal = false): Promise<AuthResult> {
   try {
     const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     if (!res.ok) return { ok: false, error: await readError(res) };
     const json = (await res.json()) as { user: CloudUser; save: unknown; updatedAt: number };
     setUser(json.user);
-    adopt(json.save, json.updatedAt);
+    const local = localData();
+    if (keepNewerLocal && !serverSaveWins(local, json)) {
+      // Reconnexion après une session perdue : la progression locale, plus récente, part sur le compte.
+      markServer(json.updatedAt);
+      void pushNow();
+    } else adopt(json.save, json.updatedAt);
     return { ok: true };
   } catch {
     return { ok: false, error: "Impossible de joindre le serveur. Vérifie ta connexion." };
@@ -201,8 +237,15 @@ async function authRequest(url: string, payload: object): Promise<AuthResult> {
 export const register = (pseudo: string, password: string, save: GameData = localData()) =>
   authRequest("/api/auth/register", { pseudo, password, save });
 
-/** Se connecte et remplace la progression locale par celle du compte. */
-export const login = (pseudo: string, password: string) => authRequest("/api/auth/login", { pseudo, password });
+/**
+ * Se connecte et remplace la progression locale par celle du compte. Après une session
+ * expirée du même compte, la version la plus récente des deux est gardée.
+ */
+export function login(pseudo: string, password: string) {
+  const expired = useCloud.getState().expired;
+  const sameAccount = Boolean(expired) && expired!.trim().normalize("NFKC").toLowerCase() === pseudo.trim().normalize("NFKC").toLowerCase();
+  return authRequest("/api/auth/login", { pseudo, password }, sameAccount);
+}
 
 /** Déconnexion : envoie d'abord les derniers changements, puis garde ou efface les données locales. */
 export async function logout(keepLocal: boolean) {
@@ -226,7 +269,7 @@ function requestPersistentStorage() {
 export function useCloudSync(hydrated: boolean) {
   useEffect(() => {
     if (!hydrated) return;
-    set({ user: readHint() });
+    set({ user: readHint(), expired: readExpired() });
     void pull();
     requestPersistentStorage();
 

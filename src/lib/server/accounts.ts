@@ -1,14 +1,15 @@
 import "server-only";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { type PublicProfile, publicProfileFrom } from "@/lib/game/save";
 import type { GameData } from "@/lib/game/state";
-import { type SessionPayload, hashPassword, pseudoKey, signToken, verifyToken } from "./auth";
-import { getStore, redisConfig } from "./store";
+import { type SessionPayload, hashPassword, persistedSecret, pseudoKey, publicPlayerId, randomSecret, resolveSessionSecret, signToken, verifyToken } from "./auth";
+import { getStore } from "./store";
 
 /**
  * Comptes joueurs : identifiants, sauvegardes et profils publics.
  * Clés : `user:<pseudo en minuscules>`, `save:<id>`, hash `players` (id → profil public).
+ * L'id de compte ne quitte jamais le serveur : le client ne voit que `publicPlayerId(id)`.
  */
 
 export const SESSION_COOKIE = "qb_session";
@@ -27,17 +28,33 @@ export interface StoredSave {
 }
 
 let warned = false;
+/**
+ * Production sans SESSION_SECRET ni Redis : secret aléatoire conservé dans le dossier
+ * de données (stockage fichier), ou seulement en mémoire (stockage éphémère).
+ */
+let processSecret: string | null = null;
 
-/** SESSION_SECRET, à défaut un secret dérivé du jeton Redis, sinon une constante de développement. */
+function fallbackSecret(): string {
+  if (processSecret) return processSecret;
+  const store = getStore();
+  processSecret = store.kind === "file" && store.dir ? persistedSecret(store.dir) : randomSecret();
+  return processSecret;
+}
+
 export function sessionSecret(): string {
-  if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
-  const redis = redisConfig();
-  if (redis) return createHash("sha256").update(`questbac-session:${redis.token}`).digest("hex");
-  if (!warned) {
+  const { secret, source } = resolveSessionSecret(process.env, fallbackSecret);
+  if (!warned && (source === "process" || source === "dev")) {
     warned = true;
-    console.warn("[auth] SESSION_SECRET absent : secret de développement utilisé (à définir en production).");
+    const kind = getStore().kind;
+    console.warn(
+      source === "dev"
+        ? "[auth] SESSION_SECRET absent : secret de développement utilisé (à définir en production)."
+        : kind === "file"
+          ? "[auth] SESSION_SECRET absent : secret aléatoire conservé dans le dossier de données."
+          : "[auth] SESSION_SECRET absent : secret aléatoire propre à ce processus (les sessions tombent au redémarrage).",
+    );
   }
-  return "questbac-dev-secret-ne-pas-utiliser-en-production";
+  return secret;
 }
 
 export const getAccount = (pseudo: string) => getStore().get<Account>(`user:${pseudoKey(pseudo)}`);
@@ -53,11 +70,12 @@ export const getSave = (userId: string) => getStore().get<StoredSave>(`save:${us
 export async function putSave(account: { id: string; pseudo: string }, save: GameData) {
   const store = getStore();
   await store.set(`save:${account.id}`, { save, updatedAt: save.updatedAt } satisfies StoredSave);
-  await store.hset("players", account.id, publicProfileFrom(account, save));
+  await store.hset("players", account.id, publicProfileFrom({ publicId: publicPlayerId(account.id), pseudo: account.pseudo }, save));
 }
 
 export async function listPlayers(limit = 200): Promise<PublicProfile[]> {
-  const all = Object.values(await getStore().hgetall<PublicProfile>("players"));
+  // L'identifiant publié est toujours recalculé (les anciens profils stockaient l'id brut).
+  const all = Object.entries(await getStore().hgetall<PublicProfile>("players")).map(([id, p]) => ({ ...p, id: publicPlayerId(id) }));
   return all.sort((a, b) => b.rp - a.rp || b.xp - a.xp).slice(0, limit);
 }
 
@@ -82,7 +100,8 @@ export async function currentSession(): Promise<SessionPayload | null> {
   return verifyToken((await cookies()).get(SESSION_COOKIE)?.value, sessionSecret());
 }
 
-export const publicUser = (a: { id: string; pseudo: string }) => ({ id: a.id, pseudo: a.pseudo });
+/** Ce que le client connaît du compte : l'identifiant public, jamais l'id interne. */
+export const publicUser = (a: { id: string; pseudo: string }) => ({ id: publicPlayerId(a.id), pseudo: a.pseudo });
 
 export const jsonError = (error: string, status: number, headers?: HeadersInit) => Response.json({ error }, { status, headers });
 

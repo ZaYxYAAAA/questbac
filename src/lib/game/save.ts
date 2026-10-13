@@ -123,6 +123,7 @@ export const MAX_SAVE_BYTES = 2_000_000;
 // ───────────── Profil public (classement réel) ─────────────
 
 export interface PublicProfile {
+  /** Identifiant public (empreinte de l'id de compte, qui reste secret). */
   id: string;
   pseudo: string;
   avatar: string;
@@ -142,13 +143,13 @@ export interface PublicProfile {
 }
 
 /** Seule la miniature est publiée (jamais la grande photo) ; l'avatar reste un emoji. */
-export function publicProfileFrom(account: { id: string; pseudo: string }, save: GameData): PublicProfile {
+export function publicProfileFrom(account: { publicId: string; pseudo: string }, save: GameData): PublicProfile {
   const avatar = save.profile?.avatar ?? "🙂";
   const thumb = save.profile?.photoThumb;
   const peakRp = Math.max(save.rp, save.peakRp ?? 0);
   const frame = save.profile?.frameId && unlockedTiers(peakRp).includes(save.profile.frameId) ? save.profile.frameId : undefined;
   return {
-    id: account.id,
+    id: account.publicId,
     pseudo: account.pseudo,
     avatar: avatar.length <= MAX_AVATAR_CHARS && !avatar.startsWith("data:") ? avatar : "🙂",
     ...(isPhotoDataUrl(thumb, MAX_THUMB_CHARS) ? { photoThumb: thumb } : {}),

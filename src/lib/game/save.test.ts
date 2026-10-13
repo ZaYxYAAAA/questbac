@@ -40,8 +40,8 @@ describe("migration des sauvegardes", () => {
   it("publie le titre choisi seulement s'il est débloqué", () => {
     const base = { ...createInitialData(now), rp: 900, peakRp: 900 };
     const withTitle = (titleId: string) => ({ ...base, profile: { pseudo: "Lina", avatar: "🦊", level: "premiere" as const, createdAt: 1, titleId, frameId: titleId } });
-    expect(publicProfileFrom({ id: "a", pseudo: "Lina" }, withTitle("argent"))).toMatchObject({ titleId: "argent", frameId: "argent" });
-    const locked = publicProfileFrom({ id: "a", pseudo: "Lina" }, withTitle("legende"));
+    expect(publicProfileFrom({ publicId: "a", pseudo: "Lina" }, withTitle("argent"))).toMatchObject({ titleId: "argent", frameId: "argent" });
+    const locked = publicProfileFrom({ publicId: "a", pseudo: "Lina" }, withTitle("legende"));
     expect(locked.titleId).toBe("or");
     expect(locked.frameId).toBeUndefined();
   });
@@ -86,7 +86,7 @@ describe("classement réel", () => {
 
   it("construit le profil public depuis une sauvegarde", () => {
     const save = { ...createInitialData(now), xp: 1000, rp: 250, profile: { pseudo: "x", avatar: "data:" + "a".repeat(30_000), level: "terminale" as const, createdAt: 1 } };
-    const p = publicProfileFrom({ id: "u1", pseudo: "Lina" }, save);
+    const p = publicProfileFrom({ publicId: "u1", pseudo: "Lina" }, save);
     expect(p).toMatchObject({ id: "u1", pseudo: "Lina", level: "terminale", rp: 250, xp: 1000 });
     expect(p.avatar).toBe("🙂"); // l'avatar public reste un emoji
   });
@@ -94,7 +94,7 @@ describe("classement réel", () => {
   it("ne publie que la miniature de la photo", () => {
     const thumb = "data:image/jpeg;base64,AAAA";
     const save = { ...createInitialData(now), profile: { pseudo: "x", avatar: "🐼", photo: "data:image/jpeg;base64,BBBB", photoThumb: thumb, level: "premiere" as const, createdAt: 1 } };
-    const p = publicProfileFrom({ id: "u1", pseudo: "Lina" }, save);
+    const p = publicProfileFrom({ publicId: "u1", pseudo: "Lina" }, save);
     expect(p.photoThumb).toBe(thumb);
     expect(JSON.stringify(p)).not.toContain("BBBB");
     expect(realEntries([p], null, now)[0].photo).toBe(thumb);

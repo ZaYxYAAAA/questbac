@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import clsx from "clsx";
 import { FlaskConical, GraduationCap, Hammer, Home, Map as MapIcon, Skull, Trophy, User } from "lucide-react";
 import { Onboarding } from "@/components/layout/Onboarding";
@@ -72,6 +72,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (hydrated) refresh();
   }, [hydrated, refresh, pathname]);
+
+  // Fin de l'onboarding : l'accueil s'affiche depuis le haut, pas à la hauteur du formulaire.
+  const onboarding = useRef(false);
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!profile) onboarding.current = true;
+    else if (onboarding.current) {
+      onboarding.current = false;
+      window.scrollTo(0, 0);
+    }
+  }, [hydrated, profile]);
 
   return (
     <div className="flex min-h-dvh">

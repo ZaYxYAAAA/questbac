@@ -13,6 +13,8 @@ export type StorageKind = "redis" | "file" | "ephemeral";
 
 export interface KvStore {
   kind: StorageKind;
+  /** Dossier des fichiers (stockages « file » et « ephemeral »). */
+  dir?: string;
   get<T>(key: string): Promise<T | null>;
   set(key: string, value: unknown): Promise<void>;
   /** Écrit seulement si la clé n'existe pas encore ; renvoie false sinon. */
@@ -92,6 +94,7 @@ export function fileStore(dir: string, kind: StorageKind = "file"): KvStore {
   }
   return {
     kind,
+    dir,
     get: read,
     set: (key, value) => serial(() => write(key, value)),
     create: (key, value) =>

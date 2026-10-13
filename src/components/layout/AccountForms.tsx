@@ -38,15 +38,25 @@ export function FormError({ children }: { children: string | null }) {
 }
 
 /** Connexion à un compte existant : la progression du compte remplace celle de l'appareil. */
-export function LoginForm({ onSuccess, beforeSubmit, idPrefix = "login" }: { onSuccess?: () => void; beforeSubmit?: () => boolean; idPrefix?: string }) {
-  const [pseudo, setPseudo] = useState("");
+export function LoginForm({
+  onSuccess,
+  beforeSubmit,
+  idPrefix = "login",
+  defaultPseudo = "",
+}: {
+  onSuccess?: () => void;
+  beforeSubmit?: (pseudo: string) => boolean;
+  idPrefix?: string;
+  defaultPseudo?: string;
+}) {
+  const [pseudo, setPseudo] = useState(defaultPseudo);
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (busy || (beforeSubmit && !beforeSubmit())) return;
+    if (busy || (beforeSubmit && !beforeSubmit(pseudo.trim()))) return;
     setBusy(true);
     setError(null);
     const res = await login(pseudo.trim(), password);

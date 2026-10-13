@@ -75,15 +75,24 @@ function CreateAccountForm({ defaultPseudo }: { defaultPseudo: string }) {
   );
 }
 
+/** Reconnexion au compte dont la session a expiré : rien à remplacer, pas de confirmation. */
+const sameAccount = (expired: string | null, pseudo: string) =>
+  Boolean(expired) && expired!.trim().normalize("NFKC").toLowerCase() === pseudo.normalize("NFKC").toLowerCase();
+
 /** Section « Compte & sauvegarde » du profil. */
 export function AccountSection() {
-  const { user, status, savedAt, error } = useCloud();
+  const { user, status, savedAt, error, expired } = useCloud();
   const profile = useGame((s) => s.profile);
   const storage = useStorageKind();
   const [panel, setPanel] = useState<"none" | "login" | "logout">("none");
   const [busy, setBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const toast = useToasts((s) => s.push);
+
+  // Session perdue : on propose directement de se reconnecter au même compte.
+  useEffect(() => {
+    if (expired) setPanel("login");
+  }, [expired]);
 
   function exportSave() {
     const data = toGameData(useGame.getState());
@@ -174,16 +183,29 @@ export function AccountSection() {
           </div>
         ) : (
           <div className="space-y-4">
-            {error && <FormError>{error}</FormError>}
-            <p className="flex gap-2 rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
-              <TriangleAlert size={18} className="mt-0.5 shrink-0" />
-              <span>Tu joues sans compte : ta progression n&apos;existe que sur cet appareil et peut disparaître. Crée un compte pour la sauvegarder et la retrouver partout.</span>
-            </p>
+            {expired ? (
+              <p className="flex gap-2 rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200" data-testid="session-expired">
+                <TriangleAlert size={18} className="mt-0.5 shrink-0" />
+                <span>
+                  Session expirée : reconnecte-toi au compte <b>{expired}</b> pour continuer à sauvegarder. Rien n&apos;est perdu : ta progression est toujours sur cet appareil et sur ton compte.
+                </span>
+              </p>
+            ) : (
+              <>
+                {error && <FormError>{error}</FormError>}
+                <p className="flex gap-2 rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+                  <TriangleAlert size={18} className="mt-0.5 shrink-0" />
+                  <span>Tu joues sans compte : ta progression n&apos;existe que sur cet appareil et peut disparaître. Crée un compte pour la sauvegarder et la retrouver partout.</span>
+                </p>
+              </>
+            )}
             {panel === "login" ? (
               <>
                 <LoginForm
+                  key={expired ?? ""}
                   idPrefix="profile-login"
-                  beforeSubmit={() => confirm("La progression de ton compte va remplacer celle de cet appareil. Continuer ?")}
+                  defaultPseudo={expired ?? ""}
+                  beforeSubmit={(pseudo) => sameAccount(expired, pseudo) || confirm("La progression de ton compte va remplacer celle de cet appareil. Continuer ?")}
                   onSuccess={() => setPanel("none")}
                 />
                 <button type="button" onClick={() => setPanel("none")} className="text-sm font-semibold text-violet-300 hover:underline">
