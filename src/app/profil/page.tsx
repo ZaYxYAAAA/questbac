@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import clsx from "clsx";
+import { AccountSection } from "@/components/layout/AccountSection";
 import { AccuracyBars, MasteryRadar, XpBarChart } from "@/components/game/Charts";
 import { RankBadge } from "@/components/game/RankBadge";
 import { Button } from "@/components/ui/Button";
@@ -11,6 +12,7 @@ import { LEVELS, levelLabel, subjectsForLevel } from "@/lib/content/curriculum";
 import { ACHIEVEMENTS } from "@/lib/game/achievements";
 import { RANK_TIERS, levelFromXp, rankFromRp } from "@/lib/game/progression";
 import { subjectProgress, xpHistory } from "@/lib/game/selectors";
+import { useCloud } from "@/lib/store/cloud-sync";
 import { useGame } from "@/lib/store/game-store";
 import type { Level } from "@/lib/types";
 
@@ -22,6 +24,7 @@ export default function ProfilePage() {
   const level = levelFromXp(game.xp);
   const rank = rankFromRp(game.rp);
   const [pseudo, setPseudo] = useState(profile.pseudo);
+  const account = useCloud((s) => s.user);
   const subjects = subjectsForLevel(profile.level);
   const accuracy = game.stats.answered ? Math.round((game.stats.correct / game.stats.answered) * 100) : 0;
   const unlocked = Object.keys(game.achievements).length;
@@ -124,13 +127,19 @@ export default function ProfilePage() {
         </div>
       </Card>
 
+      <AccountSection />
+
       <Card>
         <SectionTitle icon={<span>⚙️</span>}>Réglages</SectionTitle>
         <div className="space-y-5">
-          <div className="flex flex-wrap gap-2">
-            <input value={pseudo} onChange={(e) => setPseudo(e.target.value)} maxLength={20} className="flex-1 rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-white" aria-label="Pseudo" />
-            <Button variant="secondary" disabled={pseudo.trim().length < 2 || pseudo === profile.pseudo} onClick={() => game.updateProfile({ pseudo: pseudo.trim() })}>Renommer</Button>
-          </div>
+          {account ? (
+            <p className="text-sm text-slate-400">Ton pseudo <b className="text-white">{account.pseudo}</b> est celui de ton compte : il sert à te connecter et au classement.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <input value={pseudo} onChange={(e) => setPseudo(e.target.value)} maxLength={20} className="flex-1 rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-white" aria-label="Pseudo" />
+              <Button variant="secondary" disabled={pseudo.trim().length < 2 || pseudo === profile.pseudo} onClick={() => game.updateProfile({ pseudo: pseudo.trim() })}>Renommer</Button>
+            </div>
+          )}
           <div className="grid grid-cols-8 gap-2">
             {AVATARS.map((a) => (
               <button key={a} type="button" onClick={() => game.updateProfile({ avatar: a })} className={clsx("grid aspect-square place-items-center rounded-xl text-2xl", profile.avatar === a ? "bg-violet-600 ring-2 ring-violet-300" : "bg-slate-800 hover:bg-slate-700")} aria-label={`Avatar ${a}`}>
@@ -145,7 +154,7 @@ export default function ProfilePage() {
               </button>
             ))}
           </div>
-          <Button variant="danger" onClick={() => confirm("Effacer toute ta progression ? Cette action est irréversible.") && game.resetAll()}>
+          <Button variant="danger" onClick={() => confirm("Remettre à zéro ta progression (XP, étoiles, succès, fiches…) ? Ton profil est conservé. Cette action est irréversible.") && game.resetAll()}>
             Réinitialiser ma progression
           </Button>
         </div>

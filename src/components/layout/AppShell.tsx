@@ -6,10 +6,12 @@ import { type ReactNode, useEffect } from "react";
 import clsx from "clsx";
 import { FlaskConical, GraduationCap, Hammer, Home, Map as MapIcon, Skull, Trophy, User } from "lucide-react";
 import { Onboarding } from "@/components/layout/Onboarding";
+import { SaveIndicator } from "@/components/layout/SaveIndicator";
 import { Toaster } from "@/components/game/Toaster";
 import { RankBadge } from "@/components/game/RankBadge";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { levelFromXp } from "@/lib/game/progression";
+import { useCloud, useCloudSync } from "@/lib/store/cloud-sync";
 import { useGame, useHydrated } from "@/lib/store/game-store";
 
 const NAV = [
@@ -25,7 +27,7 @@ const NAV = [
 
 const MOBILE_NAV = NAV.slice(0, 6);
 
-const isActive = (pathname: string, href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
+const isActive = (pathname: string, href: string) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`));
 
 function Hud() {
   const { profile, xp, rp, streak } = useGame();
@@ -33,6 +35,7 @@ function Hud() {
   if (!profile) return null;
   return (
     <div className="flex items-center gap-2 sm:gap-3">
+      <SaveIndicator />
       <div className="hidden items-center gap-2 sm:flex">
         <div className="w-28">
           <div className="mb-0.5 flex justify-between text-[10px] font-semibold text-slate-400">
@@ -59,6 +62,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const hydrated = useHydrated();
   const profile = useGame((s) => s.profile);
   const refresh = useGame((s) => s.refresh);
+  const cloudChecked = useCloud((s) => s.checked);
+  useCloudSync(hydrated);
 
   useEffect(() => {
     if (hydrated) refresh();
@@ -100,7 +105,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         </header>
 
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-28 pt-5 lg:pb-10">
-          {!hydrated ? <div className="h-64 animate-pulse rounded-3xl bg-slate-900/60" /> : !profile ? <Onboarding /> : children}
+          {/* Sans profil local, on attend la réponse du serveur : un compte connecté retrouve sa progression. */}
+          {!hydrated || (!profile && !cloudChecked) ? (
+            <div className="h-64 animate-pulse rounded-3xl bg-slate-900/60" />
+          ) : !profile ? (
+            <Onboarding />
+          ) : (
+            children
+          )}
         </main>
       </div>
 

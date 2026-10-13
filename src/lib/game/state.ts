@@ -60,6 +60,8 @@ export interface GameData {
   xpByDay: Record<string, number>;
   fiches: SavedFiche[];
   missions: CustomMission[];
+  /** Horodatage (ms) de la dernière modification : arbitre la synchronisation serveur. */
+  updatedAt: number;
 }
 
 export function createInitialData(now = new Date()): GameData {
@@ -88,6 +90,7 @@ export function createInitialData(now = new Date()): GameData {
     xpByDay: {},
     fiches: [],
     missions: [],
+    updatedAt: 0,
   };
 }
 

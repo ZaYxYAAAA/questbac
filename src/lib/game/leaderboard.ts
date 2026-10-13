@@ -1,12 +1,12 @@
 /**
  * Classements.
  *
- * Fondation : en attendant un backend (voir README → « Passer en multijoueur »),
- * le joueur est classé parmi des rivaux simulés de façon déterministe. Leur
- * progression avance avec le temps pour que le classement reste vivant.
- * L'interface `LeaderboardEntry` est celle qu'un vrai backend devra renvoyer.
+ * Le joueur est classé parmi les vrais joueurs inscrits (GET /api/leaderboard)
+ * et des rivaux simulés de façon déterministe, dont la progression avance avec
+ * le temps pour que le classement reste vivant même hors ligne.
  */
 import type { Level } from "@/lib/types";
+import { type PublicProfile, currentWeeklyXp } from "./save";
 import { hashString, seededRandom } from "./quests";
 import { levelFromXp, weekKey } from "./progression";
 
@@ -19,6 +19,8 @@ export interface LeaderboardEntry {
   weeklyXp: number;
   rp: number;
   isPlayer?: boolean;
+  /** Vrai joueur inscrit (et non rival simulé). */
+  isReal?: boolean;
 }
 
 const NAMES = [
@@ -60,12 +62,29 @@ function bots(now: Date): LeaderboardEntry[] {
 
 export type LeaderboardScope = "hebdo" | "global" | "niveau";
 
+/** Profils publics du serveur → entrées de classement (sans le joueur lui-même). */
+export function realEntries(players: PublicProfile[], selfId: string | null, now = new Date()): LeaderboardEntry[] {
+  return players
+    .filter((p) => p.id !== selfId)
+    .map((p) => ({
+      id: `real-${p.id}`,
+      pseudo: p.pseudo,
+      avatar: p.avatar,
+      level: p.level,
+      playerLevel: p.playerLevel,
+      weeklyXp: currentWeeklyXp(p, now),
+      rp: p.rp,
+      isReal: true,
+    }));
+}
+
 export function buildLeaderboard(
   player: Omit<LeaderboardEntry, "id" | "isPlayer">,
   scope: LeaderboardScope,
   now = new Date(),
+  others: LeaderboardEntry[] = [],
 ): LeaderboardEntry[] {
-  let entries = [...bots(now), { ...player, id: "player", isPlayer: true }];
+  let entries = [...others, ...bots(now), { ...player, id: "player", isPlayer: true }];
   if (scope === "niveau") entries = entries.filter((e) => e.level === player.level);
   const key = scope === "hebdo" ? "weeklyXp" : "rp";
   return entries.sort((a, b) => b[key] - a[key] || (a.isPlayer ? -1 : 1));

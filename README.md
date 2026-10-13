@@ -35,7 +35,48 @@ missions IA sont remplacées par du contenu d'exemple (badge « Mode démo » da
 | 🧪 **Labo** | 10 labos : traceur universel (paramètres animables, dérivée), affine, vecteurs & produit scalaire, second degré, sécante → tangente, cercle trigo, suites (toile d'araignée), exp/ln, intégrales (Riemann), loi binomiale |
 | 🎓 **Prof IA** | Fiche complète, express ou méthode sur n'importe quelle notion, en streaming, avec LaTeX ; bibliothèque, impression PDF, « Créer un QCM » depuis la fiche |
 | ⚒️ **Forge** | Photos du cours (appareil photo ou import, compressées côté client), texte collé, sujet ou création manuelle → fiche + questions ; éditeur complet des questions |
-| 👤 **Profil** | Radar de maîtrise, réussite par matière, XP sur 14 jours, échelle des rangs, succès, réglages |
+| 👤 **Profil** | Radar de maîtrise, réussite par matière, XP sur 14 jours, échelle des rangs, succès, compte & sauvegarde, réglages |
+| ☁️ **Comptes** | Pseudo + mot de passe, progression sauvegardée en ligne et retrouvée sur tous les appareils, export / import JSON |
+
+## Sauvegarde et comptes
+
+Chaque joueur crée un compte (pseudo unique + mot de passe) ; sa progression est gardée
+sur l'appareil **et** envoyée au serveur quelques secondes après chaque changement (et dès
+que l'appli passe en arrière-plan). Sur un autre appareil, « J'ai déjà un compte » la récupère.
+Le jeu reste jouable hors ligne : l'envoi reprend au retour du réseau. Il est aussi possible
+de « Jouer sans compte » (stockage local uniquement) puis de créer un compte plus tard
+depuis le profil, qui propose également d'exporter / importer sa sauvegarde en fichier JSON.
+
+### Activer la base de données sur Vercel (3 clics)
+
+1. Projet Vercel → onglet **Storage** → **Create Database** → **Upstash for Redis** (offre gratuite).
+2. Choisir la région la plus proche (ex. Paris / Francfort) puis **Connect** au projet
+   (environnements Production + Preview). Vercel ajoute `KV_REST_API_URL` et `KV_REST_API_TOKEN`.
+3. **Settings → Environment Variables** : ajouter `SESSION_SECRET` (longue chaîne aléatoire,
+   ex. `openssl rand -hex 32`), puis **Redeploy**.
+
+Vérification : `https://<ton-projet>.vercel.app/api/status` doit afficher `"storage": "redis"`.
+Sans base, il affiche `"ephemeral"` : les comptes sont alors rangés dans `/tmp` et **effacés
+à chaque redémarrage** du serveur (un avertissement s'affiche dans le profil). En local, ils
+sont rangés dans `.data/` (`"storage": "file"`).
+
+> 💡 Utilise toujours l'adresse de **production** (`questbac….vercel.app`, celle du domaine
+> principal du projet) et pas les URL de prévisualisation (`questbac-git-…` ou
+> `questbac-abc123…vercel.app`) : chaque adresse a son propre stockage dans le navigateur et
+> ses propres cookies. Sur iPhone, ajoute l'appli à l'écran d'accueil depuis cette adresse puis
+> connecte-toi une fois dedans (l'appli de l'écran d'accueil a un stockage séparé de Safari).
+
+**Sécurité** : mots de passe hachés avec scrypt (sel aléatoire), session dans un cookie
+`httpOnly` signé HMAC (180 jours), limiteur de tentatives de connexion. En cas de conflit
+entre deux appareils, la sauvegarde la plus récente (`updatedAt`) gagne.
+
+| Route | Rôle |
+|---|---|
+| `POST /api/auth/register` | Crée le compte avec la progression actuelle |
+| `POST /api/auth/login` / `logout` | Ouvre / ferme la session |
+| `GET /api/me` | Joueur connecté + sauvegarde serveur (401 sinon ; `?optional=1` → `{ user: null }`) |
+| `PUT /api/save` | Enregistre la progression (2 Mo max, 409 si le serveur a plus récent) |
+| `GET /api/leaderboard` | Profils publics des joueurs inscrits (200 max) |
 
 ## Architecture
 
@@ -44,7 +85,9 @@ src/
 ├── app/                      Pages (App Router) + routes API
 │   ├── api/fiche             POST → fiche Markdown en streaming
 │   ├── api/missions          POST → mission (sortie JSON structurée, images acceptées)
-│   └── api/status            GET  → IA connectée ou mode démo
+│   ├── api/auth, me, save    Comptes, session, sauvegarde en ligne
+│   ├── api/leaderboard       GET  → vrais joueurs du classement
+│   └── api/status            GET  → IA connectée ou mode démo, type de stockage
 ├── components/
 │   ├── math/Graph.tsx        Moteur de graphes SVG maison (pan, zoom, pincement, points déplaçables)
 │   ├── math/labs/            Les 10 labos (chargés à la demande)
@@ -56,7 +99,8 @@ src/
     ├── game/                 Règles du jeu en fonctions pures (XP, rangs, quêtes, succès, état)
     ├── math/parser.ts        Parseur d'expressions sûr (sans eval) + dérivée/intégrale numériques
     ├── ai/                   Client Claude, prompts, schémas Zod, mode démo, limiteur de débit
-    └── store/                Zustand (sauvegarde locale) + notifications
+    ├── server/               Stockage clé/valeur (Upstash Redis ou fichiers), mots de passe, sessions, comptes
+    └── store/                Zustand (sauvegarde locale), synchronisation serveur, notifications
 ```
 
 **Principe clé** : toutes les règles du jeu sont dans `lib/game/state.ts` sous forme de
@@ -75,9 +119,8 @@ pourront tourner telles quelles côté serveur.
 
 ## Prochaines étapes conseillées
 
-1. **Comptes & multijoueur** : ajouter une base (ex. Postgres/Supabase) et une authentification,
-   exécuter `applySession` côté serveur (anti-triche), remplacer les rivaux simulés de
-   `lib/game/leaderboard.ts` par de vrais classements, ajouter classes/groupes d'amis.
+1. **Multijoueur** : exécuter `applySession` côté serveur (anti-triche), ajouter
+   classes/groupes d'amis, réinitialisation de mot de passe.
 2. **Contenu** : enrichir la banque de questions (les chapitres sans questions locales sont déjà
    jouables via « Mission IA »), faire relire par des enseignants.
 3. **Répétition espacée** : reprogrammer automatiquement les questions ratées.

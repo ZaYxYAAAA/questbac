@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { CustomMission, Level } from "@/lib/types";
+import { migrateSave, toGameData } from "@/lib/game/save";
 import {
   type ActivityInput,
   type GameData,
@@ -26,53 +27,65 @@ interface GameActions {
   deleteMission: (id: string) => void;
   deleteFiche: (id: string) => void;
   refresh: () => void;
+  /** Remet la progression à zéro en gardant le profil. */
   resetAll: () => void;
+  /** Remplace tout l'état (sauvegarde serveur ou fichier importé), sans toucher à `updatedAt` ; quêtes remises au jour. */
+  replaceAll: (data: GameData) => void;
+  /** Efface toutes les données locales (retour à l'accueil). */
+  clearLocal: () => void;
 }
 
 export type GameStore = GameData & GameActions;
 
 /**
- * Persistance locale (localStorage). Pour un mode multijoueur, remplacer
- * `persist` par une synchronisation serveur : toutes les règles du jeu sont
- * dans `lib/game/state.ts` et peuvent tourner côté serveur à l'identique.
+ * Persistance locale (localStorage) + synchronisation serveur pour les joueurs
+ * connectés (voir `cloud-sync.ts`). Chaque modification met à jour `updatedAt`.
  */
 export const useGame = create<GameStore>()(
   persist(
     (set, get) => {
-      const data = (): GameData => {
-        const s = get();
-        return {
-          version: s.version, profile: s.profile, xp: s.xp, rp: s.rp, streak: s.streak, chapters: s.chapters,
-          bosses: s.bosses, stats: s.stats, achievements: s.achievements, quests: s.quests, weekly: s.weekly,
-          xpByDay: s.xpByDay, fiches: s.fiches, missions: s.missions,
-        };
-      };
+      const data = (): GameData => toGameData(get());
+      const commit = (patch: Partial<GameData>) => set({ ...patch, updatedAt: Date.now() });
       return {
         ...createInitialData(),
-        completeOnboarding: (profile) => set({ profile: { ...profile, createdAt: Date.now() } }),
+        completeOnboarding: (profile) => commit({ profile: { ...profile, createdAt: Date.now() } }),
         updateProfile: (patch) => {
           const p = get().profile;
-          if (p) set({ profile: { ...p, ...patch } });
+          if (p) commit({ profile: { ...p, ...patch } });
         },
         setLevel: (level) => get().updateProfile({ level }),
         recordSession: (session) => {
           const { data: next, summary } = applySession(data(), session);
-          set(next);
+          commit(next);
           return summary;
         },
         recordActivity: (activity) => {
           const { data: next, summary } = applyActivity(data(), activity);
-          set(next);
+          commit(next);
           return summary;
         },
-        updateMission: (mission) => set({ missions: get().missions.map((m) => (m.id === mission.id ? mission : m)) }),
-        deleteMission: (id) => set({ missions: get().missions.filter((m) => m.id !== id) }),
-        deleteFiche: (id) => set({ fiches: get().fiches.filter((f) => f.id !== id) }),
-        refresh: () => set(refreshPeriods(data())),
-        resetAll: () => set(createInitialData()),
+        updateMission: (mission) => commit({ missions: get().missions.map((m) => (m.id === mission.id ? mission : m)) }),
+        deleteMission: (id) => commit({ missions: get().missions.filter((m) => m.id !== id) }),
+        deleteFiche: (id) => commit({ fiches: get().fiches.filter((f) => f.id !== id) }),
+        // Le changement de jour / semaine est calculé, pas une action du joueur :
+        // `updatedAt` reste inchangé, sinon une vieille sauvegarde locale
+        // paraîtrait plus récente que celle du serveur.
+        refresh: () => {
+          const current = data();
+          const next = refreshPeriods(current);
+          if (next !== current) set({ quests: next.quests, weekly: next.weekly });
+        },
+        resetAll: () => commit({ ...createInitialData(), profile: get().profile }),
+        replaceAll: (next) => set(refreshPeriods(toGameData(next))),
+        clearLocal: () => set(createInitialData()),
       };
     },
-    { name: "questbac-save", version: 1 },
+    {
+      name: "questbac-save",
+      version: 2,
+      // v1 → v2 : ajout de `updatedAt` ; la migration complète sans rien effacer.
+      migrate: (persisted) => (migrateSave(persisted) ?? createInitialData()) as GameStore,
+    },
   ),
 );
 
