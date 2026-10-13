@@ -1,4 +1,4 @@
-import { clientKey, rateLimit } from "@/lib/ai/rate-limit";
+import { clientKey, rateLimit } from "@/lib/server/rate-limit";
 import { currentSession, jsonError, storageDown } from "@/lib/server/accounts";
 import { sendPush } from "@/lib/server/push";
 

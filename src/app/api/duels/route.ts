@@ -1,6 +1,6 @@
 import { after } from "next/server";
 import { z } from "zod";
-import { clientKey, rateLimit } from "@/lib/ai/rate-limit";
+import { clientKey, rateLimit } from "@/lib/server/rate-limit";
 import { DUEL_THEMES } from "@/lib/game/duel";
 import { currentSession, jsonError, readJson, storageDown } from "@/lib/server/accounts";
 import { publicPlayerId } from "@/lib/server/auth";

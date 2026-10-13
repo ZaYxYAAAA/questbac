@@ -29,8 +29,6 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: "sage", name: "Sage", description: "Donne 500 bonnes réponses.", emoji: "🧙", xp: 300, check: (d) => d.stats.correct >= 500 },
   { id: "polymathe", name: "Polymathe", description: "Réponds dans 4 matières différentes.", emoji: "🌐", xp: 80, check: (d) => subjectsPlayed(d) >= 4 },
   { id: "laborantin", name: "Laborantin", description: "Explore 5 labos interactifs.", emoji: "🧪", xp: 60, check: (d) => d.stats.labsOpened.length >= 5 },
-  { id: "forgeron", name: "Forgeron", description: "Crée ta première mission dans la Forge.", emoji: "⚒️", xp: 60, check: (d) => d.stats.missionsForged >= 1 },
-  { id: "bibliothecaire", name: "Bibliothécaire", description: "Génère 3 fiches avec le Prof IA.", emoji: "🗂️", xp: 60, check: (d) => d.stats.fichesGenerated >= 3 },
   { id: "niveau-5", name: "Apprenti", description: "Atteins le niveau 5.", emoji: "⭐", xp: 0, check: (d) => levelFromXp(d.xp).level >= 5 },
   { id: "niveau-10", name: "Vétéran", description: "Atteins le niveau 10.", emoji: "🌟", xp: 0, check: (d) => levelFromXp(d.xp).level >= 10 },
   { id: "rang-or", name: "Cœur d'or", description: "Atteins le rang Or.", emoji: "🥇", xp: 100, check: (d) => rankFromRp(d.rp).tier.minRp >= 800 },

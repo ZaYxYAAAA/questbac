@@ -3,12 +3,10 @@
 import Link from "next/link";
 import { useState } from "react";
 import clsx from "clsx";
-import { ChevronLeft, FlaskConical, Infinity as InfinityIcon, Loader2, Play, Shuffle, Sparkles } from "lucide-react";
-import { AiBadge } from "@/components/game/AiBadge";
+import { ChevronLeft, FlaskConical, Infinity as InfinityIcon, Play, Shuffle } from "lucide-react";
 import { QuizRunner } from "@/components/game/QuizRunner";
 import { RewardScreen } from "@/components/game/RewardScreen";
 import { Button } from "@/components/ui/Button";
-import { generateMission, useAiStatus } from "@/lib/ai/client-api";
 import { levelLabel, subjectMeta } from "@/lib/content/curriculum";
 import { chapterQuestions, mixQuestions } from "@/lib/content/generated";
 import { prepareQuestions } from "@/lib/game/session";
@@ -25,9 +23,6 @@ export function MissionPlayer({ chapter }: { chapter: Chapter }) {
   const progress = useGame((s) => s.chapters[chapter.id]);
   const [phase, setPhase] = useState<Phase>({ kind: "intro" });
   const [count, setCount] = useState(6);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const ai = useAiStatus();
   const meta = subjectMeta(chapter.subject);
   const exitHref = `/matieres/${chapter.subject}?niveau=${chapter.level}`;
   const mixScope = `mix:${chapter.subject}:${chapter.level}`;
@@ -42,26 +37,6 @@ export function MissionPlayer({ chapter }: { chapter: Chapter }) {
     const questions = prepareQuestions(mixQuestions(chapter.subject, chapter.level, count, Math.random, seenFor(mixScope)));
     rememberSeen(mixScope, questions);
     setPhase({ kind: "playing", questions, label: `Mélange ${meta.name}` });
-  };
-
-  const startAi = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const mission = await generateMission({
-        level: chapter.level,
-        subject: chapter.subject,
-        mode: "sujet",
-        topic: `${chapter.title} — ${chapter.summary}`,
-        count,
-        difficulty: "mixte",
-      });
-      setPhase({ kind: "playing", questions: prepareQuestions(mission.questions), label: "Mission IA" });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Impossible de générer la mission.");
-    } finally {
-      setLoading(false);
-    }
   };
 
   if (phase.kind === "playing") {
@@ -92,11 +67,6 @@ export function MissionPlayer({ chapter }: { chapter: Chapter }) {
         backHref={exitHref}
         backLabel="Retour à la carte"
       >
-        {ratio < 1 && (
-          <Link href={`/prof?niveau=${chapter.level}&matiere=${chapter.subject}&sujet=${encodeURIComponent(chapter.title)}`} className="block rounded-2xl border border-cyan-500/30 bg-cyan-500/10 p-3 text-sm text-cyan-200 hover:bg-cyan-500/15">
-            🎓 Revois les points faibles avec une fiche du Prof IA sur « {chapter.title} »
-          </Link>
-        )}
       </RewardScreen>
     );
   }
@@ -148,30 +118,21 @@ export function MissionPlayer({ chapter }: { chapter: Chapter }) {
           <Button onClick={startLocal} className="py-3.5 text-base">
             <Play size={18} /> Lancer ({count} questions)
           </Button>
-          {ai?.ai ? (
-            <Button variant="secondary" onClick={startAi} disabled={loading} className="py-3.5">
-              {loading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-              {loading ? "Le Prof IA prépare tes questions…" : "Questions du Prof IA"}
-            </Button>
-          ) : (
-            <Button variant="secondary" onClick={startMix} className="py-3.5">
-              <Shuffle size={16} /> Mélange de tout le niveau
-            </Button>
-          )}
+          <Button variant="secondary" onClick={startMix} className="py-3.5">
+            <Shuffle size={16} /> Mélange de tout le niveau
+          </Button>
         </div>
         <p className="flex items-center gap-2 rounded-xl bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
           <InfinityIcon size={16} className="shrink-0 text-emerald-300" />
           Questions générées à chaque partie : valeurs, exemples et pièges changent, et tu ne retombes pas sur une question déjà vue.
         </p>
-        <div className="flex items-center justify-between gap-2">
-          <AiBadge />
+        <div className="flex items-center justify-end gap-2">
           {chapter.lab && (
             <Link href={`/labo/${chapter.lab}`} className="inline-flex items-center gap-1 text-sm text-violet-300 hover:text-violet-200">
               <FlaskConical size={14} /> Manipuler dans le labo
             </Link>
           )}
         </div>
-        {error && <p className="rounded-xl bg-rose-500/15 p-3 text-sm text-rose-300">{error}</p>}
       </div>
     </div>
   );

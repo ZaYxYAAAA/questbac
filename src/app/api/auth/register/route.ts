@@ -1,4 +1,4 @@
-import { clientKey, rateLimit } from "@/lib/ai/rate-limit";
+import { clientKey, rateLimit } from "@/lib/server/rate-limit";
 import { MAX_SAVE_BYTES, parseSave } from "@/lib/game/save";
 import { createInitialData } from "@/lib/game/state";
 import { passwordError, pseudoError } from "@/lib/server/auth";

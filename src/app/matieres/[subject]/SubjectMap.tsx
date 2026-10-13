@@ -3,12 +3,10 @@
 import Link from "next/link";
 import { useState } from "react";
 import clsx from "clsx";
-import { ChevronLeft, FileText, FlaskConical, Lock, Play, Sparkles, Swords } from "lucide-react";
+import { ChevronLeft, FlaskConical, Lock, Play, Swords } from "lucide-react";
 import { Tabs } from "@/components/ui/Tabs";
 import { bossesForLevel } from "@/lib/content/bosses";
 import { LEVELS, chaptersFor, subjectMeta } from "@/lib/content/curriculum";
-import { hasGenerators } from "@/lib/content/generated";
-import { hasLocalQuestions } from "@/lib/content/questions";
 import { bossStatus, chapterStars } from "@/lib/game/selectors";
 import { useGame } from "@/lib/store/game-store";
 import type { Level, SubjectId } from "@/lib/types";
@@ -48,7 +46,6 @@ export function SubjectMap({ subject, initialLevel }: { subject: SubjectId; init
       <ol className="relative space-y-3 before:absolute before:bottom-6 before:left-7 before:top-6 before:w-0.5 before:bg-gradient-to-b before:from-violet-500/60 before:to-slate-800">
         {chapters.map((c, i) => {
           const stars = chapterStars(game, c.id);
-          const local = hasGenerators(c.id) || hasLocalQuestions(c.id);
           return (
             <li key={c.id} className="relative flex gap-4">
               <div
@@ -68,19 +65,13 @@ export function SubjectMap({ subject, initialLevel }: { subject: SubjectId; init
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Link href={`/mission/${c.id}`} className="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-500">
-                      {local ? <Play size={14} /> : <Sparkles size={14} />} {local ? "Mission" : "Mission IA"}
+                      <Play size={14} /> Mission
                     </Link>
                     {c.lab && (
                       <Link href={`/labo/${c.lab}`} className="inline-flex items-center gap-1.5 rounded-xl bg-slate-800 px-3 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-700">
                         <FlaskConical size={14} /> Labo
                       </Link>
                     )}
-                    <Link
-                      href={`/prof?niveau=${level}&matiere=${subject}&sujet=${encodeURIComponent(c.title)}`}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-slate-800 px-3 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-700"
-                    >
-                      <FileText size={14} /> Fiche
-                    </Link>
                   </div>
                 </div>
               </div>

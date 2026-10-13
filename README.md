@@ -2,19 +2,16 @@
 
 Application de révision gamifiée pour la **Seconde**, la **Première** et la **Terminale** (voie générale) :
 missions par chapitre, combos, étoiles, niveaux, rangs, boss chronométrés, quêtes du jour,
-classements, **labos de maths interactifs**, **Prof IA** qui rédige des fiches, et **Forge**
-qui transforme une photo de cours en fiche + QCM.
+mode **classé** par matière, duels entre amis et **labos de maths interactifs**.
+Aucune IA payante : toutes les questions sont générées par l'application elle-même.
 
 ## Démarrage
 
 ```bash
 npm install
-cp .env.example .env.local   # puis renseigne ANTHROPIC_API_KEY (facultatif)
+cp .env.example .env.local   # facultatif : base Redis, secret de session
 npm run dev                  # http://localhost:3000
 ```
-
-Sans clé API, l'application est entièrement utilisable en **mode démo** : les fiches et
-missions IA sont remplacées par du contenu d'exemple (badge « Mode démo » dans l'interface).
 
 | Script | Rôle |
 |---|---|
@@ -33,8 +30,6 @@ missions IA sont remplacées par du contenu d'exemple (badge « Mode démo » da
 | 🏆 **Progression** | XP & niveaux, rangs Bronze → Légende avec divisions (gagnés en classé), séries de jours, 19 succès, 3 quêtes du jour + coffre |
 | ⚔️ **Classé** | Manches corrigées par le serveur, un rang par matière, groupes de la semaine et promotions le dimanche, anti-triche |
 | 🧪 **Labo** | 10 labos : traceur universel (paramètres animables, dérivée), affine, vecteurs & produit scalaire, second degré, sécante → tangente, cercle trigo, suites (toile d'araignée), exp/ln, intégrales (Riemann), loi binomiale |
-| 🎓 **Prof IA** | Fiche complète, express ou méthode sur n'importe quelle notion, en streaming, avec LaTeX ; bibliothèque, impression PDF, « Créer un QCM » depuis la fiche |
-| ⚒️ **Forge** | Photos du cours (appareil photo ou import, compressées côté client), texte collé, sujet ou création manuelle → fiche + questions ; éditeur complet des questions |
 | 👤 **Profil** | Radar de maîtrise, réussite par matière, XP sur 14 jours, échelle des rangs, succès, compte & sauvegarde, réglages |
 | ☁️ **Comptes** | Pseudo + mot de passe, progression sauvegardée en ligne et retrouvée sur tous les appareils, export / import JSON |
 
@@ -83,11 +78,9 @@ entre deux appareils, la sauvegarde la plus récente (`updatedAt`) gagne.
 ```
 src/
 ├── app/                      Pages (App Router) + routes API
-│   ├── api/fiche             POST → fiche Markdown en streaming
-│   ├── api/missions          POST → mission (sortie JSON structurée, images acceptées)
 │   ├── api/auth, me, save    Comptes, session, sauvegarde en ligne
 │   ├── api/leaderboard       GET  → vrais joueurs du classement
-│   └── api/status            GET  → IA connectée ou mode démo, type de stockage
+│   └── api/status            GET  → type de stockage
 ├── components/
 │   ├── math/Graph.tsx        Moteur de graphes SVG maison (pan, zoom, pincement, points déplaçables)
 │   ├── math/labs/            Les 10 labos (chargés à la demande)
@@ -98,7 +91,6 @@ src/
     ├── content/              Programme, banque de questions (~200), boss, labos
     ├── game/                 Règles du jeu en fonctions pures (XP, rangs, quêtes, succès, état)
     ├── math/parser.ts        Parseur d'expressions sûr (sans eval) + dérivée/intégrale numériques
-    ├── ai/                   Client Claude, prompts, schémas Zod, mode démo, limiteur de débit
     ├── server/               Stockage clé/valeur (Upstash Redis ou fichiers), mots de passe, sessions, comptes
     └── store/                Zustand (sauvegarde locale), synchronisation serveur, notifications
 ```
@@ -107,25 +99,13 @@ src/
 fonctions pures (`applySession`, `applyActivity`). Le store ne fait que les appeler : elles
 pourront tourner telles quelles côté serveur.
 
-### IA (Claude)
-
-- Modèle par défaut `claude-opus-5-5` (modifiable via `ANTHROPIC_MODEL`), réflexion adaptative,
-  effort `medium` par défaut (`ANTHROPIC_EFFORT`).
-- Repli automatique côté serveur (`fallbacks: "default"`) si le modèle décline une requête.
-- Forge : sortie JSON contrainte par schéma, puis validation tolérante question par question
-  (une question incohérente est écartée, pas toute la mission).
-- Le contenu des photos est traité comme du matériel de cours (les consignes qu'il contiendrait sont ignorées).
-- Limiteur de débit en mémoire par IP (10 fiches / 6 missions par 10 min).
-
 ## Prochaines étapes conseillées
 
 1. **Multijoueur** : exécuter `applySession` côté serveur (anti-triche), ajouter
    classes/groupes d'amis, réinitialisation de mot de passe.
-2. **Contenu** : enrichir la banque de questions (les chapitres sans questions locales sont déjà
-   jouables via « Mission IA »), faire relire par des enseignants.
+2. **Contenu** : enrichir la banque de questions, faire relire par des enseignants.
 3. **Répétition espacée** : reprogrammer automatiquement les questions ratées.
-4. **Production** : limiteur de débit partagé (Redis), quotas par compte, suivi des coûts IA,
-   PWA hors-ligne.
+4. **Production** : limiteur de débit partagé (Redis), PWA hors-ligne.
 
 ## Jouer avec des amis
 
@@ -154,7 +134,7 @@ pourront tourner telles quelles côté serveur.
 
 ## Mode classé
 
-- Navigation à 5 onglets : Accueil, **Entraînement** (Carte, Boss, Forge, Labo, Prof IA : XP
+- Navigation à 5 onglets : Accueil, **Entraînement** (Carte, Boss, Labo : XP
   seulement), **Classé** au centre, Social (Amis, Duels, fil d'actu), Profil.
 - Le rang ne se gagne qu'en classé. Un rang par matière et un rang **Général** (mélange des
   matières du niveau). Placement en 5 manches par matière, Général compris (jusqu'à
@@ -190,7 +170,7 @@ pourront tourner telles quelles côté serveur.
   question inverse et vrai/faux.
 - `src/lib/content/generated.ts` tire les questions en faisant tourner les générateurs, sans doublon,
   et évite les énoncés déjà vus (mémoire locale `questbac-seen`, 500 derniers par chapitre).
-- Les boss, le mode « Mélange de tout le niveau » et la Forge en mode démo utilisent ces générateurs.
+- Les boss et le mode « Mélange de tout le niveau » utilisent ces générateurs.
 - Test : 10 missions de 10 questions par chapitre donnent 100 énoncés tous différents.
 
 ## Notifications push

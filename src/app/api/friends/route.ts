@@ -1,6 +1,6 @@
 import { after } from "next/server";
 import { z } from "zod";
-import { clientKey, rateLimit } from "@/lib/ai/rate-limit";
+import { clientKey, rateLimit } from "@/lib/server/rate-limit";
 import { normalizeFriendCode } from "@/lib/friend-code";
 import { currentSession, jsonError, readJson, storageDown } from "@/lib/server/accounts";
 import { sendPush } from "@/lib/server/push";

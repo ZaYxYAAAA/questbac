@@ -28,8 +28,6 @@ const POOL: QuestDef[] = [
   { id: "boss-1", label: "Terrasse un boss", emoji: "⚔️", event: "boss_win", target: 1, xp: 100 },
   { id: "lab-1", label: "Explore un labo interactif", emoji: "🧪", event: "lab", target: 1, xp: 25 },
   { id: "lab-3", label: "Explore 3 labos interactifs", emoji: "🧪", event: "lab", target: 3, xp: 50 },
-  { id: "fiche-1", label: "Génère une fiche avec le Prof IA", emoji: "🗂️", event: "fiche", target: 1, xp: 40 },
-  { id: "forge-1", label: "Forge une mission depuis ton cours", emoji: "⚒️", event: "forge", target: 1, xp: 60 },
   { id: "combo-6", label: "Atteins un combo de 6", emoji: "🔥", event: "combo", target: 6, xp: 50 },
 ];
 

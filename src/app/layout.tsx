@@ -6,7 +6,7 @@ import { AppShell } from "@/components/layout/AppShell";
 export const metadata: Metadata = {
   title: { default: "QuestBac — Révise en jouant", template: "%s · QuestBac" },
   description:
-    "Application de révision gamifiée pour la Seconde, la Première et la Terminale : missions, boss, classements, labos de maths interactifs et Prof IA.",
+    "Application de révision gamifiée pour la Seconde, la Première et la Terminale : missions, boss, classements, mode classé, duels et labos de maths interactifs.",
   applicationName: "QuestBac",
   appleWebApp: { capable: true, title: "QuestBac", statusBarStyle: "black-translucent" },
   icons: { icon: "/icon-192.png" },

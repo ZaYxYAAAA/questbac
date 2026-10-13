@@ -36,7 +36,7 @@ export default function ProfilePage() {
   const account = useCloud((s) => s.user);
   const subjects = subjectsForLevel(profile.level);
   const accuracy = game.stats.answered ? Math.round((game.stats.correct / game.stats.answered) * 100) : 0;
-  const unlocked = Object.keys(game.achievements).length;
+  const unlocked = ACHIEVEMENTS.filter((a) => game.achievements[a.id]).length;
   const [tab, setTab] = useState<"stats" | "succes" | "reglages">("stats");
   // Lien « Créer mon compte » (?onglet=compte) : ouvre directement les réglages du compte.
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { FlaskConical, GraduationCap, Hammer, Home, type LucideIcon, Map as MapIcon, Skull, Swords, Target, Trophy, User, Users } from "lucide-react";
+import { FlaskConical, Home, type LucideIcon, Map as MapIcon, Skull, Swords, Target, Trophy, User, Users } from "lucide-react";
 
 export interface NavPage {
   href: string;
@@ -29,9 +29,7 @@ export const SECTIONS: NavSection[] = [
     pages: [
       { href: "/matieres", label: "Carte", icon: MapIcon },
       { href: "/boss", label: "Boss", icon: Skull },
-      { href: "/forge", label: "Forge", icon: Hammer },
       { href: "/labo", label: "Labo", icon: FlaskConical },
-      { href: "/prof", label: "Prof IA", icon: GraduationCap },
     ],
     extra: ["/mission"],
   },

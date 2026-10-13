@@ -22,8 +22,8 @@ const FEATURES = [
   { emoji: "🗺️", title: "Missions", text: "Des quiz par chapitre, avec combos et étoiles." },
   { emoji: "💀", title: "Boss", text: "Affronte un boss par matière, chrono en main." },
   { emoji: "📈", title: "Labos", text: "Manipule les maths : tout bouge en direct." },
-  { emoji: "🎓", title: "Prof IA", text: "Des fiches claires sur n'importe quelle notion." },
-  { emoji: "⚒️", title: "Forge", text: "Photographie ton cours, obtiens un QCM." },
+  { emoji: "⚔️", title: "Classé", text: "Un rang par matière, des promotions chaque semaine." },
+  { emoji: "👥", title: "Duels", text: "Défie tes amis sur les mêmes questions." },
   { emoji: "🏆", title: "Classements", text: "Monte du Bronze à Légende." },
 ];
 

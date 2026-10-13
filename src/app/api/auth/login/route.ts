@@ -1,4 +1,4 @@
-import { clientKey, rateLimit } from "@/lib/ai/rate-limit";
+import { clientKey, rateLimit } from "@/lib/server/rate-limit";
 import { createInitialData } from "@/lib/game/state";
 import { pseudoKey, verifyPassword } from "@/lib/server/auth";
 import { getAccount, getSave, jsonError, openSession, publicUser, readJson, storageDown } from "@/lib/server/accounts";
