@@ -4,9 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useRef } from "react";
 import clsx from "clsx";
-import { FlaskConical, GraduationCap, Hammer, Home, Map as MapIcon, Skull, Trophy, User, Users } from "lucide-react";
+import { FlaskConical, GraduationCap, Hammer, Home, Map as MapIcon, Skull, Swords, Trophy, User, Users } from "lucide-react";
 import { Onboarding } from "@/components/layout/Onboarding";
 import { PendingInvite } from "@/components/layout/PendingInvite";
+import { DuelNotifier } from "@/components/layout/DuelNotifier";
 import { SaveIndicator } from "@/components/layout/SaveIndicator";
 import { Avatar } from "@/components/game/Avatar";
 import { PromotionCelebration } from "@/components/game/PromotionCelebration";
@@ -27,6 +28,7 @@ const NAV = [
   { href: "/forge", label: "Forge", icon: Hammer },
   { href: "/classement", label: "Classement", icon: Trophy },
   { href: "/amis", label: "Amis", icon: Users },
+  { href: "/duels", label: "Duels", icon: Swords },
   { href: "/profil", label: "Profil", icon: User },
 ];
 
@@ -42,6 +44,7 @@ function Hud() {
   return (
     <div className="flex items-center gap-2 sm:gap-3">
       <SaveIndicator />
+      <DuelNotifier />
       <div className="hidden items-center gap-2 sm:flex">
         <div className="w-28">
           <div className="mb-0.5 flex justify-between text-[10px] font-semibold text-slate-400">

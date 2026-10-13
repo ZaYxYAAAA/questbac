@@ -113,5 +113,5 @@ export interface QuizResult {
   total: number;
   maxCombo: number;
   durationMs: number;
-  answers: { questionId: string; correct: boolean; timeMs: number }[];
+  answers: { questionId: string; correct: boolean; timeMs: number; given?: number | boolean | string }[];
 }

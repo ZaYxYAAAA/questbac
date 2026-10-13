@@ -3,6 +3,7 @@
  * (testables, indépendantes du stockage). Le store Zustand ne fait que les appeler.
  */
 import type { CustomMission, Level, QuizResult, SavedFiche, SubjectId } from "@/lib/types";
+import { DUEL_REWARDS, type DuelOutcome } from "./duel";
 import { type AchievementDef, newlyUnlocked } from "./achievements";
 import { type DailyReward, type DailyState, claimDaily } from "./daily";
 import { type LeagueState, finalLeagueResult } from "./league";
@@ -435,7 +436,8 @@ export function applySession(input: GameData, session: SessionInput, now = new D
 export type ActivityInput =
   | { kind: "lab"; labId: string }
   | { kind: "fiche"; fiche: SavedFiche }
-  | { kind: "forge"; mission: CustomMission };
+  | { kind: "forge"; mission: CustomMission }
+  | { kind: "duel"; outcome: DuelOutcome };
 
 /** Activités hors quiz : ouverture d'un labo, fiche générée, mission forgée. */
 export function applyActivity(input: GameData, activity: ActivityInput, now = new Date()) {
@@ -450,9 +452,16 @@ export function applyActivity(input: GameData, activity: ActivityInput, now = ne
   } else if (activity.kind === "fiche") {
     d = { ...d, fiches: [activity.fiche, ...d.fiches], stats: { ...d.stats, fichesGenerated: d.stats.fichesGenerated + 1 } };
     events.fiche = 1;
-  } else {
+  } else if (activity.kind === "forge") {
     d = { ...d, missions: [activity.mission, ...d.missions], stats: { ...d.stats, missionsForged: d.stats.missionsForged + 1 } };
     events.forge = 1;
+  } else {
+    const reward = DUEL_REWARDS[activity.outcome];
+    const lines: RewardLine[] = [
+      { label: reward.label, value: `+${reward.xp} XP` },
+      ...(reward.rp ? [{ label: "Points de rang", value: `+${reward.rp} RP` }] : []),
+    ];
+    return finalize(before, d, { xp: reward.xp, rp: reward.rp, lines, events }, now);
   }
 
   return finalize(before, d, { xp: 0, rp: 0, lines: [], events }, now);

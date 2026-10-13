@@ -135,3 +135,14 @@ pourront tourner telles quelles côté serveur.
 - On peut aussi saisir le code d'un ami. Connaître le code suffit : pas de demande à accepter.
 - L'onglet **Classement → Amis** compare la semaine (XP) et le rang (RP) entre amis.
 - Données serveur : `friends:<id>` (liste symétrique, 100 amis max) et l'index `friendcodes`.
+
+## Duels entre amis
+
+- Page **Duels** (ou bouton **⚔️ Défier** sur un ami) : choisis un ami et un chapitre.
+- Le serveur fige 4 à 6 questions (mêmes questions, même ordre des choix pour les deux).
+- Chacun joue quand il veut, dans les 72 h. Le serveur **recalcule le score** à partir des
+  réponses envoyées : plus de bonnes réponses gagne, puis le temps total le plus court.
+- Récompenses (une seule fois par joueur, tous appareils confondus) : victoire +120 XP +25 RP,
+  égalité +60 XP +10 RP, défaite +30 XP. Expiré avec un seul joueur : victoire par forfait.
+- Une pastille ⚔️ dans l'en-tête signale les duels où c'est ton tour.
+- Données serveur : `duel:<id>` et `duels:<id de compte>` (40 derniers duels).

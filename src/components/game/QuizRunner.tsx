@@ -6,6 +6,7 @@ import { Flame, Sparkles, X } from "lucide-react";
 import Link from "next/link";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { comboMultiplier, xpForAnswer } from "@/lib/game/progression";
+import type { GivenAnswer } from "@/lib/game/session";
 import type { Question, QuizResult } from "@/lib/types";
 import { QuestionCard } from "./QuestionCard";
 
@@ -34,8 +35,8 @@ export function QuizRunner({
   const q = questions[index];
   const correctCount = answers.current.filter((a) => a.correct).length;
 
-  const onAnswered = (correct: boolean) => {
-    answers.current.push({ questionId: q.id, correct, timeMs: Date.now() - questionStart.current });
+  const onAnswered = (correct: boolean, given: GivenAnswer) => {
+    answers.current.push({ questionId: q.id, correct, timeMs: Date.now() - questionStart.current, given });
     if (correct) {
       const gained = xpForAnswer(q.difficulty ?? 1, combo);
       setXp((x) => x + gained);

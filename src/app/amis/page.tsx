@@ -117,6 +117,7 @@ export default function FriendsPage() {
               <p className="text-xs text-slate-500">Niv. {f.playerLevel} · {levelLabel(f.level)} · {currentWeeklyXp(f, now)} XP cette semaine</p>
             </div>
             <span className="hidden sm:block"><RankBadge rp={f.rp} size="sm" /></span>
+            <Link href={`/duels?ami=${encodeURIComponent(f.id)}`} aria-label={`Défier ${f.pseudo}`} className="rounded-xl bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-500">⚔️ Défier</Link>
             <button
               type="button"
               aria-label={`Retirer ${f.pseudo} de mes amis`}

@@ -18,7 +18,7 @@ export function QuestionCard({
 }: {
   question: Question;
   /** Appelé une seule fois quand l'élève valide. */
-  onAnswered: (correct: boolean) => void;
+  onAnswered: (correct: boolean, given: GivenAnswer) => void;
   onNext: () => void;
   /** Le parent signale que le temps est écoulé (mode boss). */
   timedOut?: boolean;
@@ -42,7 +42,7 @@ export function QuestionCard({
     const ok = isCorrect(question, answer);
     setGiven(answer);
     setStatus(ok ? "correct" : "wrong");
-    onAnswered(ok);
+    onAnswered(ok, answer);
   };
 
   // Raccourcis clavier : 1-4 pour les QCM, V/F pour vrai-faux, Entrée pour continuer
