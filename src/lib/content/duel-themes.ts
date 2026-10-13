@@ -3,12 +3,9 @@
  * Les maths et la physique sont générées au hasard (valeurs différentes à
  * chaque duel) ; les autres matières tirent dans des banques de repères.
  */
-import type { McqQuestion, NumericQuestion, Question, SubjectId, TrueFalseQuestion } from "@/lib/types";
+import type { Question, SubjectId } from "@/lib/types";
 import { shuffle } from "@/lib/game/quests";
-
-type Rand = () => number;
-type Draft = Omit<McqQuestion, "id"> | Omit<NumericQuestion, "id"> | Omit<TrueFalseQuestion, "id">;
-type Generator = (r: Rand) => Draft;
+import { type Generator, type Rand, fr, frac, gcd, int, mcq, numMcq, numeric, pick, tf } from "./gen/kit";
 
 export interface DuelTheme {
   id: string;
@@ -18,44 +15,6 @@ export interface DuelTheme {
   description: string;
   generators: Generator[];
 }
-
-// ───────────── Outils ─────────────
-
-const int = (r: Rand, min: number, max: number) => min + Math.floor(r() * (max - min + 1));
-const pick = <T,>(r: Rand, items: readonly T[]): T => items[Math.floor(r() * items.length)];
-const fr = (n: number) => String(Math.round(n * 1000) / 1000).replace(".", ",");
-const gcd = (a: number, b: number): number => (b === 0 ? Math.abs(a) : gcd(b, a % b));
-
-/** QCM : la bonne réponse + 3 leurres distincts (complétés si besoin). */
-function mcq(r: Rand, prompt: string, answer: string, wrongs: string[], explanation: string, fill?: () => string): Draft {
-  const pool = [...new Set(wrongs.filter((w) => w !== answer))];
-  for (let guard = 0; pool.length < 3 && fill && guard < 30; guard++) {
-    const w = fill();
-    if (w !== answer && !pool.includes(w)) pool.push(w);
-  }
-  const choices = shuffle([answer, ...shuffle(pool, r).slice(0, 3)], r);
-  return { type: "mcq", prompt, choices, answer: choices.indexOf(answer), explanation, difficulty: 1 };
-}
-
-/** QCM numérique : leurres proches (erreurs typiques puis voisins). */
-function numMcq(r: Rand, prompt: string, answer: number, typical: number[], explanation: string, wrap = (s: string) => s): Draft {
-  const step = Math.max(1, Math.round(Math.abs(answer) * 0.1));
-  return mcq(r, prompt, wrap(fr(answer)), typical.filter((t) => t !== answer).map((t) => wrap(fr(t))), explanation, () =>
-    wrap(fr(answer + (r() < 0.5 ? -1 : 1) * step * int(r, 1, 3))),
-  );
-}
-
-const numeric = (prompt: string, answer: number, explanation: string, unit?: string): Draft => ({
-  type: "numeric", prompt, answer, explanation, difficulty: 1, ...(unit ? { unit } : {}),
-});
-
-const tf = (prompt: string, answer: boolean, explanation: string): Draft => ({ type: "truefalse", prompt, answer, explanation, difficulty: 1 });
-
-const frac = (n: number, d: number) => {
-  const g = gcd(n, d);
-  const [a, b] = [n / g, d / g];
-  return b === 1 ? `$${a}$` : `$\\dfrac{${a}}{${b}}$`;
-};
 
 // ───────────── Calcul mental ─────────────
 
