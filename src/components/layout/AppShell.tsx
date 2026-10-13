@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { FlaskConical, GraduationCap, Hammer, Home, Map as MapIcon, Skull, Swords, Trophy, User, Users } from "lucide-react";
+import { FlaskConical, GraduationCap, Hammer, Home, LayoutGrid, Map as MapIcon, Skull, Swords, Trophy, User, Users } from "lucide-react";
 import { Onboarding } from "@/components/layout/Onboarding";
 import { PendingInvite } from "@/components/layout/PendingInvite";
 import { DuelNotifier } from "@/components/layout/DuelNotifier";
@@ -32,8 +32,9 @@ const NAV = [
   { href: "/profil", label: "Profil", icon: User },
 ];
 
-// Sur mobile, le profil est accessible par l'avatar en haut à droite.
-const MOBILE_NAV = [NAV[0], NAV[1], NAV[2], { ...NAV[6], label: "Ligue" }, NAV[3], NAV[4], NAV[5]];
+// Mobile : 4 onglets principaux + « Plus » qui ouvre le reste en grand.
+const MOBILE_NAV = [NAV[0], NAV[1], NAV[7], { ...NAV[6], label: "Ligue" }];
+const MOBILE_MORE = [NAV[8], NAV[2], NAV[5], NAV[4], NAV[3], NAV[9]];
 
 const isActive = (pathname: string, href: string) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`));
 
@@ -72,6 +73,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const profile = useGame((s) => s.profile);
   const refresh = useGame((s) => s.refresh);
   const cloudChecked = useCloud((s) => s.checked);
+  const [moreOpen, setMoreOpen] = useState(false);
   useCloudSync(hydrated);
 
   useEffect(() => {
@@ -137,17 +139,56 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
 
       {/* Navigation basse (mobile) */}
-      <nav className="qb-no-print fixed inset-x-0 bottom-0 z-40 grid grid-cols-7 border-t border-white/10 bg-slate-950/90 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
+      {moreOpen && (
+        <div className="qb-no-print fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm lg:hidden" onClick={() => setMoreOpen(false)}>
+          <div
+            className="qb-pop absolute inset-x-3 rounded-3xl border border-white/10 bg-slate-900 p-4 shadow-2xl"
+            style={{ bottom: "calc(4.5rem + env(safe-area-inset-bottom))" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="grid grid-cols-3 gap-2">
+              {MOBILE_MORE.map(({ href, label, icon: Icon }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => setMoreOpen(false)}
+                  className={clsx(
+                    "flex flex-col items-center gap-1.5 rounded-2xl py-4 text-sm font-semibold transition active:scale-95",
+                    isActive(pathname, href) ? "bg-violet-600/25 text-white ring-1 ring-violet-500/40" : "bg-slate-800/70 text-slate-200",
+                  )}
+                >
+                  <Icon size={26} />
+                  {label}
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+      <nav className="qb-no-print fixed inset-x-0 bottom-0 z-50 grid grid-cols-5 border-t border-white/10 bg-slate-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
         {MOBILE_NAV.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}
-            className={clsx("flex flex-col items-center gap-0.5 py-2 text-[10px] font-semibold", isActive(pathname, href) ? "text-violet-300" : "text-slate-500")}
+            onClick={() => setMoreOpen(false)}
+            className={clsx("flex flex-col items-center gap-1 py-2.5 text-xs font-semibold", !moreOpen && isActive(pathname, href) ? "text-violet-300" : "text-slate-400")}
           >
-            <Icon size={20} />
+            <Icon size={24} />
             {label}
           </Link>
         ))}
+        <button
+          type="button"
+          onClick={() => setMoreOpen((o) => !o)}
+          aria-expanded={moreOpen}
+          className={clsx(
+            "flex flex-col items-center gap-1 py-2.5 text-xs font-semibold",
+            moreOpen || MOBILE_MORE.some((n) => isActive(pathname, n.href)) ? "text-violet-300" : "text-slate-400",
+          )}
+        >
+          <LayoutGrid size={24} />
+          Plus
+        </button>
       </nav>
       <PendingInvite />
       <Toaster />
