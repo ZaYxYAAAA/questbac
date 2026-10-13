@@ -5,10 +5,14 @@
 import { z } from "zod";
 import type { Level } from "@/lib/types";
 import { MAX_PHOTO_CHARS, MAX_THUMB_CHARS, isPhotoDataUrl } from "./photo";
-import { levelFromXp, weekKey } from "./progression";
+import { levelFromXp, rankFromRp, weekKey } from "./progression";
+import { activeTierReward, unlockedTiers } from "./ranks";
 import { type GameData, createInitialData } from "./state";
 
 const DATA_KEYS = Object.keys(createInitialData()) as (keyof GameData)[];
+
+/** Sous-objets « fixes » : fusionnés avec les valeurs par défaut pour combler les champs ajoutés depuis. */
+const FIXED_OBJECTS = new Set<keyof GameData>(["streak", "stats", "quests", "weekly", "league", "daily"]);
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
@@ -32,9 +36,14 @@ export function migrateSave(raw: unknown): GameData | null {
     const b = base[k];
     const v = raw[k];
     // Sous-objets « fixes » : fusion pour combler les champs ajoutés depuis.
-    merged[k] = isObject(b) && isObject(v) && (k === "streak" || k === "stats" || k === "quests" || k === "weekly") ? { ...b, ...v } : v;
+    merged[k] = isObject(b) && isObject(v) && FIXED_OBJECTS.has(k) ? { ...b, ...v } : v;
   }
   merged.version = 1;
+  // Ajouts du lot « ligues » : meilleur RP, ligue de la semaine au palier actuel, fil d'actualité.
+  const rp = typeof merged.rp === "number" && Number.isFinite(merged.rp) ? merged.rp : 0;
+  merged.peakRp = Math.max(rp, typeof merged.peakRp === "number" && Number.isFinite(merged.peakRp) ? merged.peakRp : 0);
+  if (!isObject(raw.league)) merged.league = { ...base.league, tierId: rankFromRp(rp).tier.id };
+  if (!Array.isArray(merged.feed)) merged.feed = [];
   if (isObject(merged.profile)) merged.profile = migrateProfile(merged.profile);
   merged.updatedAt = typeof raw.updatedAt === "number" && Number.isFinite(raw.updatedAt) ? raw.updatedAt : 0;
   return merged as unknown as GameData;
@@ -86,10 +95,13 @@ export const SaveSchema = z.looseObject({
       photoThumb: z.string().refine((v) => isPhotoDataUrl(v, MAX_THUMB_CHARS)).optional(),
       level,
       createdAt: num,
+      titleId: z.string().max(40).optional(),
+      frameId: z.string().max(40).optional(),
     })
     .nullable(),
   xp: num.min(0),
   rp: num.min(0),
+  peakRp: num.min(0),
   streak: z.looseObject({ count: num, lastDay: z.string().nullable(), best: num }),
   chapters: z.record(z.string(), z.unknown()),
   bosses: z.record(z.string(), z.unknown()),
@@ -97,6 +109,9 @@ export const SaveSchema = z.looseObject({
   achievements: z.record(z.string(), z.unknown()),
   quests: z.looseObject({ day: z.string() }),
   weekly: z.looseObject({ week: z.string(), xp: num }),
+  league: z.looseObject({ week: z.string(), tierId: z.string().max(40), last: z.looseObject({ rank: num, size: num }).nullable() }),
+  daily: z.looseObject({ lastClaim: z.string().nullable(), count: num }),
+  feed: z.array(z.looseObject({ at: num, kind: z.string(), ref: z.string().max(80) })).max(100),
   xpByDay: z.record(z.string(), num),
   fiches: z.array(z.unknown()).max(500),
   missions: z.array(z.unknown()).max(500),
@@ -113,6 +128,10 @@ export interface PublicProfile {
   avatar: string;
   /** Miniature 64 × 64 de la photo de profil, s'il y en a une. */
   photoThumb?: string;
+  /** Palier du titre affiché sous le pseudo. */
+  titleId?: string;
+  /** Palier du cadre d'avatar choisi (sinon : celui du rang). */
+  frameId?: string;
   level: Level;
   playerLevel: number;
   rp: number;
@@ -126,11 +145,15 @@ export interface PublicProfile {
 export function publicProfileFrom(account: { id: string; pseudo: string }, save: GameData): PublicProfile {
   const avatar = save.profile?.avatar ?? "🙂";
   const thumb = save.profile?.photoThumb;
+  const peakRp = Math.max(save.rp, save.peakRp ?? 0);
+  const frame = save.profile?.frameId && unlockedTiers(peakRp).includes(save.profile.frameId) ? save.profile.frameId : undefined;
   return {
     id: account.id,
     pseudo: account.pseudo,
     avatar: avatar.length <= MAX_AVATAR_CHARS && !avatar.startsWith("data:") ? avatar : "🙂",
     ...(isPhotoDataUrl(thumb, MAX_THUMB_CHARS) ? { photoThumb: thumb } : {}),
+    titleId: activeTierReward(save.profile?.titleId, peakRp).tierId,
+    ...(frame ? { frameId: frame } : {}),
     level: save.profile?.level ?? "premiere",
     playerLevel: levelFromXp(save.xp).level,
     rp: Math.round(save.rp),

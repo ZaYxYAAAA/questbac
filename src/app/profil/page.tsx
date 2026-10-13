@@ -1,11 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import clsx from "clsx";
+import { Lock } from "lucide-react";
 import { AccountSection } from "@/components/layout/AccountSection";
 import { Avatar } from "@/components/game/Avatar";
 import { AccuracyBars, MasteryRadar, XpBarChart } from "@/components/game/Charts";
 import { PhotoPicker } from "@/components/game/PhotoPicker";
+import { PlayerTitle } from "@/components/game/PlayerTitle";
+import { RankEmblem } from "@/components/game/RankEmblem";
 import { RankBadge } from "@/components/game/RankBadge";
 import { Button } from "@/components/ui/Button";
 import { Card, SectionTitle } from "@/components/ui/Card";
@@ -13,6 +17,7 @@ import { ProgressBar } from "@/components/ui/ProgressBar";
 import { LEVELS, levelLabel, subjectsForLevel } from "@/lib/content/curriculum";
 import { ACHIEVEMENTS } from "@/lib/game/achievements";
 import { RANK_TIERS, levelFromXp, rankFromRp } from "@/lib/game/progression";
+import { TIER_REWARDS, activeTierReward, playerFrame, unlockedTiers } from "@/lib/game/ranks";
 import { subjectProgress, xpHistory } from "@/lib/game/selectors";
 import { useCloud } from "@/lib/store/cloud-sync";
 import { useGame } from "@/lib/store/game-store";
@@ -45,9 +50,10 @@ export default function ProfilePage() {
   return (
     <div className="space-y-6">
       <section className="flex flex-col items-center gap-4 rounded-3xl border border-white/10 bg-gradient-to-br from-violet-700/30 to-slate-950 p-6 text-center sm:flex-row sm:text-left">
-        <Avatar emoji={profile.avatar} photo={profile.photo} name={profile.pseudo} size="xl" rp={game.rp} className="m-1" />
+        <Avatar emoji={profile.avatar} photo={profile.photo} name={profile.pseudo} size="xl" rp={game.rp} frame={playerFrame(profile, game.peakRp)} className="m-1" />
         <div className="flex-1">
           <h1 className="text-3xl font-black text-white">{profile.pseudo}</h1>
+          <PlayerTitle titleId={profile.titleId} peakRp={game.peakRp} />
           <p className="text-slate-400">{levelLabel(profile.level)} · inscrit le {new Date(profile.createdAt).toLocaleDateString("fr-FR")}</p>
           <div className="mt-2"><RankBadge rp={game.rp} size="lg" /></div>
         </div>
@@ -93,23 +99,7 @@ export default function ProfilePage() {
         </Card>
       </div>
 
-      <Card>
-        <SectionTitle icon={<span>🏅</span>}>Échelle des rangs</SectionTitle>
-        <div className="flex gap-2 overflow-x-auto pb-2">
-          {RANK_TIERS.map((t) => {
-            const reached = game.rp >= t.minRp;
-            const current = rank.tier.id === t.id;
-            return (
-              <div key={t.id} className={clsx("min-w-24 flex-1 rounded-2xl border p-3 text-center", current ? "border-violet-400 bg-violet-600/20" : reached ? "border-white/15 bg-slate-800/60" : "border-white/5 bg-slate-900/40 opacity-50")}>
-                <div className="text-3xl">{t.emoji}</div>
-                <p className="text-sm font-bold" style={{ color: t.color }}>{t.name}</p>
-                <p className="text-xs text-slate-500">{t.minRp} RP</p>
-              </div>
-            );
-          })}
-        </div>
-        <p className="mt-2 text-xs text-slate-500">Gagne des RP en réussissant tes missions (selon tes étoiles et ton combo) et en battant des boss. Une défaite contre un boss coûte 15 RP.</p>
-      </Card>
+      <TitlesAndFrames />
 
       <Card>
         <SectionTitle icon={<span>🏆</span>} action={<span className="text-sm text-slate-400">{unlocked}/{ACHIEVEMENTS.length}</span>}>Succès</SectionTitle>
@@ -178,5 +168,95 @@ export default function ProfilePage() {
         </div>
       </Card>
     </div>
+  );
+}
+
+/** « Cadre de bronze » → « Bronze ». */
+function shortFrame(frame: string) {
+  const short = frame.replace(/^Cadre (de |d'|du )?/, "");
+  return short.charAt(0).toUpperCase() + short.slice(1);
+}
+
+/** Choix du titre affiché sous le pseudo et du cadre d'avatar, parmi ceux débloqués. */
+function TitlesAndFrames() {
+  const game = useGame();
+  const profile = game.profile!;
+  const unlocked = unlockedTiers(game.peakRp);
+  const activeTitle = activeTierReward(profile.titleId, game.peakRp).tierId;
+  const activeFrame = playerFrame(profile, game.peakRp);
+  const tierOf = (id: string) => RANK_TIERS.find((t) => t.id === id)!;
+
+  return (
+    <Card>
+      <SectionTitle icon={<span>🏅</span>} action={<Link href="/classement?vue=rangs" className="text-sm text-violet-300 hover:text-violet-200">Tous les rangs →</Link>}>
+        Titres et cadres
+      </SectionTitle>
+      <p className="mb-3 text-sm text-slate-400">
+        Chaque palier atteint débloque un titre et un cadre d&apos;avatar, gardés même si tu perds des RP. Ils sont visibles dans le classement.
+      </p>
+
+      <p className="mb-2 text-sm font-bold text-slate-300">Titre affiché</p>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {TIER_REWARDS.map((r) => {
+          const tier = tierOf(r.tierId);
+          const open = unlocked.includes(r.tierId);
+          const selected = activeTitle === r.tierId;
+          return (
+            <button
+              key={r.tierId}
+              type="button"
+              disabled={!open}
+              aria-pressed={selected}
+              onClick={() => game.updateProfile({ titleId: r.tierId })}
+              className={clsx(
+                "flex items-center gap-2 rounded-2xl border p-2 text-left transition",
+                selected ? "border-violet-400 bg-violet-600/20" : open ? "border-white/10 bg-slate-800/60 hover:border-white/25" : "cursor-not-allowed border-white/5 bg-slate-900/40",
+              )}
+            >
+              <RankEmblem tierId={r.tierId} size="sm" locked={!open} className="!h-10 !w-10 !text-xl" />
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-bold" style={{ color: open ? tier.color : undefined }}>{open ? r.title : "???"}</span>
+                <span className="block truncate text-[11px] text-slate-500">
+                  {open ? tier.name : <><Lock size={10} className="mr-0.5 inline" />{tier.name} · {tier.minRp} RP</>}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <p className="mb-2 mt-5 text-sm font-bold text-slate-300">Cadre d&apos;avatar</p>
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="button"
+          aria-pressed={!activeFrame}
+          onClick={() => game.updateProfile({ frameId: undefined })}
+          className={clsx("flex w-20 flex-col items-center gap-1 rounded-2xl border p-2 text-[11px]", !activeFrame ? "border-violet-400 bg-violet-600/20 text-white" : "border-white/10 bg-slate-800/60 text-slate-400")}
+        >
+          <Avatar emoji={profile.avatar} photo={profile.photoThumb ?? profile.photo} name={profile.pseudo} size="md" rp={game.rp} emblem={false} />
+          Selon mon rang
+        </button>
+        {TIER_REWARDS.map((r) => {
+          const open = unlocked.includes(r.tierId);
+          return (
+            <button
+              key={r.tierId}
+              type="button"
+              disabled={!open}
+              aria-pressed={activeFrame === r.tierId}
+              aria-label={open ? r.frame : `${r.frame} (verrouillé)`}
+              onClick={() => game.updateProfile({ frameId: r.tierId })}
+              className={clsx(
+                "flex w-20 flex-col items-center gap-1 rounded-2xl border p-2 text-center text-[11px] leading-tight",
+                activeFrame === r.tierId ? "border-violet-400 bg-violet-600/20 text-white" : open ? "border-white/10 bg-slate-800/60 text-slate-300" : "cursor-not-allowed border-white/5 bg-slate-900/40 text-slate-600",
+              )}
+            >
+              <Avatar emoji={profile.avatar} photo={profile.photoThumb ?? profile.photo} name={profile.pseudo} size="md" frame={r.tierId} emblem={false} className={clsx(!open && "opacity-50")} />
+              {open ? shortFrame(r.frame) : <Lock size={12} />}
+            </button>
+          );
+        })}
+      </div>
+    </Card>
   );
 }

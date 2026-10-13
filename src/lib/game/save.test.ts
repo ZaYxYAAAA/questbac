@@ -19,6 +19,33 @@ describe("migration des sauvegardes", () => {
     expect(d.stats.missionsForged).toBe(0);
   });
 
+  it("ajoute ligue, coffre quotidien, fil et meilleur RP à une ancienne sauvegarde", () => {
+    const v3 = { ...createInitialData(now), rp: 900, profile: { pseudo: "Lina", avatar: "🦊", level: "premiere", createdAt: 1 } } as Record<string, unknown>;
+    delete v3.league;
+    delete v3.daily;
+    delete v3.feed;
+    delete v3.peakRp;
+    const d = migrateSave(v3)!;
+    expect(d.peakRp).toBe(900);
+    expect(d.league).toMatchObject({ tierId: "or", last: null });
+    expect(d.daily).toEqual({ lastClaim: null, count: 0 });
+    expect(d.feed).toEqual([]);
+    expect(SaveSchema.safeParse(d).success).toBe(true);
+    // Les champs existants sont conservés.
+    const kept = migrateSave({ ...d, peakRp: 1200, daily: { lastClaim: "2026-10-11", count: 3 } })!;
+    expect(kept.peakRp).toBe(1200);
+    expect(kept.daily.count).toBe(3);
+  });
+
+  it("publie le titre choisi seulement s'il est débloqué", () => {
+    const base = { ...createInitialData(now), rp: 900, peakRp: 900 };
+    const withTitle = (titleId: string) => ({ ...base, profile: { pseudo: "Lina", avatar: "🦊", level: "premiere" as const, createdAt: 1, titleId, frameId: titleId } });
+    expect(publicProfileFrom({ id: "a", pseudo: "Lina" }, withTitle("argent"))).toMatchObject({ titleId: "argent", frameId: "argent" });
+    const locked = publicProfileFrom({ id: "a", pseudo: "Lina" }, withTitle("legende"));
+    expect(locked.titleId).toBe("or");
+    expect(locked.frameId).toBeUndefined();
+  });
+
   it("ignore les champs inconnus et refuse ce qui n'est pas une sauvegarde", () => {
     const d = migrateSave({ ...createInitialData(now), recordSession: () => 1 })!;
     expect("recordSession" in d).toBe(false);

@@ -118,6 +118,34 @@ body {
 @keyframes qb-float-y { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
 .qb-bob { animation: qb-float-y 3s ease-in-out infinite; }
 
+/* ───────────── Ligues, rangs, coffres ───────────── */
+
+.qb-hex { clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%); }
+.qb-silhouette { filter: brightness(0) opacity(0.55); }
+
+@keyframes qb-spin { to { transform: rotate(360deg); } }
+.qb-frame-spin { animation: qb-spin 8s linear infinite; }
+.qb-rays { animation: qb-spin 18s linear infinite; }
+
+@keyframes qb-wiggle { 0%, 80%, 100% { transform: rotate(0) scale(1); } 84% { transform: rotate(-9deg) scale(1.06); } 88% { transform: rotate(8deg) scale(1.06); } 92% { transform: rotate(-5deg); } 96% { transform: rotate(3deg); } }
+.qb-wiggle { animation: qb-wiggle 2.6s ease-in-out infinite; }
+
+@keyframes qb-chest-open { 0% { transform: scale(1); } 30% { transform: scale(1.25) rotate(-6deg); } 60% { transform: scale(0.9) rotate(4deg); } 100% { transform: scale(1); } }
+.qb-chest-open { animation: qb-chest-open 0.6s ease-out; }
+
+@keyframes qb-emblem { 0% { transform: scale(0.2) rotate(-25deg); opacity: 0; filter: brightness(3); } 60% { transform: scale(1.15) rotate(6deg); opacity: 1; } 100% { transform: scale(1) rotate(0); filter: brightness(1); } }
+.qb-emblem { animation: qb-emblem 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+@keyframes qb-fade { from { opacity: 0; } to { opacity: 1; } }
+.qb-fade { animation: qb-fade 0.3s ease-out both; }
+
+@keyframes qb-shimmer { 0% { background-position: -150% 0; } 100% { background-position: 250% 0; } }
+.qb-mystery { background-image: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.06) 50%, transparent 70%); background-size: 200% 100%; animation: qb-shimmer 3.5s linear infinite; }
+.qb-legend { background-image: linear-gradient(110deg, transparent 25%, rgba(253, 224, 71, 0.18) 50%, transparent 75%); background-size: 200% 100%; animation: qb-shimmer 4s linear infinite; }
+
+@keyframes qb-here { 0%, 100% { box-shadow: 0 0 0 0 rgba(167, 139, 250, 0.55); } 50% { box-shadow: 0 0 0 6px rgba(167, 139, 250, 0); } }
+.qb-here { animation: qb-here 2s ease-in-out infinite; }
+
 .qb-glow { box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.25), 0 20px 60px -20px rgba(124, 58, 237, 0.45); }
 
 @media (prefers-reduced-motion: reduce) {

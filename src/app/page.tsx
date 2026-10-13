@@ -5,6 +5,10 @@ import clsx from "clsx";
 import { ArrowRight, CheckCircle2, Gift, Lock, Swords } from "lucide-react";
 import { XpBarChart } from "@/components/game/Charts";
 import { Avatar } from "@/components/game/Avatar";
+import { DailyChest } from "@/components/game/DailyChest";
+import { LeagueCard, LeagueResultBanner } from "@/components/game/LeagueCard";
+import { NewsFeed } from "@/components/game/NewsFeed";
+import { PlayerTitle } from "@/components/game/PlayerTitle";
 import { RankBadge } from "@/components/game/RankBadge";
 import { Card, SectionTitle } from "@/components/ui/Card";
 import { ProgressBar } from "@/components/ui/ProgressBar";
@@ -12,6 +16,7 @@ import { bossesForLevel } from "@/lib/content/bosses";
 import { levelLabel, subjectMeta } from "@/lib/content/curriculum";
 import { levelFromXp, rankFromRp } from "@/lib/game/progression";
 import { CHEST_XP, dailyQuests } from "@/lib/game/quests";
+import { playerFrame } from "@/lib/game/ranks";
 import { bossStatus, chapterStars, recommendedChapters, xpHistory } from "@/lib/game/selectors";
 import { useGame } from "@/lib/store/game-store";
 
@@ -19,7 +24,7 @@ const SHORTCUTS = [
   { href: "/labo", emoji: "📈", title: "Labo de maths", text: "Courbes et figures à manipuler", gradient: "from-violet-600/30 to-indigo-600/10" },
   { href: "/prof", emoji: "🎓", title: "Prof IA", text: "Une fiche sur n'importe quelle notion", gradient: "from-cyan-600/30 to-sky-600/10" },
   { href: "/forge", emoji: "⚒️", title: "Forge", text: "Ton cours en photo → un QCM", gradient: "from-amber-600/30 to-orange-600/10" },
-  { href: "/classement", emoji: "🏆", title: "Classement", text: "Ta place cette semaine", gradient: "from-pink-600/30 to-rose-600/10" },
+  { href: "/classement?vue=rangs", emoji: "🏆", title: "Ligues & rangs", text: "De Bronze à Légende", gradient: "from-pink-600/30 to-rose-600/10" },
 ];
 
 export default function HomePage() {
@@ -44,11 +49,14 @@ export default function HomePage() {
         )}
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center">
           <Link href="/profil" aria-label="Mon profil" className="self-start rounded-full sm:self-center">
-            <Avatar emoji={profile.avatar} photo={profile.photo} name={profile.pseudo} size="xl" rp={game.rp} />
+            <Avatar emoji={profile.avatar} photo={profile.photo} name={profile.pseudo} size="xl" rp={game.rp} frame={playerFrame(profile, game.peakRp)} />
           </Link>
           <div className="flex-1 space-y-2">
             <p className="text-sm text-violet-200">{levelLabel(profile.level)} · Série de {game.streak.count} jour{game.streak.count > 1 ? "s" : ""} 🔥</p>
-            <h1 className="text-3xl font-black text-white">Salut {profile.pseudo} !</h1>
+            <div>
+              <h1 className="text-3xl font-black text-white">Salut {profile.pseudo} !</h1>
+              <PlayerTitle titleId={profile.titleId} peakRp={game.peakRp} />
+            </div>
             <div className="max-w-md">
               <div className="mb-1 flex justify-between text-xs text-slate-300">
                 <span className="font-bold">Niveau {level.level}</span>
@@ -62,10 +70,18 @@ export default function HomePage() {
             {rank.nextLabel && (
               <p className="text-xs text-slate-400">Encore <b className="text-white">{rank.rpToNext} RP</b> pour {rank.nextLabel}</p>
             )}
+            <Link href="/classement?vue=rangs" className="block text-xs font-semibold text-violet-300 hover:text-violet-200">Voir tous les rangs →</Link>
             <p className="text-xs text-slate-400">Cette semaine : <b className="text-white">{game.weekly.xp} XP</b></p>
           </div>
         </div>
       </section>
+
+      <LeagueResultBanner />
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2"><DailyChest /></div>
+        <LeagueCard />
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Quêtes du jour */}
@@ -156,15 +172,18 @@ export default function HomePage() {
         </Card>
       </div>
 
-      {/* Raccourcis */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {SHORTCUTS.map((s) => (
-          <Link key={s.href} href={s.href} className={clsx("rounded-2xl border border-white/10 bg-gradient-to-br p-4 transition hover:-translate-y-0.5 hover:border-white/25", s.gradient)}>
-            <div className="text-3xl">{s.emoji}</div>
-            <p className="mt-2 font-bold text-white">{s.title}</p>
-            <p className="text-xs text-slate-400">{s.text}</p>
-          </Link>
-        ))}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2"><NewsFeed /></div>
+        {/* Raccourcis */}
+        <div className="grid grid-cols-2 content-start gap-3">
+          {SHORTCUTS.map((s) => (
+            <Link key={s.href} href={s.href} className={clsx("rounded-2xl border border-white/10 bg-gradient-to-br p-4 transition hover:-translate-y-0.5 hover:border-white/25", s.gradient)}>
+              <div className="text-3xl">{s.emoji}</div>
+              <p className="mt-2 font-bold text-white">{s.title}</p>
+              <p className="text-xs text-slate-400">{s.text}</p>
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   );

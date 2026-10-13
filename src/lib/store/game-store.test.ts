@@ -57,3 +57,26 @@ describe("démarrage d'un appareil aux données anciennes", () => {
     expect(serverSaveWins(staleLocal, { save: null, updatedAt: Date.now() })).toBe(false);
   });
 });
+
+describe("ligue et coffre quotidien dans le store", () => {
+  it("clôt une ligue passée au refresh sans modifier updatedAt", () => {
+    const lastWeek = new Date(Date.now() - 8 * 86_400_000);
+    const old = { ...createInitialData(lastWeek), profile, rp: 100, peakRp: 100, updatedAt: lastWeek.getTime() };
+    useGame.setState({ ...old, weekly: { ...old.weekly, xp: 5000 } });
+    useGame.getState().refresh();
+    const s = useGame.getState();
+    expect(s.league.last).toMatchObject({ seen: false });
+    expect(s.league.week).not.toBe(old.league.week);
+    expect(s.updatedAt).toBe(old.updatedAt);
+    useGame.getState().acknowledgeLeague();
+    expect(useGame.getState().league.last?.seen).toBe(true);
+    expect(useGame.getState().updatedAt).toBeGreaterThan(old.updatedAt);
+  });
+
+  it("le coffre du jour ne s'ouvre qu'une fois", () => {
+    useGame.setState({ ...createInitialData(), profile });
+    expect(useGame.getState().claimDaily()?.reward.day).toBe(1);
+    expect(useGame.getState().claimDaily()).toBeNull();
+    expect(useGame.getState().xp).toBe(30);
+  });
+});

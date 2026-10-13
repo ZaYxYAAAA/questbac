@@ -9,6 +9,7 @@ import type { Level } from "@/lib/types";
 import { type PublicProfile, currentWeeklyXp } from "./save";
 import { hashString, seededRandom } from "./quests";
 import { levelFromXp, weekKey } from "./progression";
+import { RIVAL_AVATARS, RIVAL_NAMES } from "./rivals";
 
 export interface LeaderboardEntry {
   id: string;
@@ -16,6 +17,10 @@ export interface LeaderboardEntry {
   avatar: string;
   /** Photo de profil (miniature pour les autres joueurs). */
   photo?: string;
+  /** Palier du titre affiché (vrais joueurs) ; sinon celui du rang. */
+  titleId?: string;
+  /** Palier du cadre d'avatar choisi ; sinon celui du rang. */
+  frameId?: string;
   level: Level;
   playerLevel: number;
   weeklyXp: number;
@@ -25,14 +30,6 @@ export interface LeaderboardEntry {
   isReal?: boolean;
 }
 
-const NAMES = [
-  "Lina_Maths", "Noé42", "Inès.exe", "Hugo_Newton", "Jade⚡", "Rayan_Bac", "Chloé_SVT", "Adam.ln",
-  "Léa_Euler", "Sacha_RC", "Manon🦉", "Yanis_TVI", "Camille_π", "Nathan.dx", "Zoé_Kant", "Ilyes_Redox",
-  "Emma∫", "Lucas_Δ", "Sarah_Hugo", "Théo_Bohr", "Maëlys_ADN", "Gabriel.exp", "Anaïs_1789", "Mehdi_Vect",
-  "Louise_Zola", "Enzo_pH", "Romane_Gauss", "Ayoub_q^n", "Clara_Spinoza", "Tom_Kepler", "Nina_Lewis",
-  "Mathis_cos", "Eva_Pascal", "Samy_Doppler", "Alice_Boole", "Kenzo_RNA", "Lou_Sartre", "Bilal_Bernoulli",
-];
-const AVATARS = ["🦊", "🐼", "🐯", "🦁", "🐸", "🐙", "🦄", "🐺", "🦅", "🐲", "🐧", "🦋", "🐨", "🦖", "🐬", "🦉"];
 const LEVELS: Level[] = ["seconde", "premiere", "terminale"];
 
 const EPOCH = Date.UTC(2026, 0, 1);
@@ -43,7 +40,7 @@ function bots(now: Date): LeaderboardEntry[] {
   const weekProgress = (day - 1 + now.getHours() / 24) / 7;
   const daysSinceEpoch = Math.max(0, (now.getTime() - EPOCH) / 86_400_000);
 
-  return NAMES.map((pseudo, i) => {
+  return RIVAL_NAMES.map((pseudo, i) => {
     const r = seededRandom(hashString(`bot:${pseudo}`));
     const skill = r(); // talent stable du bot
     const wr = seededRandom(hashString(`bot:${pseudo}:${week}`))();
@@ -53,7 +50,7 @@ function bots(now: Date): LeaderboardEntry[] {
     return {
       id: `bot-${i}`,
       pseudo,
-      avatar: AVATARS[i % AVATARS.length],
+      avatar: RIVAL_AVATARS[i % RIVAL_AVATARS.length],
       level: LEVELS[Math.floor(r() * 3)],
       playerLevel: levelFromXp(totalXp).level,
       weeklyXp: Math.round(weeklyTarget * Math.min(1, weekProgress + 0.05)),
@@ -73,6 +70,8 @@ export function realEntries(players: PublicProfile[], selfId: string | null, now
       pseudo: p.pseudo,
       avatar: p.avatar,
       photo: p.photoThumb,
+      titleId: p.titleId,
+      frameId: p.frameId,
       level: p.level,
       playerLevel: p.playerLevel,
       weeklyXp: currentWeeklyXp(p, now),

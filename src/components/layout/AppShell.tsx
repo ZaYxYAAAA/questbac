@@ -8,10 +8,12 @@ import { FlaskConical, GraduationCap, Hammer, Home, Map as MapIcon, Skull, Troph
 import { Onboarding } from "@/components/layout/Onboarding";
 import { SaveIndicator } from "@/components/layout/SaveIndicator";
 import { Avatar } from "@/components/game/Avatar";
+import { PromotionCelebration } from "@/components/game/PromotionCelebration";
 import { Toaster } from "@/components/game/Toaster";
 import { RankBadge } from "@/components/game/RankBadge";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { levelFromXp } from "@/lib/game/progression";
+import { playerFrame } from "@/lib/game/ranks";
 import { useCloud, useCloudSync } from "@/lib/store/cloud-sync";
 import { useGame, useHydrated } from "@/lib/store/game-store";
 
@@ -26,12 +28,13 @@ const NAV = [
   { href: "/profil", label: "Profil", icon: User },
 ];
 
-const MOBILE_NAV = NAV.slice(0, 6);
+// Sur mobile, le profil est accessible par l'avatar en haut à droite.
+const MOBILE_NAV = [NAV[0], NAV[1], NAV[2], { ...NAV[6], label: "Ligue" }, NAV[3], NAV[4], NAV[5]];
 
 const isActive = (pathname: string, href: string) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`));
 
 function Hud() {
-  const { profile, xp, rp, streak } = useGame();
+  const { profile, xp, rp, peakRp, streak } = useGame();
   const level = levelFromXp(xp);
   if (!profile) return null;
   return (
@@ -52,7 +55,7 @@ function Hud() {
       </span>
       <Link href="/classement" className="hidden sm:block"><RankBadge rp={rp} size="sm" /></Link>
       <Link href="/profil" aria-label="Mon profil" className="rounded-full transition hover:brightness-110">
-        <Avatar emoji={profile.avatar} photo={profile.photoThumb ?? profile.photo} name={profile.pseudo} size="sm" rp={rp} />
+        <Avatar emoji={profile.avatar} photo={profile.photoThumb ?? profile.photo} name={profile.pseudo} size="sm" rp={rp} frame={playerFrame(profile, peakRp)} />
       </Link>
     </div>
   );
@@ -118,7 +121,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
 
       {/* Navigation basse (mobile) */}
-      <nav className="qb-no-print fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t border-white/10 bg-slate-950/90 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
+      <nav className="qb-no-print fixed inset-x-0 bottom-0 z-40 grid grid-cols-7 border-t border-white/10 bg-slate-950/90 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
         {MOBILE_NAV.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
@@ -131,6 +134,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         ))}
       </nav>
       <Toaster />
+      <PromotionCelebration />
     </div>
   );
 }

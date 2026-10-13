@@ -4,6 +4,8 @@
  */
 import type { CustomMission, Level, QuizResult, SavedFiche, SubjectId } from "@/lib/types";
 import { type AchievementDef, newlyUnlocked } from "./achievements";
+import { type DailyReward, type DailyState, claimDaily } from "./daily";
+import { type LeagueState, finalLeagueResult } from "./league";
 import {
   dayKey,
   levelFromXp,
@@ -14,6 +16,7 @@ import {
   weekKey,
 } from "./progression";
 import { CHEST_XP, type QuestDef, type QuestEvent, dailyQuests } from "./quests";
+import { type Promotion, promotionBetween } from "./ranks";
 
 export interface Profile {
   pseudo: string;
@@ -25,6 +28,26 @@ export interface Profile {
   photoThumb?: string;
   level: Level;
   createdAt: number;
+  /** Palier dont le titre est affiché sous le pseudo (par défaut : le meilleur atteint). */
+  titleId?: string;
+  /** Palier dont le cadre d'avatar est porté (par défaut : celui du rang actuel). */
+  frameId?: string;
+}
+
+/** Événement du fil d'actualité, stocké sous forme de données (texte calculé à l'affichage). */
+export interface FeedEvent {
+  at: number;
+  kind: "boss" | "rank" | "achievement" | "level" | "league";
+  /** bossId, libellé du rang, id du succès, niveau, ou « place:palier » pour la ligue. */
+  ref: string;
+}
+
+export const MAX_FEED = 20;
+
+/** Ajoute des événements en gardant les plus récents. */
+export function pushFeed(feed: FeedEvent[], events: FeedEvent[]): FeedEvent[] {
+  if (events.length === 0) return feed;
+  return [...events, ...feed].sort((a, b) => b.at - a.at).slice(0, MAX_FEED);
 }
 
 export interface ChapterProgress {
@@ -45,6 +68,8 @@ export interface GameData {
   profile: Profile | null;
   xp: number;
   rp: number;
+  /** Meilleur total de RP jamais atteint : débloque titres et cadres, même après une défaite. */
+  peakRp: number;
   streak: { count: number; lastDay: string | null; best: number };
   chapters: Record<string, ChapterProgress>;
   bosses: Record<string, BossRecord>;
@@ -62,6 +87,9 @@ export interface GameData {
   achievements: Record<string, number>;
   quests: { day: string; progress: Record<string, number>; done: string[]; chest: boolean };
   weekly: { week: string; xp: number };
+  league: LeagueState;
+  daily: DailyState;
+  feed: FeedEvent[];
   xpByDay: Record<string, number>;
   fiches: SavedFiche[];
   missions: CustomMission[];
@@ -75,6 +103,7 @@ export function createInitialData(now = new Date()): GameData {
     profile: null,
     xp: 0,
     rp: 0,
+    peakRp: 0,
     streak: { count: 0, lastDay: null, best: 0 },
     chapters: {},
     bosses: {},
@@ -92,6 +121,9 @@ export function createInitialData(now = new Date()): GameData {
     achievements: {},
     quests: { day: dayKey(now), progress: {}, done: [], chest: false },
     weekly: { week: weekKey(now), xp: 0 },
+    league: { week: weekKey(now), tierId: "bronze", last: null },
+    daily: { lastClaim: null, count: 0 },
+    feed: [],
     xpByDay: {},
     fiches: [],
     missions: [],
@@ -117,16 +149,51 @@ export interface RewardSummary {
   achievements: AchievementDef[];
   quests: QuestDef[];
   chest: boolean;
+  /** Nouveau meilleur rang atteint (à célébrer). */
+  promotion: Promotion | null;
 }
 
-/** Réinitialise quêtes et XP hebdomadaire si le jour / la semaine a changé. */
+/** Clé stable du joueur pour tirer son groupe de ligue. */
+export const leagueKey = (d: Pick<GameData, "profile">) => String(d.profile?.createdAt ?? 0);
+
+/**
+ * Réinitialise quêtes et XP hebdomadaire si le jour / la semaine a changé.
+ * Au changement de semaine, la ligue écoulée est close : place finale,
+ * récompense (XP / RP) et nouveau groupe selon le rang actuel.
+ */
 export function refreshPeriods(d: GameData, now = new Date()): GameData {
   const today = dayKey(now);
   const week = weekKey(now);
   let next = d;
   if (d.quests.day !== today) next = { ...next, quests: { day: today, progress: {}, done: [], chest: false } };
-  if (d.weekly.week !== week) next = { ...next, weekly: { week, xp: 0 } };
+  if (d.weekly.week !== week || d.league.week !== week) {
+    let { xp, rp, peakRp, feed } = next;
+    let last = next.league.last;
+    // Classé seulement si le joueur a gagné de l'XP pendant la semaine de sa ligue.
+    if (next.league.week !== week && next.league.week === next.weekly.week && next.weekly.xp > 0) {
+      last = finalLeagueResult(next.league, leagueKey(next), next.weekly.xp);
+      xp += last.rewardXp;
+      rp = Math.max(0, rp + last.rewardRp);
+      peakRp = Math.max(peakRp, rp);
+      feed = pushFeed(feed, [{ at: now.getTime(), kind: "league", ref: `${last.rank}:${last.tierId}` }]);
+    }
+    next = {
+      ...next,
+      xp,
+      rp,
+      peakRp,
+      feed,
+      weekly: next.weekly.week === week ? next.weekly : { week, xp: 0 },
+      league: next.league.week === week ? next.league : { week, tierId: rankFromRp(rp).tier.id, last },
+    };
+  }
   return next;
+}
+
+/** Le joueur a vu le résultat de sa dernière ligue. */
+export function acknowledgeLeague(d: GameData): GameData {
+  if (!d.league.last || d.league.last.seen) return d;
+  return { ...d, league: { ...d.league, last: { ...d.league.last, seen: true } } };
 }
 
 /** Fait progresser les quêtes du jour. `combo` utilise la valeur max, les autres s'additionnent. */
@@ -168,7 +235,14 @@ function touchStreak(d: GameData, now: Date): GameData {
 function finalize(
   before: GameData,
   afterBase: GameData,
-  base: { xp: number; rp: number; lines: RewardLine[]; stars?: 0 | 1 | 2 | 3; events: Partial<Record<QuestEvent, number>> },
+  base: {
+    xp: number;
+    rp: number;
+    lines: RewardLine[];
+    stars?: 0 | 1 | 2 | 3;
+    events: Partial<Record<QuestEvent, number>>;
+    feed?: Omit<FeedEvent, "at">[];
+  },
   now: Date,
 ): { data: GameData; summary: RewardSummary } {
   let d = addXp({ ...afterBase, rp: Math.max(0, afterBase.rp + base.rp) }, base.xp, now);
@@ -207,13 +281,27 @@ function finalize(
 
   const rankBefore = rankFromRp(before.rp);
   const rankAfter = rankFromRp(d.rp);
+  const levelBefore = levelFromXp(before.xp).level;
+  const levelAfter = levelFromXp(d.xp).level;
+  const promotion = promotionBetween(before.peakRp, d.rp);
+  const at = now.getTime();
+  d = {
+    ...d,
+    peakRp: Math.max(d.peakRp, d.rp),
+    feed: pushFeed(d.feed, [
+      ...(base.feed ?? []).map((e) => ({ ...e, at })),
+      ...achievements.map((a) => ({ at, kind: "achievement" as const, ref: a.id })),
+      ...(levelAfter > levelBefore ? [{ at, kind: "level" as const, ref: String(levelAfter) }] : []),
+      ...(promotion ? [{ at, kind: "rank" as const, ref: promotion.step.label }] : []),
+    ]),
+  };
   return {
     data: d,
     summary: {
       xpGained,
       rpDelta: d.rp - before.rp,
-      levelBefore: levelFromXp(before.xp).level,
-      levelAfter: levelFromXp(d.xp).level,
+      levelBefore,
+      levelAfter,
       rankBefore: rankBefore.label,
       rankAfter: rankAfter.label,
       rankUp: d.rp > before.rp && rankAfter.label !== rankBefore.label,
@@ -222,6 +310,7 @@ function finalize(
       achievements,
       quests: q.completed,
       chest: q.chest,
+      promotion,
     },
   };
 }
@@ -291,7 +380,8 @@ export function applySession(input: GameData, session: SessionInput, now = new D
       ...(bonus > 0 ? [{ label: `Bonus de série (${d.streak.count} j)`, value: `+${bonus} XP` }] : []),
       { label: "Points de rang", value: `${rp >= 0 ? "+" : ""}${rp} RP` },
     ];
-    return finalize(before, d, { xp: raw + bonus, rp, lines, events }, now);
+    const feed = session.won ? [{ kind: "boss" as const, ref: session.bossId }] : [];
+    return finalize(before, d, { xp: raw + bonus, rp, lines, events, feed }, now);
   }
 
   const rewards = missionRewards(result, session.answerXp, d.streak.count);
@@ -366,4 +456,18 @@ export function applyActivity(input: GameData, activity: ActivityInput, now = ne
   }
 
   return finalize(before, d, { xp: 0, rp: 0, lines: [], events }, now);
+}
+
+/** Ouvre le coffre de connexion du jour (XP et RP du calendrier). Null s'il est déjà ouvert. */
+export function applyDailyClaim(input: GameData, now = new Date()): { data: GameData; summary: RewardSummary; reward: DailyReward } | null {
+  const before = refreshPeriods(input, now);
+  const claimed = claimDaily(before.daily, dayKey(now));
+  if (!claimed) return null;
+  const { reward } = claimed;
+  const lines: RewardLine[] = [
+    { label: `Coffre du jour ${reward.day}/7`, value: `+${reward.xp} XP` },
+    ...(reward.rp ? [{ label: "Points de rang", value: `+${reward.rp} RP` }] : []),
+  ];
+  const { data, summary } = finalize(before, { ...before, daily: claimed.state }, { xp: reward.xp, rp: reward.rp, lines, events: {} }, now);
+  return { data, summary, reward };
 }

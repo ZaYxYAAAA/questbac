@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { CustomMission, Level } from "@/lib/types";
+import type { DailyReward } from "@/lib/game/daily";
+import { promotionBetween } from "@/lib/game/ranks";
 import { migrateSave, toGameData } from "@/lib/game/save";
 import {
   type ActivityInput,
@@ -11,11 +13,14 @@ import {
   type Profile,
   type RewardSummary,
   type SessionInput,
+  acknowledgeLeague,
   applyActivity,
+  applyDailyClaim,
   applySession,
   createInitialData,
   refreshPeriods,
 } from "@/lib/game/state";
+import { useCelebration } from "./celebration-store";
 
 interface GameActions {
   completeOnboarding: (profile: Omit<Profile, "createdAt">) => void;
@@ -26,6 +31,10 @@ interface GameActions {
   updateMission: (mission: CustomMission) => void;
   deleteMission: (id: string) => void;
   deleteFiche: (id: string) => void;
+  /** Ouvre le coffre de connexion du jour ; null s'il est déjà ouvert. */
+  claimDaily: () => { summary: RewardSummary; reward: DailyReward } | null;
+  /** Masque le message de fin de ligue. */
+  acknowledgeLeague: () => void;
   refresh: () => void;
   /** Remet la progression à zéro en gardant le profil. */
   resetAll: () => void;
@@ -57,23 +66,41 @@ export const useGame = create<GameStore>()(
         recordSession: (session) => {
           const { data: next, summary } = applySession(data(), session);
           commit(next);
+          useCelebration.getState().show(summary.promotion);
           return summary;
         },
         recordActivity: (activity) => {
           const { data: next, summary } = applyActivity(data(), activity);
           commit(next);
+          useCelebration.getState().show(summary.promotion);
           return summary;
+        },
+        claimDaily: () => {
+          const claimed = applyDailyClaim(data());
+          if (!claimed) return null;
+          commit(claimed.data);
+          useCelebration.getState().show(claimed.summary.promotion);
+          return { summary: claimed.summary, reward: claimed.reward };
+        },
+        acknowledgeLeague: () => {
+          const current = data();
+          const next = acknowledgeLeague(current);
+          if (next !== current) commit({ league: next.league });
         },
         updateMission: (mission) => commit({ missions: get().missions.map((m) => (m.id === mission.id ? mission : m)) }),
         deleteMission: (id) => commit({ missions: get().missions.filter((m) => m.id !== id) }),
         deleteFiche: (id) => commit({ fiches: get().fiches.filter((f) => f.id !== id) }),
         // Le changement de jour / semaine est calculé, pas une action du joueur :
         // `updatedAt` reste inchangé, sinon une vieille sauvegarde locale
-        // paraîtrait plus récente que celle du serveur.
+        // paraîtrait plus récente que celle du serveur (le calcul est déterministe,
+        // un autre appareil obtiendra le même résultat).
         refresh: () => {
           const current = data();
           const next = refreshPeriods(current);
-          if (next !== current) set({ quests: next.quests, weekly: next.weekly });
+          if (next === current) return;
+          const { updatedAt: _keep, ...changes } = next;
+          set(changes);
+          useCelebration.getState().show(promotionBetween(current.peakRp, next.rp));
         },
         resetAll: () => commit({ ...createInitialData(), profile: get().profile }),
         replaceAll: (next) => set(refreshPeriods(toGameData(next))),
@@ -82,8 +109,9 @@ export const useGame = create<GameStore>()(
     },
     {
       name: "questbac-save",
-      version: 3,
-      // v1 → v2 : ajout de `updatedAt` ; v2 → v3 : photo de profil à part de l'emoji.
+      version: 4,
+      // v1 → v2 : ajout de `updatedAt` ; v2 → v3 : photo de profil à part de l'emoji ;
+      // v3 → v4 : ligue hebdomadaire, coffre quotidien, fil d'actualité, meilleur RP.
       // La migration complète sans rien effacer.
       migrate: (persisted) => (migrateSave(persisted) ?? createInitialData()) as GameStore,
     },

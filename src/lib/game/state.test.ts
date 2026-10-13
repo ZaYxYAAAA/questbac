@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { applyActivity, applySession, createInitialData } from "./state";
+import { finalLeagueResult } from "./league";
+import { acknowledgeLeague, applyActivity, applyDailyClaim, applySession, createInitialData, refreshPeriods } from "./state";
 
 const now = new Date(2026, 9, 12, 10);
 const perfect = { correct: 5, total: 5, maxCombo: 5, durationMs: 30_000, answers: [] };
@@ -45,5 +46,70 @@ describe("applySession", () => {
     expect(day2.quests.day).toBe("2026-10-13");
     expect(day2.stats.labsOpened).toEqual(["trigo", "suites"]);
     expect(day2.streak.count).toBe(2);
+  });
+});
+
+describe("ligue hebdomadaire", () => {
+  const profile = { pseudo: "Lina", avatar: "🦊", level: "premiere" as const, createdAt: 42 };
+  const monday = new Date(2026, 9, 12, 9); // semaine 2026-W42
+  const nextMonday = new Date(2026, 9, 19, 9);
+
+  it("clôt la semaine écoulée : place, récompense et nouveau groupe", () => {
+    const d0 = { ...createInitialData(monday), profile, rp: 250, peakRp: 250 };
+    const played = { ...d0, weekly: { ...d0.weekly, xp: 1_000_000 } };
+    const next = refreshPeriods(played, nextMonday);
+    expect(next.league.week).toBe("2026-W43");
+    expect(next.weekly).toEqual({ week: "2026-W43", xp: 0 });
+    expect(next.league.last).toMatchObject({ week: "2026-W42", rank: 1, zone: "promotion", seen: false });
+    expect(next.rp).toBe(310);
+    expect(next.peakRp).toBe(310);
+    expect(next.xp).toBe(300);
+    // Le nouveau groupe est tiré au palier atteint grâce au bonus.
+    expect(next.league.tierId).toBe("argent");
+    expect(next.feed[0]).toMatchObject({ kind: "league", ref: "1:bronze" });
+    // Déterministe et appliqué une seule fois.
+    expect(refreshPeriods(next, nextMonday)).toBe(next);
+    expect(next.league.last).toEqual({ ...finalLeagueResult(played.league, "42", 1_000_000) });
+    expect(acknowledgeLeague(next).league.last?.seen).toBe(true);
+  });
+
+  it("ne classe pas un joueur absent toute la semaine", () => {
+    const d0 = { ...createInitialData(monday), profile, rp: 40, peakRp: 40 };
+    const next = refreshPeriods(d0, nextMonday);
+    expect(next.league.last).toBeNull();
+    expect(next.rp).toBe(40);
+    expect(next.league.week).toBe("2026-W43");
+  });
+
+  it("la relégation coûte quelques RP sans descendre sous 0", () => {
+    const d0 = { ...createInitialData(monday), profile, rp: 4, peakRp: 4 };
+    const next = refreshPeriods({ ...d0, weekly: { ...d0.weekly, xp: 1 } }, nextMonday);
+    expect(next.league.last?.zone).toBe("relegation");
+    expect(next.rp).toBe(0);
+    expect(next.peakRp).toBe(4);
+  });
+});
+
+describe("coffre quotidien, meilleur rang et fil", () => {
+  it("ouvre le coffre une fois par jour et compte l'XP dans la semaine", () => {
+    const d0 = createInitialData(now);
+    const claimed = applyDailyClaim(d0, now)!;
+    expect(claimed.reward.day).toBe(1);
+    expect(claimed.data.xp).toBe(claimed.summary.xpGained);
+    expect(claimed.data.weekly.xp).toBe(claimed.data.xp);
+    expect(claimed.data.daily).toEqual({ lastClaim: "2026-10-12", count: 1 });
+    expect(applyDailyClaim(claimed.data, now)).toBeNull();
+  });
+
+  it("note la promotion, le boss vaincu et garde le meilleur RP", () => {
+    const d0 = { ...createInitialData(now), rp: 280, peakRp: 280 };
+    const win = applySession(d0, { kind: "boss", bossId: "derivatus", subject: "maths", result: perfect, won: true, xpReward: 350, rpReward: 80, bossHpLeft: 0 }, now);
+    expect(win.summary.promotion).toMatchObject({ step: { label: "Argent III" }, newTier: true });
+    expect(win.data.peakRp).toBe(360);
+    expect(win.data.feed.map((e) => e.kind)).toEqual(expect.arrayContaining(["boss", "rank", "achievement"]));
+    const lose = applySession(win.data, { kind: "boss", bossId: "derivatus", subject: "maths", result: perfect, won: false, xpReward: 350, rpReward: 80, bossHpLeft: 0.5 }, now);
+    expect(lose.data.rp).toBe(345);
+    expect(lose.data.peakRp).toBe(360);
+    expect(lose.summary.promotion).toBeNull();
   });
 });
