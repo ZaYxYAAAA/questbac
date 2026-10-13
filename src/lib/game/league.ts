@@ -1,15 +1,18 @@
 /**
- * Ligue hebdomadaire (façon Duolingo) : chaque semaine, le joueur affronte un
- * groupe d'adversaires simulés de son palier. Top 3 promu (bonus), 3 derniers
- * relégués (petite pénalité). Tout est déterministe : même semaine, même groupe.
+ * Ligue hebdomadaire entre vrais joueurs : chaque semaine, le joueur est classé
+ * avec les inscrits les plus proches de son rang (RP). Le haut du groupe est
+ * promu (bonus), le bas relégué (petite pénalité) ; les places dépendent de la
+ * taille du groupe. Le groupe est mémorisé dans la sauvegarde pour calculer le
+ * résultat final au changement de semaine, même hors ligne.
  */
-import { hashString, seededRandom, shuffle } from "./quests";
-import { RIVAL_AVATARS, RIVAL_NAMES } from "./rivals";
-import { tierById, tierIndex } from "./ranks";
+import type { PublicProfile } from "./save";
+import { weekKey } from "./progression";
+import { tierById } from "./ranks";
 
-export const LEAGUE_SIZE = 20; // joueur compris
-export const PROMOTION_SPOTS = 3;
-export const RELEGATION_SPOTS = 3;
+/** Taille maximale d'un groupe (joueur compris). */
+export const LEAGUE_SIZE = 20;
+/** En dessous, pas de récompense ni de zone : il faut au moins 3 joueurs. */
+export const LEAGUE_MIN_SIZE = 3;
 
 export type LeagueZone = "promotion" | "relegation" | "safe";
 
@@ -26,33 +29,58 @@ export interface LeagueResult {
   seen: boolean;
 }
 
-export interface LeagueState {
-  week: string;
-  /** Palier du joueur au début de la semaine : fixe le niveau des adversaires. */
-  tierId: string;
-  last: LeagueResult | null;
-}
-
 export interface LeagueRow {
   id: string;
   pseudo: string;
   avatar: string;
+  photo?: string;
   weeklyXp: number;
   isPlayer?: boolean;
 }
 
-/** Récompenses de fin de semaine selon la place. */
-export function leagueReward(rank: number, size = LEAGUE_SIZE): { xp: number; rp: number; zone: LeagueZone } {
-  if (rank === 1) return { xp: 300, rp: 60, zone: "promotion" };
-  if (rank === 2) return { xp: 200, rp: 40, zone: "promotion" };
-  if (rank === 3) return { xp: 120, rp: 25, zone: "promotion" };
-  if (rank > size - RELEGATION_SPOTS) return { xp: 0, rp: -10, zone: "relegation" };
-  if (rank <= 10) return { xp: 50, rp: 0, zone: "safe" };
-  return { xp: 0, rp: 0, zone: "safe" };
+export interface LeagueState {
+  week: string;
+  /** Palier du joueur au début de la semaine (nom de la ligue). */
+  tierId: string;
+  last: LeagueResult | null;
+  /** Derniers adversaires connus de la semaine (vrais joueurs). */
+  rivals?: LeagueRow[];
 }
 
-export const zoneOf = (rank: number, size = LEAGUE_SIZE): LeagueZone =>
-  rank <= PROMOTION_SPOTS ? "promotion" : rank > size - RELEGATION_SPOTS ? "relegation" : "safe";
+/** Places promues selon la taille du groupe. */
+export const promotionSpots = (size: number) => (size < LEAGUE_MIN_SIZE ? 0 : size >= 10 ? 3 : size >= 5 ? 2 : 1);
+/** Places reléguées selon la taille du groupe. */
+export const relegationSpots = (size: number) => (size < 6 ? 0 : size >= 10 ? 3 : 1);
+
+export const zoneOf = (rank: number, size: number): LeagueZone =>
+  rank <= promotionSpots(size) ? "promotion" : rank > size - relegationSpots(size) ? "relegation" : "safe";
+
+const PODIUM_REWARDS = [
+  { xp: 300, rp: 60 },
+  { xp: 200, rp: 40 },
+  { xp: 120, rp: 25 },
+];
+
+/** Récompenses de fin de semaine selon la place et la taille du groupe. */
+export function leagueReward(rank: number, size: number): { xp: number; rp: number; zone: LeagueZone } {
+  const zone = zoneOf(rank, size);
+  if (zone === "promotion") return { ...PODIUM_REWARDS[rank - 1], zone };
+  if (zone === "relegation") return { xp: 0, rp: -10, zone };
+  if (size >= LEAGUE_MIN_SIZE && rank <= Math.ceil(size / 2)) return { xp: 50, rp: 0, zone };
+  return { xp: 0, rp: 0, zone };
+}
+
+/**
+ * Groupe de la semaine : les vrais joueurs les plus proches de mon RP (moi exclu).
+ * `withPhotos: false` pour la copie gardée dans la sauvegarde (plus légère).
+ */
+export function leagueRivals(players: PublicProfile[], selfId: string | null, rp: number, now = new Date(), withPhotos = true): LeagueRow[] {
+  return players
+    .filter((p) => p.id !== selfId)
+    .sort((a, b) => Math.abs(a.rp - rp) - Math.abs(b.rp - rp))
+    .slice(0, LEAGUE_SIZE - 1)
+    .map((p) => ({ id: `real-${p.id}`, pseudo: p.pseudo, avatar: p.avatar, ...(withPhotos && p.photoThumb ? { photo: p.photoThumb } : {}), weeklyXp: p.week === weekKey(now) ? p.weeklyXp : 0 }));
+}
 
 /** Avancement de la semaine ISO (lundi 0 h → dimanche 24 h), entre 0 et 1. */
 export function weekProgress(now = new Date()): number {
@@ -80,71 +108,15 @@ export function formatCountdown(ms: number): string {
   return `${s % 60} s`;
 }
 
-/** Graine du groupe : semaine + palier + joueur (deux joueurs n'ont pas le même groupe). */
-const groupSeed = (league: Pick<LeagueState, "week" | "tierId">, playerKey: string) => `league:${league.week}:${league.tierId}:${playerKey}`;
-
-interface Opponent {
-  id: string;
-  pseudo: string;
-  avatar: string;
-  /** XP visée en fin de semaine. */
-  target: number;
-  /** Forme de la courbe : < 1 démarre fort, > 1 finit fort. */
-  shape: number;
-}
-
-/** Les adversaires de la semaine (sans le joueur). */
-export function leagueOpponents(league: Pick<LeagueState, "week" | "tierId">, playerKey: string): Opponent[] {
-  const seed = groupSeed(league, playerKey);
-  const rand = seededRandom(hashString(seed));
-  const names = shuffle(RIVAL_NAMES, rand).slice(0, LEAGUE_SIZE - 1);
-  // Plus le palier est haut, plus les adversaires sont actifs.
-  const level = 1 + 0.4 * tierIndex(league.tierId);
-  return names.map((pseudo, i) => {
-    const r = seededRandom(hashString(`${seed}:${pseudo}`));
-    const activity = r();
-    // Environ 1 adversaire sur 6 joue très peu cette semaine.
-    const target = activity < 0.16
-      ? Math.round(20 + r() * 120)
-      : Math.round((150 + 1900 * Math.pow(r(), 1.4)) * level);
-    return {
-      id: `league-${i}`,
-      pseudo,
-      avatar: RIVAL_AVATARS[hashString(pseudo) % RIVAL_AVATARS.length],
-      target,
-      shape: 0.6 + r() * 0.9,
-    };
-  });
-}
-
-/** XP d'un adversaire à un moment de la semaine (croissante, par paliers d'une heure). */
-function opponentXp(o: Opponent, progress: number): number {
-  if (progress >= 1) return o.target;
-  const hour = Math.floor(progress * 168) / 168;
-  return Math.round(o.target * Math.pow(hour, o.shape));
-}
-
-/** Classement du groupe à un instant donné (progress = 1 : classement final). */
-export function leagueStandings(
-  league: Pick<LeagueState, "week" | "tierId">,
-  playerKey: string,
-  player: { pseudo: string; avatar: string; weeklyXp: number },
-  progress: number,
-): LeagueRow[] {
-  const rows: LeagueRow[] = leagueOpponents(league, playerKey).map((o) => ({
-    id: o.id,
-    pseudo: o.pseudo,
-    avatar: o.avatar,
-    weeklyXp: opponentXp(o, progress),
-  }));
-  rows.push({ id: "player", pseudo: player.pseudo, avatar: player.avatar, weeklyXp: player.weeklyXp, isPlayer: true });
-  // À égalité, le joueur passe devant.
+/** Classement du groupe (à égalité, le joueur passe devant). */
+export function leagueStandings(rivals: LeagueRow[], player: { pseudo: string; avatar: string; weeklyXp: number }): LeagueRow[] {
+  const rows: LeagueRow[] = [...rivals, { id: "player", pseudo: player.pseudo, avatar: player.avatar, weeklyXp: player.weeklyXp, isPlayer: true }];
   return rows.sort((a, b) => b.weeklyXp - a.weeklyXp || (a.isPlayer ? -1 : b.isPlayer ? 1 : 0));
 }
 
-/** Résultat final d'une semaine terminée. */
-export function finalLeagueResult(league: Pick<LeagueState, "week" | "tierId">, playerKey: string, weeklyXp: number): LeagueResult {
-  const rows = leagueStandings(league, playerKey, { pseudo: "", avatar: "", weeklyXp }, 1);
+/** Résultat final d'une semaine terminée, d'après les derniers scores connus du groupe. */
+export function finalLeagueResult(league: Pick<LeagueState, "week" | "tierId" | "rivals">, weeklyXp: number): LeagueResult {
+  const rows = leagueStandings(league.rivals ?? [], { pseudo: "", avatar: "", weeklyXp });
   const rank = rows.findIndex((r) => r.isPlayer) + 1;
   const reward = leagueReward(rank, rows.length);
   return {

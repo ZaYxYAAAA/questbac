@@ -31,7 +31,7 @@ missions IA sont remplacées par du contenu d'exemple (badge « Mode démo » da
 | 🎯 **Missions** | Quiz QCM / vrai-faux / réponse numérique (accepte `3,5`, `7/2`, `20 g/L`), combos jusqu'à ×2, explications, raccourcis clavier |
 | 💀 **Boss** | 17 boss (un par matière/niveau) : PV, 3 cœurs, chrono, coups critiques, phase « enragé », déblocage par chapitres |
 | 🏆 **Progression** | XP & niveaux, rangs Bronze → Légende avec divisions, séries de jours, 19 succès, 3 quêtes du jour + coffre |
-| 📊 **Classement** | Hebdomadaire, global (RP) et par classe |
+| 📊 **Classement** | Vrais joueurs uniquement : ligue de la semaine, amis, hebdomadaire, global (RP) et par classe |
 | 🧪 **Labo** | 10 labos : traceur universel (paramètres animables, dérivée), affine, vecteurs & produit scalaire, second degré, sécante → tangente, cercle trigo, suites (toile d'araignée), exp/ln, intégrales (Riemann), loi binomiale |
 | 🎓 **Prof IA** | Fiche complète, express ou méthode sur n'importe quelle notion, en streaming, avec LaTeX ; bibliothèque, impression PDF, « Créer un QCM » depuis la fiche |
 | ⚒️ **Forge** | Photos du cours (appareil photo ou import, compressées côté client), texte collé, sujet ou création manuelle → fiche + questions ; éditeur complet des questions |
@@ -138,11 +138,25 @@ pourront tourner telles quelles côté serveur.
 
 ## Duels entre amis
 
-- Page **Duels** (ou bouton **⚔️ Défier** sur un ami) : choisis un ami et un chapitre.
-- Le serveur fige 4 à 6 questions (mêmes questions, même ordre des choix pour les deux).
+- Page **Duels** (ou bouton **⚔️ Défier** sur un ami) : choisis un ami et un thème éclair
+  (calcul mental, fractions & puissances, fonctions express, physique flash, dates clés,
+  culture bac, English flash ou grand mélange).
+- **10 questions à faire de tête, 15 s chacune** (chrono visible ; à zéro, la question compte
+  comme ratée). Maths et physique sont générées au hasard (`lib/content/duel-themes.ts`), les
+  autres matières tirent dans des banques de repères : chaque duel est différent.
+- Les questions sont générées à la création et enregistrées : mêmes questions, même ordre pour les deux.
 - Chacun joue quand il veut, dans les 72 h. Le serveur **recalcule le score** à partir des
   réponses envoyées : plus de bonnes réponses gagne, puis le temps total le plus court.
 - Récompenses (une seule fois par joueur, tous appareils confondus) : victoire +120 XP +25 RP,
   égalité +60 XP +10 RP, défaite +30 XP. Expiré avec un seul joueur : victoire par forfait.
 - Une pastille ⚔️ dans l'en-tête signale les duels où c'est ton tour.
 - Données serveur : `duel:<id>` et `duels:<id de compte>` (40 derniers duels).
+
+## Ligue de la semaine
+
+- Plus aucun joueur simulé : classements, ligue et répartition des rangs ne montrent que les vrais inscrits.
+- La ligue réunit jusqu'à 20 joueurs, les plus proches de ton rang (RP). Il faut au moins
+  3 joueurs pour qu'elle compte. Places promues : 1 (3–4 joueurs), 2 (5–9), 3 (10+) ;
+  reléguées : 1 (6–9 joueurs), 3 (10+).
+- Les derniers scores connus du groupe sont gardés dans la sauvegarde (`league.rivals`) pour
+  calculer le résultat final au changement de semaine, même hors ligne.

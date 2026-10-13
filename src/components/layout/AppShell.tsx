@@ -18,6 +18,7 @@ import { levelFromXp } from "@/lib/game/progression";
 import { playerFrame } from "@/lib/game/ranks";
 import { useCloud, useCloudSync } from "@/lib/store/cloud-sync";
 import { useGame, useHydrated } from "@/lib/store/game-store";
+import { usePlayersSync } from "@/lib/store/players-store";
 
 const NAV = [
   { href: "/", label: "Accueil", icon: Home },
@@ -75,6 +76,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const cloudChecked = useCloud((s) => s.checked);
   const [moreOpen, setMoreOpen] = useState(false);
   useCloudSync(hydrated);
+  usePlayersSync(hydrated && profile !== null);
 
   useEffect(() => {
     if (hydrated) refresh();

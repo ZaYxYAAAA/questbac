@@ -11,11 +11,11 @@ import { WeeklyLeague } from "@/components/game/WeeklyLeague";
 import { Tabs } from "@/components/ui/Tabs";
 import { levelLabel } from "@/lib/content/curriculum";
 import { type LeaderboardScope, buildLeaderboard, realEntries } from "@/lib/game/leaderboard";
-import type { PublicProfile } from "@/lib/game/save";
 import { levelFromXp, rankFromRp } from "@/lib/game/progression";
 import { activeTierReward, playerFrame } from "@/lib/game/ranks";
 import { useCloud } from "@/lib/store/cloud-sync";
 import { useGame } from "@/lib/store/game-store";
+import { loadPlayers, usePlayers } from "@/lib/store/players-store";
 
 const PODIUM = ["🥇", "🥈", "🥉"];
 
@@ -39,18 +39,9 @@ export default function LeaderboardPage() {
     window.history.replaceState(null, "", v === "ligue" ? "/classement" : `/classement?vue=${v}`);
   };
   const selfId = useCloud((s) => s.user?.id ?? null);
-  const [players, setPlayers] = useState<PublicProfile[]>([]);
-
-  // Vrais joueurs inscrits ; hors ligne, on garde seulement les rivaux simulés.
+  const players = usePlayers((s) => s.players);
   useEffect(() => {
-    let alive = true;
-    fetch("/api/leaderboard", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : { players: [] }))
-      .then((json: { players?: PublicProfile[] }) => alive && setPlayers(Array.isArray(json.players) ? json.players : []))
-      .catch(() => undefined);
-    return () => {
-      alive = false;
-    };
+    void loadPlayers(true);
   }, []);
 
   const player = useMemo(
@@ -68,8 +59,8 @@ export default function LeaderboardPage() {
     [profile, game.xp, game.weekly.xp, game.rp, game.peakRp],
   );
   const others = useMemo(() => realEntries(players, selfId), [players, selfId]);
-  const entries = useMemo(() => buildLeaderboard(player, scope, new Date(), others), [player, scope, others]);
-  const globalEntries = useMemo(() => buildLeaderboard(player, "global", new Date(), others), [player, others]);
+  const entries = useMemo(() => buildLeaderboard(player, scope, others), [player, scope, others]);
+  const globalEntries = useMemo(() => buildLeaderboard(player, "global", others), [player, others]);
   const realCount = players.filter((p) => p.id !== selfId).length;
   const position = entries.findIndex((e) => e.isPlayer) + 1;
   const above = entries[position - 2];
@@ -141,9 +132,6 @@ export default function LeaderboardPage() {
                 <div className="min-w-0 flex-1">
                   <p className={clsx("flex items-center gap-1.5 font-semibold", e.isPlayer ? "text-violet-200" : "text-white")}>
                     <span className="truncate">{e.pseudo}{e.isPlayer && " (toi)"}</span>
-                    {e.isReal && (
-                      <span title="Vrai joueur inscrit" className="shrink-0 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-300">Joueur</span>
-                    )}
                   </p>
                   <p className="flex flex-wrap items-center gap-x-2 text-xs text-slate-500">
                     <PlayerTitle titleId={e.titleId ?? rankFromRp(e.rp).tier.id} className="text-[10px]" />
@@ -157,8 +145,8 @@ export default function LeaderboardPage() {
           </div>
           <p className="text-center text-xs text-slate-500">
             Rang actuel : {rankFromRp(game.rp).label}. Le classement hebdomadaire repart à zéro chaque lundi. {realCount > 0
-              ? `${realCount} joueur${realCount > 1 ? "s" : ""} inscrit${realCount > 1 ? "s" : ""} (badge « Joueur ») et des rivaux simulés.`
-              : "Rivaux simulés en attendant d'autres joueurs inscrits."}
+              ? `${realCount + 1} joueurs inscrits.`
+              : "Tu es le premier inscrit : invite tes amis depuis la page Amis !"}
           </p>
         </>
       )}

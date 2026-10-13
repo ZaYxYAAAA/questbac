@@ -11,7 +11,7 @@ import { celebrate } from "@/components/game/RewardScreen";
 import { Button } from "@/components/ui/Button";
 import { Markdown } from "@/components/ui/Markdown";
 import { subjectMeta } from "@/lib/content/curriculum";
-import { DUEL_REWARDS } from "@/lib/game/duel";
+import { DUEL_REWARDS, DUEL_SECONDS, duelThemeById } from "@/lib/game/duel";
 import { useCloud } from "@/lib/store/cloud-sync";
 import { type DuelView, claimDuel, fetchDuel, playDuel } from "@/lib/store/duels-store";
 import { useGame } from "@/lib/store/game-store";
@@ -67,6 +67,7 @@ export default function DuelPage() {
         questions={questions}
         title={`Duel contre ${duel.opponent.pseudo}`}
         subtitle={duel.chapterTitle}
+        secondsPerQuestion={duelThemeById(duel.chapterId) ? DUEL_SECONDS : undefined}
         exitHref={`/duels/${duel.id}`}
         onComplete={async (result) => {
           setBusy(true);
@@ -121,7 +122,9 @@ export default function DuelPage() {
       <Link href="/duels" className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-white"><ChevronLeft size={16} /> Duels</Link>
 
       <div className={clsx("rounded-3xl bg-gradient-to-br p-5", meta.gradient)}>
-        <p className="text-sm font-semibold text-white/80">{meta.emoji} {meta.name} · {questions.length || "…"} questions</p>
+        <p className="text-sm font-semibold text-white/80">
+          {duelThemeById(duel.chapterId) ? `⚡ Duel éclair · ${questions.length || "…"} questions · ${DUEL_SECONDS} s chacune` : `${meta.emoji} ${meta.name} · ${questions.length || "…"} questions`}
+        </p>
         <h1 className="text-2xl font-black text-white">{duel.chapterTitle}</h1>
         <div className="mt-4 flex items-stretch gap-3">
           {side(profile.pseudo, profile.avatar, profile.photoThumb ?? profile.photo, duel.mine, false)}
@@ -133,7 +136,7 @@ export default function DuelPage() {
       {duel.status === "your_turn" && (
         <div className="space-y-3 rounded-3xl border border-white/10 bg-slate-900/70 p-5 text-center">
           <p className="text-slate-300">
-            {duel.opponentPlayed ? `${duel.opponent.pseudo} a déjà joué : à toi de faire mieux !` : `${duel.opponent.pseudo} n'a pas encore joué.`} Plus de bonnes réponses gagne ; à égalité, le plus rapide.
+            {duel.opponentPlayed ? `${duel.opponent.pseudo} a déjà joué : à toi de faire mieux !` : `${duel.opponent.pseudo} n'a pas encore joué.`} Plus de bonnes réponses gagne ; à égalité, le plus rapide. Réponds de tête, le chrono tourne !
           </p>
           <Button className="w-full py-3.5 text-base" disabled={busy || questions.length === 0} onClick={() => setPlaying(true)}><Swords size={18} /> Jouer mon tour</Button>
         </div>

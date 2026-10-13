@@ -1,6 +1,6 @@
 /**
  * Échelle complète des rangs : divisions, récompenses de chaque palier
- * (titre + cadre d'avatar), répartition simulée des joueurs et promotions.
+ * (titre + cadre d'avatar), répartition des joueurs et promotions.
  */
 import { RANK_TIERS, type RankTier, rankFromRp } from "./progression";
 
@@ -85,21 +85,7 @@ export function playerFrame(profile: { frameId?: string } | null, peakRp: number
   return id && unlockedTiers(peakRp).includes(id) ? id : null;
 }
 
-// ─────────────────────────── Répartition simulée ───────────────────────────
-
-/** Part des joueurs dans chaque palier (simulée, somme = 100 %). */
-const SHARES: Record<string, number> = {
-  bronze: 31.5,
-  argent: 26,
-  or: 19,
-  platine: 12,
-  diamant: 7,
-  maitre: 3,
-  "grand-maitre": 1.1,
-  legende: 0.4,
-};
-
-const EPOCH = Date.UTC(2026, 0, 1);
+// ─────────────────────────── Répartition des joueurs ───────────────────────────
 
 export interface TierPopulation {
   tierId: string;
@@ -107,13 +93,13 @@ export interface TierPopulation {
   players: number;
 }
 
-/** Nombre de joueurs par palier : communauté simulée (qui grandit doucement) + vrais joueurs. */
-export function tierPopulation(now = new Date(), realByTier: Record<string, number> = {}): TierPopulation[] {
-  const days = Math.max(0, Math.floor((now.getTime() - EPOCH) / 86_400_000));
-  const total = 12_400 + days * 37;
-  const rows = RANK_TIERS.map((t) => ({ tierId: t.id, players: Math.max(1, Math.round((total * SHARES[t.id]) / 100)) + (realByTier[t.id] ?? 0) }));
-  const sum = rows.reduce((n, r) => n + r.players, 0);
-  return rows.map((r) => ({ ...r, share: (r.players / sum) * 100 }));
+/** Nombre de vrais joueurs par palier (joueur compris) et part de chacun. */
+export function tierPopulation(byTier: Record<string, number>): TierPopulation[] {
+  const sum = RANK_TIERS.reduce((n, t) => n + (byTier[t.id] ?? 0), 0);
+  return RANK_TIERS.map((t) => {
+    const players = byTier[t.id] ?? 0;
+    return { tierId: t.id, players, share: sum ? (players / sum) * 100 : 0 };
+  });
 }
 
 /** Pourcentage lisible : « 0,4 % », « 12 % ». */

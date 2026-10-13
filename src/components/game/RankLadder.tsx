@@ -34,15 +34,15 @@ export function RankLadder({ entries }: { entries: LeaderboardEntry[] }) {
 
   const population = useMemo(() => {
     const real: Record<string, number> = {};
-    for (const e of entries) if (e.isReal || e.isPlayer) real[rankFromRp(e.rp).tier.id] = (real[rankFromRp(e.rp).tier.id] ?? 0) + 1;
-    return tierPopulation(new Date(), real);
+    for (const e of entries) real[rankFromRp(e.rp).tier.id] = (real[rankFromRp(e.rp).tier.id] ?? 0) + 1;
+    return tierPopulation(real);
   }, [entries]);
   const total = population.reduce((n, p) => n + p.players, 0);
 
-  // Part des joueurs que le joueur dépasse : paliers inférieurs + une partie du sien.
-  const tierIdx = RANK_TIERS.indexOf(rank.tier);
-  const below = population.slice(0, tierIdx).reduce((n, p) => n + p.share, 0);
-  const better = Math.min(99.9, below + population[tierIdx].share * (tierIdx === RANK_TIERS.length - 1 ? 1 : rank.progress / (rank.tier.divisions ? 3 : 1)));
+  // Part des autres joueurs que le joueur dépasse en RP.
+  const others = entries.filter((e) => !e.isPlayer);
+  const better = others.length ? (others.filter((e) => e.rp < game.rp).length / others.length) * 100 : 0;
+  const maxShare = Math.max(1, ...population.map((p) => p.share));
 
   return (
     <div className="space-y-4">
@@ -53,7 +53,7 @@ export function RankLadder({ entries }: { entries: LeaderboardEntry[] }) {
             <p className="text-xs font-bold uppercase tracking-wider text-violet-200">Ton rang</p>
             <p className="text-2xl font-black text-white">{rank.label}</p>
             <p className="text-sm text-slate-300">
-              {game.rp} RP · tu fais mieux que <b className="text-white">{formatShare(better)}</b> des joueurs
+              {game.rp} RP{others.length > 0 && <> · tu fais mieux que <b className="text-white">{formatShare(better)}</b> des autres joueurs</>}
             </p>
           </div>
         </div>
@@ -114,7 +114,7 @@ export function RankLadder({ entries }: { entries: LeaderboardEntry[] }) {
                     {next ? `${fmt(tier.minRp)} – ${fmt(next.minRp - 1)} RP` : `${fmt(tier.minRp)} RP et plus`} · {formatShare(pop.share)} des joueurs ({fmt(pop.players)})
                   </p>
                   <div className="mt-1 h-1 w-full max-w-48 overflow-hidden rounded-full bg-slate-800" title={`${formatShare(pop.share)} des joueurs`}>
-                    <div className="h-full rounded-full" style={{ width: `${Math.max(2, (pop.share / 32) * 100)}%`, background: tier.color }} />
+                    <div className="h-full rounded-full" style={{ width: `${Math.max(2, (pop.share / maxShare) * 100)}%`, background: tier.color }} />
                   </div>
 
                   {/* Divisions */}
@@ -161,7 +161,6 @@ export function RankLadder({ entries }: { entries: LeaderboardEntry[] }) {
                       <p className="min-w-0 truncate text-xs text-slate-400">
                         {rivals.slice(0, 2).map((e) => e.pseudo).join(", ")}
                         {rivals.length > 2 && ` et ${rivals.length - 2} autre${rivals.length > 3 ? "s" : ""}`}
-                        {rivals.some((e) => e.isReal) && <span className="ml-1 text-emerald-300">· joueurs inscrits</span>}
                       </p>
                     </div>
                   )}
@@ -172,7 +171,7 @@ export function RankLadder({ entries }: { entries: LeaderboardEntry[] }) {
         })}
       </ol>
       <p className="text-center text-xs text-slate-500">
-        Répartition simulée en attendant plus de joueurs. Les titres et cadres restent acquis même si tu perds des RP.
+        Répartition des joueurs inscrits. Les titres et cadres restent acquis même si tu perds des RP.
       </p>
     </div>
   );

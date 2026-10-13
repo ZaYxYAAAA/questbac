@@ -2,18 +2,17 @@
  * Duels entre amis (asynchrones) : mêmes questions, même ordre, chacun joue
  * quand il veut. Le serveur note les réponses lui-même avec ces fonctions.
  */
-import { CHAPTERS } from "@/lib/content/curriculum";
-import { questionsForChapter } from "@/lib/content/questions";
-import type { Level, Question } from "@/lib/types";
+import { DUEL_THEMES, duelThemeById, generateDuelQuestions } from "@/lib/content/duel-themes";
+import type { Question } from "@/lib/types";
 import { hashString, seededRandom } from "./quests";
-import { isCorrect, prepareQuestions } from "./session";
+import { isCorrect } from "./session";
 
-/** Nombre de questions d'un duel : 6 au plus, 4 au moins (selon la banque du chapitre). */
-export const DUEL_SIZE = 6;
-export const DUEL_MIN_SIZE = 4;
+/** Questions éclair : 10 par duel, 15 secondes chacune. */
+export const DUEL_SIZE = 10;
+export const DUEL_SECONDS = 15;
 export const DUEL_TTL_MS = 72 * 3_600_000;
-/** Temps maximal compté par question (évite les durées absurdes). */
-const MAX_QUESTION_MS = 5 * 60_000;
+/** Temps maximal compté par question (le chrono du client coupe à 15 s). */
+const MAX_QUESTION_MS = DUEL_SECONDS * 1000;
 /** En dessous de cet écart de temps total, l'égalité de score reste une égalité. */
 const TIE_MARGIN_MS = 500;
 
@@ -33,14 +32,15 @@ export interface DuelPlay {
   playedAt: number;
 }
 
-/** Chapitres jouables en duel (assez de questions dans la banque locale). */
-export function duelChapters(level?: Level) {
-  return CHAPTERS.filter((c) => (!level || c.level === level) && questionsForChapter(c.id).length >= DUEL_MIN_SIZE);
-}
+export { DUEL_THEMES, duelThemeById };
 
-/** Questions figées d'un duel : tirage et ordre des choix dépendent de l'identifiant du duel. */
-export function duelQuestions(chapterId: string, duelId: string): Question[] {
-  return prepareQuestions(questionsForChapter(chapterId), DUEL_SIZE, seededRandom(hashString(`duel:${duelId}`)));
+/**
+ * Questions d'un duel, générées une fois à sa création puis enregistrées
+ * (les deux joueurs ont exactement les mêmes). Null si le thème n'existe pas.
+ */
+export function duelQuestions(themeId: string, duelId: string): Question[] | null {
+  const theme = duelThemeById(themeId);
+  return theme ? generateDuelQuestions(theme, DUEL_SIZE, seededRandom(hashString(`duel:${duelId}`))) : null;
 }
 
 /** Note les réponses envoyées ; null si le format ne correspond pas au duel. */

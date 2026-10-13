@@ -56,11 +56,13 @@ describe("ligue hebdomadaire", () => {
 
   it("clôt la semaine écoulée : place, récompense et nouveau groupe", () => {
     const d0 = { ...createInitialData(monday), profile, rp: 250, peakRp: 250 };
-    const played = { ...d0, weekly: { ...d0.weekly, xp: 1_000_000 } };
+    const rivals = [1, 2, 3, 4].map((i) => ({ id: `real-${i}`, pseudo: `J${i}`, avatar: "🐼", weeklyXp: i * 100 }));
+    const played = { ...d0, weekly: { ...d0.weekly, xp: 1_000_000 }, league: { ...d0.league, rivals } };
     const next = refreshPeriods(played, nextMonday);
     expect(next.league.week).toBe("2026-W43");
     expect(next.weekly).toEqual({ week: "2026-W43", xp: 0 });
-    expect(next.league.last).toMatchObject({ week: "2026-W42", rank: 1, zone: "promotion", seen: false });
+    expect(next.league.last).toMatchObject({ week: "2026-W42", rank: 1, size: 5, zone: "promotion", seen: false });
+    expect(next.league.rivals).toEqual([]);
     expect(next.rp).toBe(310);
     expect(next.peakRp).toBe(310);
     expect(next.xp).toBe(300);
@@ -69,8 +71,16 @@ describe("ligue hebdomadaire", () => {
     expect(next.feed[0]).toMatchObject({ kind: "league", ref: "1:bronze" });
     // Déterministe et appliqué une seule fois.
     expect(refreshPeriods(next, nextMonday)).toBe(next);
-    expect(next.league.last).toEqual({ ...finalLeagueResult(played.league, "42", 1_000_000) });
+    expect(next.league.last).toEqual({ ...finalLeagueResult(played.league, 1_000_000) });
     expect(acknowledgeLeague(next).league.last?.seen).toBe(true);
+  });
+
+  it("pas de résultat de ligue sans au moins 3 vrais joueurs", () => {
+    const d0 = { ...createInitialData(monday), profile, rp: 40, peakRp: 40 };
+    const played = { ...d0, weekly: { ...d0.weekly, xp: 500 }, league: { ...d0.league, rivals: [{ id: "real-1", pseudo: "A", avatar: "🐼", weeklyXp: 10 }] } };
+    const next = refreshPeriods(played, nextMonday);
+    expect(next.league.last).toBeNull();
+    expect(next.rp).toBe(40);
   });
 
   it("ne classe pas un joueur absent toute la semaine", () => {
@@ -83,7 +93,8 @@ describe("ligue hebdomadaire", () => {
 
   it("la relégation coûte quelques RP sans descendre sous 0", () => {
     const d0 = { ...createInitialData(monday), profile, rp: 4, peakRp: 4 };
-    const next = refreshPeriods({ ...d0, weekly: { ...d0.weekly, xp: 1 } }, nextMonday);
+    const rivals = Array.from({ length: 9 }, (_, i) => ({ id: `real-${i}`, pseudo: `J${i}`, avatar: "🐼", weeklyXp: 100 + i }));
+    const next = refreshPeriods({ ...d0, weekly: { ...d0.weekly, xp: 1 }, league: { ...d0.league, rivals } }, nextMonday);
     expect(next.league.last?.zone).toBe("relegation");
     expect(next.rp).toBe(0);
     expect(next.peakRp).toBe(4);

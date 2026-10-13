@@ -100,7 +100,7 @@ describe("classement réel", () => {
     expect(realEntries([p], null, now)[0].photo).toBe(thumb);
   });
 
-  it("fusionne vrais joueurs et rivaux, sans doublon du joueur", () => {
+  it("classe les vrais joueurs, sans doublon du joueur", () => {
     const players = [profile({ id: "me", pseudo: "Moi" }), profile({ id: "a", rp: 999_999, weeklyXp: 99_999 }), profile({ id: "b", pseudo: "Ancien", weeklyXp: 5000, week: "2020-W01" })];
     const others = realEntries(players, "me", now);
     expect(others.map((e) => e.pseudo)).toEqual(["Alice", "Ancien"]);
@@ -108,10 +108,10 @@ describe("classement réel", () => {
     expect(others[1].weeklyXp).toBe(0); // semaine passée → remise à zéro
 
     const me = { pseudo: "Moi", avatar: "🦊", level: "premiere" as const, playerLevel: 1, weeklyXp: 10, rp: 10 };
-    const global = buildLeaderboard(me, "global", now, others);
+    const global = buildLeaderboard(me, "global", others);
     expect(global[0].pseudo).toBe("Alice");
     expect(global.filter((e) => e.isPlayer)).toHaveLength(1);
-    expect(global.some((e) => !e.isReal && !e.isPlayer)).toBe(true); // rivaux simulés toujours là
-    expect(buildLeaderboard(me, "global", now)).toHaveLength(global.length - 2);
+    expect(global).toHaveLength(3); // aucun bot
+    expect(buildLeaderboard(me, "global")).toHaveLength(1);
   });
 });

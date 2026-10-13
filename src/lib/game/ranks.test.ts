@@ -20,12 +20,12 @@ describe("échelle des rangs", () => {
     expect(stepIndex(9000)).toBe(17);
   });
 
-  it("répartit les joueurs à 100 % et les vrais joueurs s'ajoutent", () => {
-    const now = new Date(2026, 9, 12);
-    const pop = tierPopulation(now);
+  it("compte les vrais joueurs par palier", () => {
+    const pop = tierPopulation({ bronze: 3, legende: 1 });
     expect(pop.reduce((n, p) => n + p.share, 0)).toBeCloseTo(100, 5);
-    expect(pop[0].players).toBeGreaterThan(pop.at(-1)!.players);
-    expect(tierPopulation(now, { legende: 2 }).at(-1)!.players).toBe(pop.at(-1)!.players + 2);
+    expect(pop[0]).toMatchObject({ tierId: "bronze", players: 3, share: 75 });
+    expect(pop.at(-1)!.players).toBe(1);
+    expect(tierPopulation({}).every((p) => p.players === 0 && p.share === 0)).toBe(true);
     expect(formatShare(0.42)).toBe("0,4 %");
     expect(formatShare(31.4)).toBe("31 %");
   });

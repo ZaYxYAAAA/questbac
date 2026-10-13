@@ -62,7 +62,8 @@ describe("ligue et coffre quotidien dans le store", () => {
   it("clôt une ligue passée au refresh sans modifier updatedAt", () => {
     const lastWeek = new Date(Date.now() - 8 * 86_400_000);
     const old = { ...createInitialData(lastWeek), profile, rp: 100, peakRp: 100, updatedAt: lastWeek.getTime() };
-    useGame.setState({ ...old, weekly: { ...old.weekly, xp: 5000 } });
+    const rivals = [1, 2, 3].map((i) => ({ id: `real-${i}`, pseudo: `J${i}`, avatar: "🐼", weeklyXp: i * 10 }));
+    useGame.setState({ ...old, weekly: { ...old.weekly, xp: 5000 }, league: { ...old.league, rivals } });
     useGame.getState().refresh();
     const s = useGame.getState();
     expect(s.league.last).toMatchObject({ seen: false });

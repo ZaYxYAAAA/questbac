@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { clientKey, rateLimit } from "@/lib/ai/rate-limit";
-import { duelChapters } from "@/lib/game/duel";
+import { DUEL_THEMES } from "@/lib/game/duel";
 import { currentSession, jsonError, readJson, storageDown } from "@/lib/server/accounts";
 import { publicPlayerId } from "@/lib/server/auth";
 import { createDuel, listDuels, opponentProfiles, viewDuel } from "@/lib/server/duels";
@@ -27,9 +27,9 @@ export async function GET() {
 }
 
 const CreateBody = z.object({ friendId: z.string().min(1).max(64), chapterId: z.string().min(1).max(80) });
-const PLAYABLE = new Set(duelChapters().map((c) => c.id));
+const PLAYABLE = new Set(DUEL_THEMES.map((t) => t.id));
 
-/** POST /api/duels { friendId, chapterId } — défie un ami sur un chapitre. */
+/** POST /api/duels { friendId, chapterId } — défie un ami sur un thème (chapterId = id du thème). */
 export async function POST(req: Request) {
   const session = await currentSession();
   if (!session) return jsonError("Connecte-toi pour jouer en duel.", 401);
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
   if (!read.ok) return read.response;
   const parsed = CreateBody.safeParse(read.body);
   if (!parsed.success) return jsonError("Requête invalide.", 400);
-  if (!PLAYABLE.has(parsed.data.chapterId)) return jsonError("Ce chapitre n'est pas disponible en duel.", 400);
+  if (!PLAYABLE.has(parsed.data.chapterId)) return jsonError("Ce thème n'est pas disponible en duel.", 400);
 
   try {
     const friend = (await friendIds(session.uid)).find((id) => publicPlayerId(id) === parsed.data.friendId);

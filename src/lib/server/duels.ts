@@ -1,7 +1,6 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
-import { chapterById } from "@/lib/content/curriculum";
-import { DUEL_TTL_MS, type DuelOutcome, type DuelPlay, type DuelStatus, duelQuestions, duelState } from "@/lib/game/duel";
+import { DUEL_TTL_MS, type DuelOutcome, type DuelPlay, type DuelStatus, duelQuestions, duelState, duelThemeById } from "@/lib/game/duel";
 import type { PublicProfile } from "@/lib/game/save";
 import type { Question, SubjectId } from "@/lib/types";
 import { publicPlayerId } from "./auth";
@@ -23,6 +22,7 @@ interface DuelSide {
 
 export interface StoredDuel {
   id: string;
+  /** Thème du duel (anciens duels : chapitre du programme). */
   chapterId: string;
   chapterTitle: string;
   subject: SubjectId;
@@ -54,15 +54,15 @@ export interface DuelView {
 
 const newId = () => randomBytes(9).toString("base64url");
 
-export async function createDuel(from: { uid: string; pseudo: string }, to: { uid: string; pseudo: string }, chapterId: string, now = Date.now()) {
-  const chapter = chapterById(chapterId)!;
+export async function createDuel(from: { uid: string; pseudo: string }, to: { uid: string; pseudo: string }, themeId: string, now = Date.now()) {
+  const theme = duelThemeById(themeId)!;
   const id = newId();
   const duel: StoredDuel = {
     id,
-    chapterId,
-    chapterTitle: chapter.title,
-    subject: chapter.subject,
-    questions: duelQuestions(chapterId, id),
+    chapterId: theme.id,
+    chapterTitle: `${theme.emoji} ${theme.title}`,
+    subject: theme.subject,
+    questions: duelQuestions(theme.id, id)!,
     createdAt: now,
     expiresAt: now + DUEL_TTL_MS,
     sides: [

@@ -5,21 +5,23 @@ import clsx from "clsx";
 import { ChevronsDown, ChevronsUp, Clock } from "lucide-react";
 import { Avatar } from "@/components/game/Avatar";
 import { RankEmblem } from "@/components/game/RankEmblem";
+import Link from "next/link";
 import {
-  LEAGUE_SIZE,
-  PROMOTION_SPOTS,
-  RELEGATION_SPOTS,
+  LEAGUE_MIN_SIZE,
   formatCountdown,
   leagueName,
   leagueReward,
+  leagueRivals,
   leagueStandings,
+  promotionSpots,
+  relegationSpots,
   weekEnd,
-  weekProgress,
   zoneOf,
 } from "@/lib/game/league";
 import { playerFrame, tierById } from "@/lib/game/ranks";
-import { leagueKey } from "@/lib/game/state";
+import { useCloud } from "@/lib/store/cloud-sync";
 import { useGame } from "@/lib/store/game-store";
+import { usePlayers } from "@/lib/store/players-store";
 
 /** Compte à rebours jusqu'à la fin de la semaine (rafraîchi chaque seconde). */
 export function LeagueCountdown({ className }: { className?: string }) {
@@ -31,19 +33,20 @@ export function LeagueCountdown({ className }: { className?: string }) {
   return <span className={clsx("tabular-nums", className)}>{formatCountdown(weekEnd(new Date(now)).getTime() - now)}</span>;
 }
 
-/** Classement de la ligue de la semaine, recalculé chaque minute. */
+/**
+ * Classement de la ligue de la semaine entre vrais joueurs : liste en direct si
+ * elle est chargée, sinon les derniers scores gardés dans la sauvegarde.
+ */
 export function useLeagueStandings() {
   const game = useGame();
   const profile = game.profile!;
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 60_000);
-    return () => clearInterval(id);
-  }, []);
-  const rows = useMemo(
-    () => leagueStandings(game.league, leagueKey(game), { pseudo: profile.pseudo, avatar: profile.avatar, weeklyXp: game.weekly.xp }, weekProgress(now)),
-    [game, profile, now],
-  );
+  const players = usePlayers((s) => s.players);
+  const loaded = usePlayers((s) => s.loaded);
+  const selfId = useCloud((s) => s.user?.id ?? null);
+  const rows = useMemo(() => {
+    const rivals = loaded ? leagueRivals(players, selfId, game.rp) : (game.league.rivals ?? []);
+    return leagueStandings(rivals, { pseudo: profile.pseudo, avatar: profile.avatar, weeklyXp: game.weekly.xp });
+  }, [loaded, players, selfId, game.rp, game.league.rivals, game.weekly.xp, profile.pseudo, profile.avatar]);
   const position = rows.findIndex((r) => r.isPlayer) + 1;
   return { rows, position, tierId: game.league.tierId };
 }
@@ -59,6 +62,8 @@ export function WeeklyLeague() {
   const last = game.league.last;
   const above = rows[position - 2];
   const frame = playerFrame(profile, game.peakRp);
+  const promo = promotionSpots(rows.length);
+  const relegated = relegationSpots(rows.length);
 
   return (
     <div className="space-y-4">
@@ -75,8 +80,13 @@ export function WeeklyLeague() {
           </div>
         </div>
         <div className="relative mt-4 rounded-2xl bg-slate-950/50 p-3 text-sm">
-          {game.weekly.xp === 0 ? (
-            <p className="text-slate-300">Gagne ta première XP de la semaine pour entrer dans la course : <b className="text-white">{LEAGUE_SIZE - 1} rivaux</b> de ton niveau t&apos;attendent.</p>
+          {rows.length < LEAGUE_MIN_SIZE ? (
+            <p className="text-slate-300">
+              Il faut au moins <b className="text-white">{LEAGUE_MIN_SIZE} joueurs</b> pour lancer la ligue (récompenses et promotions).{" "}
+              <Link href="/amis" className="font-semibold text-violet-300 underline">Invite tes amis</Link> !
+            </p>
+          ) : game.weekly.xp === 0 ? (
+            <p className="text-slate-300">Gagne ta première XP de la semaine pour entrer dans la course face à <b className="text-white">{rows.length - 1} joueurs</b> proches de ton rang.</p>
           ) : (
             <p className="text-slate-300">
               Tu es <b className="text-white">{ordinal(position)}</b> sur {rows.length}
@@ -97,21 +107,25 @@ export function WeeklyLeague() {
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-        {[1, 2, 3].map((r) => {
-          const rw = leagueReward(r);
-          return (
-            <div key={r} className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2">
-              <p className="font-bold text-emerald-200">{["🥇", "🥈", "🥉"][r - 1]} {ordinal(r)}</p>
-              <p className="text-emerald-100/80">+{rw.xp} XP · +{rw.rp} RP</p>
+      {promo > 0 && (
+        <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+          {Array.from({ length: promo }, (_, i) => i + 1).map((r) => {
+            const rw = leagueReward(r, rows.length);
+            return (
+              <div key={r} className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2">
+                <p className="font-bold text-emerald-200">{["🥇", "🥈", "🥉"][r - 1]} {ordinal(r)}</p>
+                <p className="text-emerald-100/80">+{rw.xp} XP · +{rw.rp} RP</p>
+              </div>
+            );
+          })}
+          {Math.ceil(rows.length / 2) > promo && (
+            <div className="rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2">
+              <p className="font-bold text-slate-200">{ordinal(promo + 1)} – {ordinal(Math.ceil(rows.length / 2))}</p>
+              <p className="text-slate-400">+{leagueReward(promo + 1, rows.length).xp} XP</p>
             </div>
-          );
-        })}
-        <div className="rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2">
-          <p className="font-bold text-slate-200">4e – 10e</p>
-          <p className="text-slate-400">+{leagueReward(4).xp} XP</p>
+          )}
         </div>
-      </div>
+      )}
 
       <div className="overflow-hidden rounded-3xl border border-white/10 bg-slate-900/70">
         {rows.map((r, i) => {
@@ -119,9 +133,9 @@ export function WeeklyLeague() {
           const z = zoneOf(rank, rows.length);
           return (
             <div key={r.id}>
-              {rank === rows.length - RELEGATION_SPOTS + 1 && (
+              {relegated > 0 && rank === rows.length - relegated + 1 && (
                 <p className="flex items-center justify-center gap-1 bg-rose-500/10 py-1 text-[11px] font-bold uppercase tracking-wider text-rose-300">
-                  <ChevronsDown size={14} /> Zone de relégation · −{Math.abs(leagueReward(rows.length).rp)} RP
+                  <ChevronsDown size={14} /> Zone de relégation · −{Math.abs(leagueReward(rows.length, rows.length).rp)} RP
                 </p>
               )}
               <div
@@ -135,14 +149,14 @@ export function WeeklyLeague() {
                 {r.isPlayer ? (
                   <Avatar emoji={profile.avatar} photo={profile.photoThumb ?? profile.photo} name={profile.pseudo} size="sm" rp={game.rp} frame={frame} />
                 ) : (
-                  <Avatar emoji={r.avatar} name={r.pseudo} size="sm" frame={tierId} />
+                  <Avatar emoji={r.avatar} photo={r.photo} name={r.pseudo} size="sm" frame={tierId} />
                 )}
                 <p className={clsx("min-w-0 flex-1 truncate font-semibold", r.isPlayer ? "text-violet-200" : "text-white")}>
                   {r.pseudo}{r.isPlayer && " (toi)"}
                 </p>
                 <span className="font-mono text-sm font-bold text-slate-200">{r.weeklyXp} XP</span>
               </div>
-              {rank === PROMOTION_SPOTS && (
+              {promo > 0 && rank === promo && rows.length > promo && (
                 <p className="flex items-center justify-center gap-1 bg-emerald-500/10 py-1 text-[11px] font-bold uppercase tracking-wider text-emerald-300">
                   <ChevronsUp size={14} /> Zone de promotion
                 </p>
@@ -152,7 +166,7 @@ export function WeeklyLeague() {
         })}
       </div>
       <p className="text-center text-xs text-slate-500">
-        Ton groupe est tiré chaque lundi parmi des rivaux de ton palier. Les récompenses sont versées à ta reconnexion après la fin de la semaine.
+        Ta ligue réunit les vrais joueurs les plus proches de ton rang (jusqu'à 20). Les récompenses sont versées à ta reconnexion après la fin de la semaine.
       </p>
     </div>
   );

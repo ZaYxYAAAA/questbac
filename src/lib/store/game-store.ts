@@ -5,6 +5,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { CustomMission, Level } from "@/lib/types";
 import type { DailyReward } from "@/lib/game/daily";
+import type { LeagueRow } from "@/lib/game/league";
 import { promotionBetween } from "@/lib/game/ranks";
 import { migrateSave, toGameData } from "@/lib/game/save";
 import {
@@ -35,6 +36,8 @@ interface GameActions {
   claimDaily: () => { summary: RewardSummary; reward: DailyReward } | null;
   /** Masque le message de fin de ligue. */
   acknowledgeLeague: () => void;
+  /** Mémorise les derniers scores connus des adversaires de la ligue. */
+  setLeagueRivals: (rivals: LeagueRow[]) => void;
   refresh: () => void;
   /** Remet la progression à zéro en gardant le profil. */
   resetAll: () => void;
@@ -87,6 +90,8 @@ export const useGame = create<GameStore>()(
           const next = acknowledgeLeague(current);
           if (next !== current) commit({ league: next.league });
         },
+        // Donnée observée (pas une action du joueur) : `updatedAt` reste inchangé.
+        setLeagueRivals: (rivals) => set({ league: { ...get().league, rivals } }),
         updateMission: (mission) => commit({ missions: get().missions.map((m) => (m.id === mission.id ? mission : m)) }),
         deleteMission: (id) => commit({ missions: get().missions.filter((m) => m.id !== id) }),
         deleteFiche: (id) => commit({ fiches: get().fiches.filter((f) => f.id !== id) }),

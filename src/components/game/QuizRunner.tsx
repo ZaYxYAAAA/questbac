@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { Flame, Sparkles, X } from "lucide-react";
+import { Flame, Sparkles, Timer, X } from "lucide-react";
 import Link from "next/link";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { comboMultiplier, xpForAnswer } from "@/lib/game/progression";
@@ -16,12 +16,15 @@ export function QuizRunner({
   subtitle,
   exitHref,
   onComplete,
+  secondsPerQuestion,
 }: {
   questions: Question[];
   title: string;
   subtitle?: string;
   exitHref: string;
   onComplete: (result: QuizResult, answerXp: number) => void;
+  /** Chrono par question (duels) : à zéro, la question compte comme ratée. */
+  secondsPerQuestion?: number;
 }) {
   const [index, setIndex] = useState(0);
   const [combo, setCombo] = useState(0);
@@ -31,11 +34,37 @@ export function QuizRunner({
   const answers = useRef<QuizResult["answers"]>([]);
   const startedAt = useRef(Date.now());
   const questionStart = useRef(Date.now());
+  /** Dernière question déjà répondue (ou expirée) : évite un double enregistrement. */
+  const answeredIndex = useRef(-1);
+  const [timedOut, setTimedOut] = useState(false);
+  const [remaining, setRemaining] = useState(secondsPerQuestion ?? 0);
 
   const q = questions[index];
   const correctCount = answers.current.filter((a) => a.correct).length;
 
+  useEffect(() => {
+    if (!secondsPerQuestion) return;
+    setTimedOut(false);
+    setRemaining(secondsPerQuestion);
+    const limit = secondsPerQuestion * 1000;
+    const id = setInterval(() => {
+      if (answeredIndex.current === index) return clearInterval(id);
+      const left = limit - (Date.now() - questionStart.current);
+      setRemaining(Math.max(0, left / 1000));
+      if (left <= 0) {
+        clearInterval(id);
+        answeredIndex.current = index;
+        answers.current.push({ questionId: questions[index].id, correct: false, timeMs: limit, given: "" });
+        setCombo(0);
+        setTimedOut(true);
+      }
+    }, 100);
+    return () => clearInterval(id);
+  }, [index, secondsPerQuestion, questions]);
+
   const onAnswered = (correct: boolean, given: GivenAnswer) => {
+    if (answeredIndex.current === index) return;
+    answeredIndex.current = index;
     answers.current.push({ questionId: q.id, correct, timeMs: Date.now() - questionStart.current, given });
     if (correct) {
       const gained = xpForAnswer(q.difficulty ?? 1, combo);
@@ -100,8 +129,22 @@ export function QuizRunner({
         </div>
       </div>
 
+      {secondsPerQuestion && (
+        <div className="flex items-center gap-2">
+          <Timer size={18} className={remaining <= 5 ? "text-rose-400" : "text-amber-300"} />
+          <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-800">
+            <div
+              className={clsx("h-full rounded-full transition-[width] duration-100 ease-linear", remaining <= 5 ? "bg-rose-500" : "bg-amber-400")}
+              style={{ width: `${(remaining / secondsPerQuestion) * 100}%` }}
+            />
+          </div>
+          <span className={clsx("w-10 text-right font-mono text-sm font-bold tabular-nums", remaining <= 5 ? "text-rose-300" : "text-amber-200")}>{Math.ceil(remaining)} s</span>
+        </div>
+      )}
+
       <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-5 shadow-2xl sm:p-7">
         <QuestionCard
+          timedOut={timedOut}
           key={q.id + index}
           question={q}
           onAnswered={onAnswered}

@@ -6,7 +6,7 @@ import type { CustomMission, Level, QuizResult, SavedFiche, SubjectId } from "@/
 import { DUEL_REWARDS, type DuelOutcome } from "./duel";
 import { type AchievementDef, newlyUnlocked } from "./achievements";
 import { type DailyReward, type DailyState, claimDaily } from "./daily";
-import { type LeagueState, finalLeagueResult } from "./league";
+import { LEAGUE_MIN_SIZE, type LeagueState, finalLeagueResult } from "./league";
 import {
   dayKey,
   levelFromXp,
@@ -154,8 +154,6 @@ export interface RewardSummary {
   promotion: Promotion | null;
 }
 
-/** Clé stable du joueur pour tirer son groupe de ligue. */
-export const leagueKey = (d: Pick<GameData, "profile">) => String(d.profile?.createdAt ?? 0);
 
 /**
  * Réinitialise quêtes et XP hebdomadaire si le jour / la semaine a changé.
@@ -170,9 +168,13 @@ export function refreshPeriods(d: GameData, now = new Date()): GameData {
   if (d.weekly.week !== week || d.league.week !== week) {
     let { xp, rp, peakRp, feed } = next;
     let last = next.league.last;
-    // Classé seulement si le joueur a gagné de l'XP pendant la semaine de sa ligue.
-    if (next.league.week !== week && next.league.week === next.weekly.week && next.weekly.xp > 0) {
-      last = finalLeagueResult(next.league, leagueKey(next), next.weekly.xp);
+    // Classé seulement si le joueur a gagné de l'XP pendant la semaine de sa ligue,
+    // dans un groupe d'au moins 3 vrais joueurs.
+    const result = next.league.week !== week && next.league.week === next.weekly.week && next.weekly.xp > 0
+      ? finalLeagueResult(next.league, next.weekly.xp)
+      : null;
+    if (result && result.size >= LEAGUE_MIN_SIZE) {
+      last = result;
       xp += last.rewardXp;
       rp = Math.max(0, rp + last.rewardRp);
       peakRp = Math.max(peakRp, rp);
@@ -185,7 +187,7 @@ export function refreshPeriods(d: GameData, now = new Date()): GameData {
       peakRp,
       feed,
       weekly: next.weekly.week === week ? next.weekly : { week, xp: 0 },
-      league: next.league.week === week ? next.league : { week, tierId: rankFromRp(rp).tier.id, last },
+      league: next.league.week === week ? next.league : { week, tierId: rankFromRp(rp).tier.id, last, rivals: [] },
     };
   }
   return next;

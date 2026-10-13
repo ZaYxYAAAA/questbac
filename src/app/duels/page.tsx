@@ -2,18 +2,16 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import clsx from "clsx";
 import { Swords } from "lucide-react";
 import { Avatar } from "@/components/game/Avatar";
 import { Button } from "@/components/ui/Button";
-import { LEVELS, subjectMeta } from "@/lib/content/curriculum";
-import { DUEL_REWARDS, duelChapters } from "@/lib/game/duel";
+import { subjectMeta } from "@/lib/content/curriculum";
+import { DUEL_REWARDS, DUEL_SECONDS, DUEL_SIZE, DUEL_THEMES, duelThemeById } from "@/lib/game/duel";
 import { useCloud } from "@/lib/store/cloud-sync";
 import { type DuelView, createDuel, loadDuels, useDuels } from "@/lib/store/duels-store";
 import { loadFriends, useFriends } from "@/lib/store/friends-store";
-import { useGame } from "@/lib/store/game-store";
-import type { Level } from "@/lib/types";
 
 const OUTCOME = {
   win: { label: "Victoire", className: "bg-emerald-500/20 text-emerald-300" },
@@ -29,7 +27,7 @@ function DuelRow({ d }: { d: DuelView }) {
       <Avatar emoji={d.opponent.avatar} photo={d.opponent.photoThumb} name={d.opponent.pseudo} size="md" />
       <div className="min-w-0 flex-1">
         <p className="truncate font-bold text-white">{d.iChallenged ? "Toi" : d.opponent.pseudo} <span className="text-slate-500">vs</span> {d.iChallenged ? d.opponent.pseudo : "toi"}</p>
-        <p className="truncate text-xs text-slate-400">{meta.emoji} {d.chapterTitle}</p>
+        <p className="truncate text-xs text-slate-400">{duelThemeById(d.chapterId) ? d.chapterTitle : `${meta.emoji} ${d.chapterTitle}`}</p>
         {d.status === "done" && d.mine && d.theirs && (
           <p className="text-xs text-slate-300">{d.mine.correct} – {d.theirs.correct}</p>
         )}
@@ -52,10 +50,8 @@ export default function DuelsPage() {
   const { user, checked } = useCloud();
   const { duels, loaded, error } = useDuels();
   const friends = useFriends((s) => s.friends);
-  const playerLevel = useGame((s) => s.profile?.level ?? "premiere");
   const [friendId, setFriendId] = useState("");
-  const [level, setLevel] = useState<Level>(playerLevel);
-  const [chapterId, setChapterId] = useState("");
+  const [chapterId, setChapterId] = useState(DUEL_THEMES[0].id);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -66,11 +62,6 @@ export default function DuelsPage() {
     const ami = new URLSearchParams(window.location.search).get("ami");
     if (ami) setFriendId(ami);
   }, [user]);
-
-  const chapters = useMemo(() => duelChapters(level), [level]);
-  useEffect(() => {
-    if (!chapters.some((c) => c.id === chapterId)) setChapterId(chapters[0]?.id ?? "");
-  }, [chapters, chapterId]);
 
   if (checked && !user) {
     return (
@@ -127,21 +118,32 @@ export default function DuelsPage() {
           <p className="text-sm text-slate-300">Il te faut d&apos;abord des amis : <Link href="/amis" className="text-violet-300 underline">invite-les</Link>.</p>
         ) : (
           <>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <select value={friendId} onChange={(e) => setFriendId(e.target.value)} aria-label="Ami à défier" className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2.5 text-sm text-white">
-                <option value="">Choisis un ami…</option>
-                {friends.map((f) => <option key={f.id} value={f.id}>{f.pseudo}</option>)}
-              </select>
-              <select value={level} onChange={(e) => setLevel(e.target.value as Level)} aria-label="Classe" className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2.5 text-sm text-white">
-                {LEVELS.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
-              </select>
-              <select value={chapterId} onChange={(e) => setChapterId(e.target.value)} aria-label="Chapitre" className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2.5 text-sm text-white">
-                {chapters.map((c) => <option key={c.id} value={c.id}>{subjectMeta(c.subject).emoji} {c.title}</option>)}
-              </select>
+            <select value={friendId} onChange={(e) => setFriendId(e.target.value)} aria-label="Ami à défier" className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-3 text-base text-white">
+              <option value="">Choisis un ami…</option>
+              {friends.map((f) => <option key={f.id} value={f.id}>{f.pseudo}</option>)}
+            </select>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Thème du duel">
+              {DUEL_THEMES.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={chapterId === t.id}
+                  onClick={() => setChapterId(t.id)}
+                  className={clsx(
+                    "rounded-2xl border p-3 text-left transition active:scale-95",
+                    chapterId === t.id ? "border-violet-400 bg-violet-600/30" : "border-white/10 bg-slate-950/60 hover:border-violet-400/50",
+                  )}
+                >
+                  <span className="text-2xl">{t.emoji}</span>
+                  <span className="block text-sm font-bold text-white">{t.title}</span>
+                  <span className="block text-[11px] leading-tight text-slate-400">{t.description}</span>
+                </button>
+              ))}
             </div>
             <Button type="submit" disabled={busy || !friendId || !chapterId} className="w-full"><Swords size={16} /> Défier</Button>
             <p className="text-xs text-slate-400">
-              Victoire +{DUEL_REWARDS.win.xp} XP et +{DUEL_REWARDS.win.rp} RP · égalité +{DUEL_REWARDS.draw.xp} XP · défaite +{DUEL_REWARDS.loss.xp} XP. Le duel expire après 72 h.
+              Victoire +{DUEL_REWARDS.win.xp} XP et +{DUEL_REWARDS.win.rp} RP · égalité +{DUEL_REWARDS.draw.xp} XP · défaite +{DUEL_REWARDS.loss.xp} XP. {DUEL_SIZE} questions éclair, {DUEL_SECONDS} s chacune, à faire de tête. Le duel expire après 72 h.
             </p>
           </>
         )}

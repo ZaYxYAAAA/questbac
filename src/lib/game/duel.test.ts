@@ -1,21 +1,43 @@
 import { describe, expect, it } from "vitest";
-import { DUEL_MIN_SIZE, DUEL_SIZE, duelChapters, duelOutcome, duelQuestions, duelState, gradeDuel } from "./duel";
+import { DUEL_SECONDS, DUEL_SIZE, DUEL_THEMES, duelOutcome, duelQuestions, duelState, gradeDuel } from "./duel";
+import { isCorrect } from "./session";
 
 const play = (correct: number, timeMs: number) => ({ correct, timeMs, results: [], playedAt: 0 });
 
 describe("duels", () => {
-  it("proposent des chapitres jouables et des questions figées", () => {
-    const chapters = duelChapters("premiere");
-    expect(chapters.length).toBeGreaterThan(3);
-    const id = chapters[0].id;
-    const a = duelQuestions(id, "abc");
-    expect(a.length).toBeGreaterThanOrEqual(DUEL_MIN_SIZE);
-    expect(a.length).toBeLessThanOrEqual(DUEL_SIZE);
-    expect(duelQuestions(id, "abc")).toEqual(a); // mêmes questions pour les deux joueurs
+  it("génèrent 10 questions variées, identiques pour un même duel", () => {
+    for (const t of DUEL_THEMES) {
+      const a = duelQuestions(t.id, "abc")!;
+      expect(a).toHaveLength(DUEL_SIZE);
+      expect(new Set(a.map((q) => q.prompt)).size).toBe(DUEL_SIZE);
+      expect(duelQuestions(t.id, "abc")).toEqual(a);
+      expect(duelQuestions(t.id, "xyz")!.map((q) => q.prompt)).not.toEqual(a.map((q) => q.prompt));
+    }
+    expect(duelQuestions("inconnu", "abc")).toBeNull();
+  });
+
+  it("ne produisent que des questions bien formées", () => {
+    for (const t of DUEL_THEMES) {
+      for (let i = 0; i < 60; i++) {
+        for (const q of duelQuestions(t.id, `seed-${i}`)!) {
+          expect(q.prompt).not.toMatch(/NaN|undefined|Infinity/);
+          if (q.type === "mcq") {
+            expect(q.choices.length, q.prompt).toBeGreaterThanOrEqual(3);
+            expect(new Set(q.choices).size).toBe(q.choices.length);
+            expect(q.choices[q.answer]).toBeDefined();
+            for (const c of q.choices) expect(c).not.toMatch(/NaN|undefined|Infinity/);
+          }
+          if (q.type === "numeric") {
+            expect(Number.isFinite(q.answer)).toBe(true);
+            expect(isCorrect(q, String(q.answer).replace(".", ","))).toBe(true);
+          }
+        }
+      }
+    }
   });
 
   it("notent les réponses côté serveur", () => {
-    const qs = duelQuestions("maths-1-derivation", "x");
+    const qs = duelQuestions("grand-melange", "x")!;
     const right = qs.map((q) => (q.type === "numeric" ? String(q.answer) : q.answer));
     const full = gradeDuel(qs, right, qs.map(() => 1000), 5)!;
     expect(full.correct).toBe(qs.length);
@@ -25,7 +47,7 @@ describe("duels", () => {
     expect(gradeDuel(qs, right.slice(1), qs.map(() => 1000))).toBeNull();
     expect(gradeDuel(qs, right, qs.map(() => -1))).toBeNull();
     // Durée plafonnée par question
-    expect(gradeDuel(qs, right, qs.map(() => 1e9))!.timeMs).toBe(qs.length * 300_000);
+    expect(gradeDuel(qs, right, qs.map(() => 1e9))!.timeMs).toBe(qs.length * DUEL_SECONDS * 1000);
   });
 
   it("départagent au score puis au temps", () => {
