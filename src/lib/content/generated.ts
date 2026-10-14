@@ -7,6 +7,7 @@ import type { Level, Question, SubjectId } from "@/lib/types";
 import { hashString, shuffle } from "@/lib/game/quests";
 import { CHAPTERS, chapterById } from "./curriculum";
 import type { Generator, Rand } from "./gen/kit";
+import { CULTURE } from "./gen/culture";
 import { ESPAGNOL } from "./gen/espagnol";
 import { EXTRA_HISTOIRE } from "./gen/extra-histoire";
 import { EXTRA_LETTRES } from "./gen/extra-lettres";
@@ -43,6 +44,7 @@ const BASE_GENERATORS: Record<string, Generator[]> = {
   ...HISTOIRE2,
   ...SCIENCES2,
   ...HUMANITES2,
+  ...CULTURE,
 };
 
 /** Banques d'informations supplémentaires, ajoutées aux chapitres existants. */

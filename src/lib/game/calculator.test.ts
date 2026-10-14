@@ -40,12 +40,15 @@ describe("needsCalculator", () => {
   const num = (prompt: string, answer: number) => ({ type: "numeric" as const, prompt, answer, explanation: "" });
   it("pas pour un calcul faisable de tête", () => {
     expect(needsCalculator(num("Force pour $2$ m/s² et $5$ kg ?", 10))).toBe(false);
-    expect(needsCalculator(num("$7! = ?$", 5040))).toBe(false);
-    expect(needsCalculator(num("$P(A) = 0{,}7$, $P_A(B) = 0{,}9$. $P(A \\cap B)$ ?", 0.63))).toBe(false);
-    expect(needsCalculator(num("Moyenne de $20;20;7;6;19$ ?", 14.4))).toBe(false);
+    expect(needsCalculator(num("$P(A) = 0{,}3$. $P(\\bar A)$ ?", 0.7))).toBe(false);
+    expect(needsCalculator(num("$6 \\times 4 = ?$", 24))).toBe(false);
+    expect(needsCalculator(num("En quelle année : **Majorité à 18 ans** ?", 1974))).toBe(false);
     expect(needsCalculator({ type: "truefalse", prompt: "$2+2=4$", answer: true, explanation: "" })).toBe(false);
   });
   it("oui pour les décimaux, la notation scientifique et les grands nombres", () => {
+    expect(needsCalculator(num("$7! = ?$", 5040))).toBe(true);
+    expect(needsCalculator(num("Moyenne de $20;20;7;6;19$ ?", 14.4))).toBe(true);
+    expect(needsCalculator(num("$P(A) = 0{,}7$, $P_A(B) = 0{,}9$. $P(A \\cap B)$ ?", 0.63))).toBe(true);
     expect(needsCalculator(num("Condensateur de $4{,}7$ µF sous $21$ V. Charge ?", 98.7))).toBe(true);
     expect(needsCalculator(num("Masse de $3 \\times 10^{-3}$ mol ?", 0.18))).toBe(true);
     expect(needsCalculator(num("$17 \\times 23 \\times 9 = ?$", 3519))).toBe(true);

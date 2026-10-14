@@ -158,14 +158,26 @@ pourront tourner telles quelles côté serveur.
   (ticket), `match:<id>` (partie), `match:settled:<id>` (points distribués une seule fois).
   Le serveur recopie le rang dans la sauvegarde (`rp`), et fait foi.
 
+## Culture générale
+
+- Matière à part (`culture`, `extra: true` dans curriculum.ts) : hors programme, mêmes thèmes à
+  tous les niveaux, absente de la carte des matières et du radar du profil, avec sa page
+  **/culture** (onglet Entraînement → Culture G) : quiz éclair de 10 questions mélangées
+  (`/mission/<thème>?melange=1`), thème du jour, 16 thèmes avec étoiles. Jouable en classé.
+- 16 thèmes (src/lib/content/gen/culture.ts, environ 750 faits) : capitales, géographie du monde,
+  France, grandes dates et personnages, arts et monuments, livres et auteurs, musique, cinéma,
+  sport, inventions et découvertes, espace, animaux et nature, mythologie, expressions et langue,
+  institutions et sigles, gastronomie. Chaque fait donne une question directe, une question
+  inverse et un vrai/faux.
+
 ## Calculatrice
 
-- Proposée seulement sur les questions de calcul pas faisables de tête (`needsCalculator`,
-  src/lib/game/calculator.ts) : résultat décimal avec 3 chiffres significatifs ou plus à partir
-  de données décimales, 3 décimales ou plus, grands nombres, mantisse d'écriture scientifique,
-  valeur « arrondie ». Jamais pour une question de cours ni un calcul simple (`7!`, `5 × 2`,
-  `0,7 × 0,9`). Le drapeau `calc` est posé à la génération et reste sur la question publique du
-  classé (environ 3 % des questions, surtout en physique-chimie).
+- Proposée sur les questions de calcul qui demandent plus qu'un calcul immédiat
+  (`needsCalculator`, src/lib/game/calculator.ts) : résultat décimal à 2 chiffres significatifs
+  ou plus, entier à 3 chiffres significatifs ou plus, données décimales, mantisse d'écriture
+  scientifique, valeur « arrondie ». Jamais pour une question de cours ni un calcul immédiat
+  (`2 × 5`, `1 − 0,3`, `3x + 1 = −5`). Le drapeau `calc` est posé à la génération et reste sur la
+  question publique du classé (environ 1 question sur 5 en physique-chimie).
 - Calculatrice scientifique intégrée (feuille en bas d'écran) : + − × ÷, puissances, racine,
   sin/cos/tan (degrés ou radians), ln, log, π, ×10ⁿ, parenthèses ; évaluation sans `eval`.
   « Mettre … en réponse » remplit la réponse libre. En classé, elle évite de sortir de l'appli

@@ -20,15 +20,10 @@ export function significantDigits(n: number): number {
   return s.length;
 }
 
-const decimals = (n: number) => {
-  const s = String(Math.round(Math.abs(n) * 1e6) / 1e6);
-  return s.includes(".") ? s.split(".")[1].length : 0;
-};
-
 const SCIENTIFIC = /\\times\s*10\^|×\s*10\^|10\^\{?-?\d/;
 /** Nombre décimal écrit dans l'énoncé (« 4,7 », « 4{,}7 », « 0.25 »). */
 const DECIMAL_IN_TEXT = /\d(?:\{,\}|,|\.)\d/;
-const FUNCTIONS = /\\(?:ln|log|sqrt|sin|cos|tan)\b|\be\^/;
+const TWO_DECIMALS_IN_TEXT = /\d(?:\{,\}|,|\.)\d\d/;
 
 /** Valeur d'un choix de QCM s'il s'agit d'un nombre simple (pas une fraction ni une expression). */
 export function choiceNumber(choice: string): number | null {
@@ -57,18 +52,20 @@ function mantissa(text: string): number | null {
 function hardValue(value: number, prompt: string): boolean {
   if (!Number.isFinite(value)) return false;
   if (/arrondi/i.test(prompt)) return true;
-  if (Number.isInteger(value)) {
-    const digits = significantDigits(value);
-    return MATH_WITH_NUMBER.test(prompt) && (digits >= 4 || (digits >= 3 && DECIMAL_IN_TEXT.test(prompt)));
-  }
-  if (decimals(value) >= 3) return true;
-  return significantDigits(value) >= 3 && (DECIMAL_IN_TEXT.test(prompt) || FUNCTIONS.test(prompt));
+  if (!MATH_WITH_NUMBER.test(prompt) && !DECIMAL_IN_TEXT.test(prompt)) return false;
+  const digits = significantDigits(value);
+  // Entier : à partir de 3 chiffres significatifs (128, 182, 5 040…), ou 2 s'il faut calculer avec des décimaux.
+  if (Number.isInteger(value)) return digits >= 3 || (digits >= 2 && DECIMAL_IN_TEXT.test(prompt));
+  // Décimal : dès 2 chiffres significatifs (0,57 ; 14,4 ; 7,4) ; 0,7 ou 0,06 restent de tête,
+  // sauf si les données ont elles-mêmes 2 décimales (1,56 ÷ 260).
+  return digits >= 2 || TWO_DECIMALS_IN_TEXT.test(prompt);
 }
 
 /**
- * Faut-il la calculatrice ? Seulement pour les questions de calcul dont le
- * résultat n'est pas faisable de tête (décimaux, notation scientifique,
- * grands nombres) ; jamais pour une question de cours ou un calcul simple.
+ * Faut-il la calculatrice ? Pour les questions de calcul dont le résultat
+ * demande plus qu'un calcul immédiat (décimaux, notation scientifique, nombres
+ * à 3 chiffres…) ; jamais pour une question de cours ou un calcul immédiat
+ * (2 × 5, 1 − 0,3, 6 × 4).
  */
 export function needsCalculator(q: AnyQuestion): boolean {
   if (q.type === "truefalse") return false;

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { ChevronLeft, FlaskConical, Infinity as InfinityIcon, Play, Shuffle } from "lucide-react";
 import { QuizRunner } from "@/components/game/QuizRunner";
@@ -16,15 +16,16 @@ import { rememberSeen, seenFor } from "@/lib/store/seen-questions";
 import { announce } from "@/lib/store/toast-store";
 import type { Chapter, Question } from "@/lib/types";
 
-type Phase = { kind: "intro" } | { kind: "playing"; questions: Question[]; label: string } | { kind: "done"; summary: RewardSummary; correct: number; total: number };
+type Phase = { kind: "intro" } | { kind: "playing"; questions: Question[]; label: string; mix?: boolean } | { kind: "done"; summary: RewardSummary; correct: number; total: number };
 
-export function MissionPlayer({ chapter }: { chapter: Chapter }) {
+export function MissionPlayer({ chapter, autoMix = false }: { chapter: Chapter; autoMix?: boolean }) {
   const recordSession = useGame((s) => s.recordSession);
   const progress = useGame((s) => s.chapters[chapter.id]);
   const [phase, setPhase] = useState<Phase>({ kind: "intro" });
   const [count, setCount] = useState(6);
   const meta = subjectMeta(chapter.subject);
-  const exitHref = `/matieres/${chapter.subject}?niveau=${chapter.level}`;
+  // La Culture générale a sa propre page, hors de la carte des matières.
+  const exitHref = meta.extra ? "/culture" : `/matieres/${chapter.subject}?niveau=${chapter.level}`;
   const mixScope = `mix:${chapter.subject}:${chapter.level}`;
 
   // Questions générées : jamais deux fois le même énoncé tant qu'il en reste de nouveaux.
@@ -33,17 +34,23 @@ export function MissionPlayer({ chapter }: { chapter: Chapter }) {
     rememberSeen(chapter.id, questions);
     setPhase({ kind: "playing", questions, label: meta.name });
   };
-  const startMix = () => {
-    const questions = prepareQuestions(mixQuestions(chapter.subject, chapter.level, count, Math.random, seenFor(mixScope)));
+  const startMix = (n = count) => {
+    const questions = prepareQuestions(mixQuestions(chapter.subject, chapter.level, n, Math.random, seenFor(mixScope)));
     rememberSeen(mixScope, questions);
-    setPhase({ kind: "playing", questions, label: `Mélange ${meta.name}` });
+    setPhase({ kind: "playing", questions, label: meta.extra ? "Tous les thèmes" : `Mélange ${meta.name}`, mix: true });
   };
+
+  // Lien « Quiz éclair » : on lance directement un mélange de 10 questions.
+  useEffect(() => {
+    if (autoMix) startMix(10);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- une seule fois, à l'arrivée sur la page
+  }, []);
 
   if (phase.kind === "playing") {
     return (
       <QuizRunner
         questions={phase.questions}
-        title={chapter.title}
+        title={phase.mix ? (meta.extra ? "Quiz éclair" : "Mélange") : chapter.title}
         subtitle={phase.label}
         exitHref={exitHref}
         onComplete={(result, answerXp) => {
@@ -65,7 +72,7 @@ export function MissionPlayer({ chapter }: { chapter: Chapter }) {
         subheading={`${phase.correct} / ${phase.total} bonnes réponses · ${chapter.title}`}
         onReplay={() => setPhase({ kind: "intro" })}
         backHref={exitHref}
-        backLabel="Retour à la carte"
+        backLabel={meta.extra ? "Retour à la Culture G" : "Retour à la carte"}
       >
       </RewardScreen>
     );
@@ -81,7 +88,7 @@ export function MissionPlayer({ chapter }: { chapter: Chapter }) {
         <div className="absolute inset-0 bg-slate-950/50" />
         <div className="relative">
           <div className="qb-bob text-6xl">{meta.emoji}</div>
-          <p className="mt-3 text-sm font-semibold text-white/80">{meta.name} · {levelLabel(chapter.level)}</p>
+          <p className="mt-3 text-sm font-semibold text-white/80">{meta.name}{meta.extra ? " · tous niveaux" : ` · ${levelLabel(chapter.level)}`}</p>
           <h1 className="text-3xl font-black text-white">{chapter.title}</h1>
           <p className="mt-1 text-white/80">{chapter.summary}</p>
           {progress && (
@@ -118,8 +125,8 @@ export function MissionPlayer({ chapter }: { chapter: Chapter }) {
           <Button onClick={startLocal} className="py-3.5 text-base">
             <Play size={18} /> Lancer ({count} questions)
           </Button>
-          <Button variant="secondary" onClick={startMix} className="py-3.5">
-            <Shuffle size={16} /> Mélange de tout le niveau
+          <Button variant="secondary" onClick={() => startMix()} className="py-3.5">
+            <Shuffle size={16} /> {meta.extra ? "Mélange de tous les thèmes" : "Mélange de tout le niveau"}
           </Button>
         </div>
         <p className="flex items-center gap-2 rounded-xl bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">

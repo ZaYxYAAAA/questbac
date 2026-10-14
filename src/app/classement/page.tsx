@@ -22,7 +22,7 @@ type Playing = { subject: SubjectId; matchId?: string | null; key: number };
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 /** Noms courts pour les tuiles étroites. */
-const SHORT: Partial<Record<SubjectId, string>> = { maths: "Maths" };
+const SHORT: Partial<Record<SubjectId, string>> = { maths: "Maths", culture: "Culture G" };
 const fmt = (n: number) => n.toLocaleString("fr-FR");
 
 export default function RankedPage() {

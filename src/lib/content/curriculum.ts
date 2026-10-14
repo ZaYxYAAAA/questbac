@@ -17,6 +17,8 @@ export interface SubjectMeta {
   /** Couleur d'accent (hex) utilisée par les graphiques. */
   color: string;
   levels: Level[];
+  /** Hors programme (Culture générale) : mêmes chapitres à tous les niveaux, à part de la carte des matières. */
+  extra?: boolean;
 }
 
 export const SUBJECTS: SubjectMeta[] = [
@@ -29,6 +31,7 @@ export const SUBJECTS: SubjectMeta[] = [
   { id: "ses", name: "SES", emoji: "📊", gradient: "from-lime-500 to-green-600", color: "#84cc16", levels: ["seconde", "premiere", "terminale"] },
   { id: "anglais", name: "Anglais", emoji: "🇬🇧", gradient: "from-sky-500 to-indigo-500", color: "#0ea5e9", levels: ["seconde", "premiere", "terminale"] },
   { id: "espagnol", name: "Espagnol", emoji: "🇪🇸", gradient: "from-red-500 to-amber-500", color: "#ef4444", levels: ["seconde", "premiere", "terminale"] },
+  { id: "culture", name: "Culture générale", emoji: "🌍", gradient: "from-teal-500 to-cyan-600", color: "#14b8a6", levels: ["seconde", "premiere", "terminale"], extra: true },
 ];
 
 export const subjectMeta = (id: SubjectId) => SUBJECTS.find((s) => s.id === id)!;
@@ -221,11 +224,33 @@ export const CHAPTERS: Chapter[] = [
   ch("es-1-monde-hispanique", "espagnol", "premiere", "Le monde hispanique", "Pays, capitales, auteurs et artistes d'Amérique latine."),
   ch("es-t-memoire", "espagnol", "terminale", "Mémoire et histoire", "Conquête, guerre civile, franquisme, transition, dictatures."),
   ch("es-t-argumenter", "espagnol", "terminale", "Argumenter en espagnol", "Connecteurs, opinion, futur, conditionnel, phrases en si."),
+
+  // ───────────── Culture générale (hors programme, tous niveaux) ─────────────
+  ch("cg-capitales", "culture", "seconde", "Capitales du monde", "Plus de 90 pays : Europe, Amériques, Asie, Afrique, Océanie, et les pièges classiques."),
+  ch("cg-geo-monde", "culture", "seconde", "Géographie du monde", "Records, océans, montagnes, fleuves, détroits et monnaies."),
+  ch("cg-france", "culture", "seconde", "France : régions et départements", "Chefs-lieux, numéros de départements, fleuves, villes et sommets."),
+  ch("cg-histoire", "culture", "seconde", "Grandes dates et personnages", "Les dates à connaître de l'Antiquité à nos jours, et qui a fait quoi."),
+  ch("cg-arts", "culture", "seconde", "Arts et monuments", "Tableaux célèbres, sculptures, courants artistiques, monuments et architectes."),
+  ch("cg-litterature", "culture", "seconde", "Livres et auteurs", "Grands romans, pièces et poèmes, leurs auteurs et leurs personnages."),
+  ch("cg-musique", "culture", "seconde", "Musique", "Compositeurs, tubes de la chanson, instruments et styles."),
+  ch("cg-cinema", "culture", "seconde", "Cinéma", "Films cultes, réalisateurs, festivals et récompenses."),
+  ch("cg-sport", "culture", "seconde", "Sport", "Règles, vocabulaire, Jeux olympiques, Coupes du monde et records."),
+  ch("cg-sciences", "culture", "seconde", "Inventions et découvertes", "Savants, inventions, éléments chimiques et corps humain."),
+  ch("cg-espace", "culture", "seconde", "Espace et astronomie", "Planètes, étoiles, missions spatiales et astronautes."),
+  ch("cg-nature", "culture", "seconde", "Animaux et nature", "Records animaliers, petits et cris des animaux, curiosités du vivant."),
+  ch("cg-mythologie", "culture", "seconde", "Mythologie", "Dieux grecs et romains, héros, créatures, mythes nordiques et égyptiens."),
+  ch("cg-langue", "culture", "seconde", "Expressions et langue française", "Expressions imagées, orthographe, pluriels et figures de style."),
+  ch("cg-institutions", "culture", "seconde", "Institutions et sigles", "République française, Union européenne, ONU et sigles du quotidien."),
+  ch("cg-gastronomie", "culture", "seconde", "Gastronomie", "Spécialités du monde et des régions françaises, produits du terroir."),
 ];
 
 export const chapterById = (id: string) => CHAPTERS.find((c) => c.id === id);
 
+/** Chapitres d'une matière pour un niveau (la Culture générale est la même à tous les niveaux). */
 export const chaptersFor = (subject: SubjectId, level: Level) =>
-  CHAPTERS.filter((c) => c.subject === subject && c.level === level);
+  CHAPTERS.filter((c) => c.subject === subject && (c.level === level || subjectMeta(subject).extra));
+
+/** Matières du programme d'un niveau (sans la Culture générale, qui a sa propre page). */
+export const schoolSubjects = (level: Level) => subjectsForLevel(level).filter((s) => !s.extra);
 
 export const subjectsForLevel = (level: Level) => SUBJECTS.filter((s) => s.levels.includes(level));

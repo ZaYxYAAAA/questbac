@@ -7,7 +7,7 @@ import { ChevronRight } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Tabs } from "@/components/ui/Tabs";
-import { LEVELS, subjectsForLevel } from "@/lib/content/curriculum";
+import { LEVELS, schoolSubjects } from "@/lib/content/curriculum";
 import { subjectProgress } from "@/lib/game/selectors";
 import { useGame } from "@/lib/store/game-store";
 import type { Level } from "@/lib/types";
@@ -25,7 +25,7 @@ export default function SubjectsPage() {
       />
 
       <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-        {subjectsForLevel(level).map((s) => {
+        {schoolSubjects(level).map((s) => {
           const p = subjectProgress(game, s.id, level);
           return (
             <Link
@@ -47,6 +47,15 @@ export default function SubjectsPage() {
           );
         })}
       </div>
+
+      <Link href="/culture" className="qb-press group flex items-center gap-3 rounded-2xl border border-teal-400/30 bg-gradient-to-r from-teal-500/15 to-cyan-600/10 p-3">
+        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 text-2xl">🌍</span>
+        <div className="min-w-0 flex-1">
+          <h2 className="font-bold text-white">Culture générale</h2>
+          <p className="text-xs text-slate-400">Hors programme · 16 thèmes pour tous les niveaux</p>
+        </div>
+        <ChevronRight size={18} className="shrink-0 text-teal-300 transition group-hover:translate-x-0.5" />
+      </Link>
     </div>
   );
 }

@@ -96,6 +96,16 @@ export default function HomePage() {
         <RankedHomeCard />
       </div>
 
+      <Link href="/culture" className="qb-press group flex items-center gap-4 rounded-3xl border border-teal-400/30 bg-gradient-to-r from-teal-500/20 via-slate-900 to-slate-900 p-4">
+        <span className="qb-bob grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-600 text-3xl">🌍</span>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-bold uppercase tracking-wider text-teal-300">Nouveau · Culture générale</p>
+          <p className="text-lg font-black text-white">Capitales, arts, sport, espace…</p>
+          <p className="text-xs text-slate-400">16 thèmes hors programme, pour tous les niveaux</p>
+        </div>
+        <ArrowRight size={20} className="shrink-0 text-teal-300 transition group-hover:translate-x-1" />
+      </Link>
+
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Quêtes du jour */}
         <section className="rounded-3xl border border-white/10 bg-slate-900/70 p-4">

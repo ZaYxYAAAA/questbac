@@ -16,7 +16,7 @@ import { Tabs } from "@/components/ui/Tabs";
 import { Card, SectionTitle } from "@/components/ui/Card";
 import { NotificationsCard } from "@/components/layout/NotificationsCard";
 import { ProgressBar } from "@/components/ui/ProgressBar";
-import { LEVELS, levelLabel, subjectsForLevel } from "@/lib/content/curriculum";
+import { LEVELS, levelLabel, schoolSubjects } from "@/lib/content/curriculum";
 import { ACHIEVEMENTS } from "@/lib/game/achievements";
 import { RANK_TIERS, levelFromXp } from "@/lib/game/progression";
 import { TIER_REWARDS, activeTierReward, playerFrame, unlockedTiers } from "@/lib/game/ranks";
@@ -33,7 +33,7 @@ export default function ProfilePage() {
   const level = levelFromXp(game.xp);
   const [pseudo, setPseudo] = useState(profile.pseudo);
   const account = useCloud((s) => s.user);
-  const subjects = subjectsForLevel(profile.level);
+  const subjects = schoolSubjects(profile.level);
   const accuracy = game.stats.answered ? Math.round((game.stats.correct / game.stats.answered) * 100) : 0;
   const unlocked = ACHIEVEMENTS.filter((a) => game.achievements[a.id]).length;
   const [tab, setTab] = useState<"stats" | "succes" | "reglages">("stats");

@@ -11,7 +11,8 @@ export type SubjectId =
   | "philo"
   | "ses"
   | "anglais"
-  | "espagnol";
+  | "espagnol"
+  | "culture";
 
 export type Difficulty = 1 | 2 | 3;
 
