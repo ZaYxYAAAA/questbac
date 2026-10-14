@@ -90,3 +90,31 @@ export function publicQuestion(q: Question): Question {
   if (q.type === "truefalse") return { ...q, answer: false, explanation: "" };
   return { id: q.id, type: "numeric", prompt: q.prompt, unit: q.unit, difficulty: q.difficulty, answer: 0, explanation: "", ...(q.calc ? { calc: true } : {}) };
 }
+
+// ─────────────────────────── Variété des matières ───────────────────────────
+
+/** Sur les 10 dernières parties, 3 au plus dans la même matière. */
+export const DIVERSITY_WINDOW = 10;
+export const MAX_SAME_SUBJECT = 3;
+/** Bonus de points de rang gagnés dans la matière du jour. */
+export const DAILY_SUBJECT_BONUS = 0.25;
+
+/**
+ * Parties à jouer dans d'autres matières avant de pouvoir rejouer celle-ci
+ * (0 : jouable tout de suite). `history` va de la plus récente à la plus ancienne.
+ */
+export function subjectLock(history: readonly Pick<MatchHistory, "subject">[], subject: string): number {
+  const recent = history.slice(0, DIVERSITY_WINDOW - 1);
+  const hits = recent.flatMap((h, i) => (h.subject === subject ? [i] : []));
+  if (hits.length < MAX_SAME_SUBJECT) return 0;
+  return DIVERSITY_WINDOW - 1 - hits[MAX_SAME_SUBJECT - 1];
+}
+
+/** Matière du jour (heure de Paris), parmi celles du niveau : +25 % de points de rang gagnés. */
+export function subjectOfDay(subjects: readonly string[], now = new Date()): string {
+  const d = parisDate(now);
+  const key = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+  let h = 0;
+  for (const c of key) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return subjects[h % subjects.length];
+}

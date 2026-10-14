@@ -1,6 +1,7 @@
 import { MAX_SAVE_BYTES, parseSave } from "@/lib/game/save";
 import { currentSession, getSave, jsonError, putSave, readJson, storageDown } from "@/lib/server/accounts";
 import { rankForSave } from "@/lib/server/match";
+import { keepBossProgress } from "@/lib/game/boss-rules";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,6 +30,8 @@ export async function PUT(req: Request) {
     }
     // Le pseudo du compte fait foi (il sert à se connecter et au classement).
     if (save.profile) save.profile = { ...save.profile, pseudo: session.pseudo };
+    // Boss : on garde toujours le plus grand nombre d'essais et de victoires connus (pas de « reset » des 3 essais).
+    save.bosses = keepBossProgress(stored?.save?.bosses as Record<string, unknown> | undefined, save.bosses as Record<string, unknown>) as typeof save.bosses;
     // Le rang affiché partout est le rang Général du mode classé, tenu par le serveur.
     Object.assign(save, await rankForSave(session.uid));
     await putSave({ id: session.uid, pseudo: session.pseudo }, save);

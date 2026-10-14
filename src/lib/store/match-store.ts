@@ -16,11 +16,15 @@ interface RankedState {
   rank: MyRank | null;
   board: BoardRow[];
   xp: XpRow[];
+  /** Parties à jouer ailleurs avant de rejouer chaque matière (0 = libre). */
+  locks: Record<string, number>;
+  /** Matière du jour (+25 % de points de rang gagnés). */
+  daily: string | null;
   error: string | null;
   loadedAt: number;
 }
 
-export const useRanked = create<RankedState>(() => ({ rank: null, board: [], xp: [], error: null, loadedAt: 0 }));
+export const useRanked = create<RankedState>(() => ({ rank: null, board: [], xp: [], locks: {}, daily: null, error: null, loadedAt: 0 }));
 
 async function call<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
@@ -38,9 +42,9 @@ let inflight: Promise<void> | null = null;
 /** Recharge mon rang et le classement général ; aligne les points de rang de la sauvegarde. */
 export function loadRanked(): Promise<void> {
   if (inflight) return inflight;
-  inflight = call<{ rank: MyRank; board: BoardRow[]; xp: XpRow[] }>("/api/ranked")
-    .then(({ rank, board, xp }) => {
-      useRanked.setState({ rank, board, xp, error: null, loadedAt: Date.now() });
+  inflight = call<{ rank: MyRank; board: BoardRow[]; xp: XpRow[]; locks: Record<string, number>; daily: string }>("/api/ranked")
+    .then(({ rank, board, xp, locks, daily }) => {
+      useRanked.setState({ rank, board, xp, locks, daily, error: null, loadedAt: Date.now() });
       useGame.getState().syncRank(rank.rp, rank.peak);
     })
     .catch((e) => useRanked.setState({ error: e instanceof Error ? e.message : "Erreur" }))

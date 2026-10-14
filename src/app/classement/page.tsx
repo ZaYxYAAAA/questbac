@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
-import { ChevronDown, Play, Swords } from "lucide-react";
+import { ChevronDown, Lock, Play, Swords } from "lucide-react";
 import { Avatar } from "@/components/game/Avatar";
 import { RankEmblem } from "@/components/game/RankEmblem";
 import { LiveMatch } from "@/components/ranked/LiveMatch";
@@ -28,7 +28,7 @@ const fmt = (n: number) => n.toLocaleString("fr-FR");
 export default function RankedPage() {
   const { user, checked } = useCloud();
   const profile = useGame((s) => s.profile);
-  const { rank, board, xp, error } = useRanked();
+  const { rank, board, xp, error, locks, daily } = useRanked();
   const [playing, setPlaying] = useState<Playing | null>(null);
   const [tab, setTab] = useState<Board>("rangs");
   const [scope, setScope] = useState<Scope>("tous");
@@ -97,22 +97,46 @@ export default function RankedPage() {
           <h2 className="flex items-center gap-2 text-lg font-black text-white"><Swords size={18} className="text-amber-300" /> Lancer une partie</h2>
           <p className="text-sm text-slate-400">3 joueurs · 10 questions en même temps · les bonnes réponses d&apos;abord, la vitesse départage.</p>
         </div>
+        {daily && (
+          <p className="flex items-center gap-2 rounded-2xl border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-sm text-amber-100">
+            <span className="text-lg">⭐</span>
+            <span>
+              Matière du jour : <b className="text-white">{subjectMeta(daily as SubjectId).name}</b> · +25 % de points de rang gagnés
+            </span>
+          </p>
+        )}
         <div className="qb-stagger grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {subjectsForLevel(level).map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              disabled={!rank || !!rank.active}
-              onClick={() => play(s.id)}
-              className={clsx("group relative flex items-center gap-2.5 overflow-hidden rounded-2xl bg-gradient-to-br p-3 text-left shadow-lg transition duration-200 hover:-translate-y-0.5 hover:shadow-xl active:scale-[0.96] disabled:pointer-events-none disabled:opacity-40 disabled:saturate-50", s.gradient)}
-            >
-              <span className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-black/25 text-xl transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6">{s.emoji}</span>
-              <span className="min-w-0 flex-1 text-sm font-black leading-tight text-white [hyphens:auto]" lang="fr">{SHORT[s.id] ?? s.name}</span>
-              <Play size={16} className="shrink-0 text-white/80 transition group-hover:scale-110" fill="currentColor" />
-            </button>
-          ))}
+          {subjectsForLevel(level).map((s) => {
+            const lock = locks[s.id] ?? 0;
+            const isDaily = daily === s.id;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                disabled={!rank || !!rank.active || lock > 0}
+                onClick={() => play(s.id)}
+                className={clsx(
+                  "group relative flex items-center gap-2.5 overflow-hidden rounded-2xl bg-gradient-to-br p-3 text-left shadow-lg transition duration-200 hover:-translate-y-0.5 hover:shadow-xl active:scale-[0.96] disabled:pointer-events-none disabled:opacity-40 disabled:saturate-50",
+                  s.gradient,
+                  isDaily && lock === 0 && "ring-2 ring-amber-300 ring-offset-2 ring-offset-slate-950",
+                )}
+              >
+                <span className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-black/25 text-xl transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6">{s.emoji}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-black leading-tight text-white [hyphens:auto]" lang="fr">{SHORT[s.id] ?? s.name}</span>
+                  {lock > 0 ? (
+                    <span className="block text-[10px] font-semibold leading-tight text-white/90">🔒 encore {lock} partie{lock > 1 ? "s" : ""} ailleurs</span>
+                  ) : isDaily ? (
+                    <span className="block text-[10px] font-bold leading-tight text-amber-100">⭐ +25 % aujourd&apos;hui</span>
+                  ) : null}
+                </span>
+                {lock > 0 ? <Lock size={15} className="shrink-0 text-white/80" /> : <Play size={16} className="shrink-0 text-white/80 transition group-hover:scale-110" fill="currentColor" />}
+              </button>
+            );
+          })}
         </div>
+        <p className="text-xs text-slate-500">Varie les matières : sur tes 10 dernières parties, 3 au plus dans la même.</p>
         {rank && rank.history.length > 0 && <History rank={rank} />}
       </section>
 

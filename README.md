@@ -158,6 +158,25 @@ pourront tourner telles quelles côté serveur.
   (ticket), `match:<id>` (partie), `match:settled:<id>` (points distribués une seule fois).
   Le serveur recopie le rang dans la sauvegarde (`rp`), et fait foi.
 
+## Boss, boosts et rythme
+
+- **Boss : 3 essais pour toute la vie du compte** (`src/lib/game/boss-rules.ts`). L'essai est
+  compté dès le lancement du combat (quitter ne le rend pas ; un combat non terminé au bout de
+  30 min compte comme abandonné). Après 3 défaites, le boss est perdu (🪦) ; vaincu, il ne se
+  rejoue plus. Victoire : coffre (+50 % d'XP), boost XP ×2 pendant 30 min, trophée 🏆, ou 🏅
+  « Imbattable » au premier essai. Le serveur garde toujours le plus grand nombre d'essais et de
+  victoires connus (`keepBossProgress` dans PUT /api/save).
+- **Boosts d'XP** (`src/lib/game/boost.ts`) : ×2 après un boss, ×1,5 pendant 30 min quand les
+  3 quêtes du jour sont faites, ×1,5 pendant 1 h au 7e coffre de la série, ×2 le dimanche. Le plus
+  fort s'applique, sans cumul ; jamais sur les points de rang.
+- **Missions rejouées** le même jour : 100 %, puis 50 %, puis 20 % de l'XP.
+- **Chrono adapté à la question** (`src/lib/game/timing.ts`) : 12 s pour un vrai/faux de cours,
+  15 s pour un QCM de cours, 28 à 60 s pour un calcul selon les étapes, la calculatrice, la
+  difficulté et la longueur de l'énoncé. Utilisé en classé (serveur et bots) et contre les boss.
+- **Classé varié** : sur les 10 dernières parties, 3 au plus dans la même matière (refus serveur,
+  tuile verrouillée avec le nombre de parties à jouer ailleurs). **Matière du jour** (heure de
+  Paris) : +25 % de points de rang gagnés.
+
 ## Culture générale
 
 - Matière à part (`culture`, `extra: true` dans curriculum.ts) : hors programme, mêmes thèmes à

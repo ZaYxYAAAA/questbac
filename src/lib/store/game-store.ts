@@ -23,6 +23,7 @@ import {
   applySession,
   createInitialData,
   refreshPeriods,
+  startBossFight,
 } from "@/lib/game/state";
 import { useCelebration } from "./celebration-store";
 
@@ -31,6 +32,8 @@ interface GameActions {
   updateProfile: (patch: Partial<Omit<Profile, "createdAt">>) => void;
   setLevel: (level: Level) => void;
   recordSession: (session: SessionInput) => RewardSummary;
+  /** Lance un combat de boss (l'essai est compté tout de suite) ; false si le boss ne peut plus être tenté. */
+  startBossFight: (bossId: string) => boolean;
   recordActivity: (activity: ActivityInput) => RewardSummary;
   updateMission: (mission: CustomMission) => void;
   deleteMission: (id: string) => void;
@@ -78,6 +81,12 @@ export const useGame = create<GameStore>()(
           commit(next);
           useCelebration.getState().show(summary.promotion);
           return summary;
+        },
+        startBossFight: (bossId) => {
+          const next = startBossFight(data(), bossId);
+          if (!next) return false;
+          commit({ bosses: next.bosses });
+          return true;
         },
         recordActivity: (activity) => {
           const { data: next, summary } = applyActivity(data(), activity);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Question } from "@/lib/types";
+import { subjectLock, subjectOfDay } from "./ranked";
 import {
   INTRO_MS,
   type Match,
@@ -102,5 +103,21 @@ describe("partie classée", () => {
     expect(rpDelta(3, 0, 2, 10)).toBeLessThan(0);
     expect(rpDelta(3, 9500, 2, 10)).toBeLessThan(rpDelta(3, 0, 2, 10));
     expect(rpDelta(1, 0, 10, 10)).toBe(rpDelta(1, 0, 9, 10) + 5);
+  });
+});
+
+
+describe("variété des matières en classé", () => {
+  const h = (...subjects: string[]) => subjects.map((subject) => ({ subject }));
+  it("3 parties sur 10 au plus dans la même matière", () => {
+    expect(subjectLock(h("histoire", "histoire"), "histoire")).toBe(0);
+    expect(subjectLock(h("histoire", "histoire", "histoire"), "histoire")).toBe(7);
+    expect(subjectLock(h("maths", "histoire", "svt", "histoire", "histoire"), "histoire")).toBe(5);
+    expect(subjectLock(h("maths", "maths", "maths", "maths", "maths", "maths", "histoire", "histoire", "histoire"), "histoire")).toBe(1);
+    expect(subjectLock(h("maths", "maths", "maths", "maths", "maths", "maths", "maths", "histoire", "histoire", "histoire"), "histoire")).toBe(0);
+  });
+  it("matière du jour stable sur la journée", () => {
+    const list = ["maths", "svt", "histoire"];
+    expect(subjectOfDay(list, new Date("2026-10-14T08:00:00Z"))).toBe(subjectOfDay(list, new Date("2026-10-14T20:00:00Z")));
   });
 });

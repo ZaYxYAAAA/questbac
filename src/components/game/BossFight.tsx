@@ -8,6 +8,7 @@ import { bossDamage } from "@/lib/game/progression";
 import { prepareQuestions } from "@/lib/game/session";
 import type { Boss, Question, QuizResult } from "@/lib/types";
 import { QuestionCard } from "./QuestionCard";
+import { questionTimeMs } from "@/lib/game/timing";
 
 const MAX_HEARTS = 3;
 
@@ -36,8 +37,9 @@ export function BossFight({ boss, pool, onComplete }: { boss: Boss; pool: Questi
   const questionStart = useRef(Date.now());
 
   const enraged = hp <= boss.hp / 2;
-  const limit = boss.secondsPerQuestion * (enraged ? 0.7 : 1) * 1000;
   const q = deck[index];
+  // Temps adapté à la question, plus ou moins serré selon le boss (et réduit quand il enrage).
+  const limit = Math.round(questionTimeMs(q) * (boss.secondsPerQuestion / 25) * (enraged ? 0.75 : 1));
 
   // Chronomètre
   useEffect(() => {

@@ -3,6 +3,8 @@
  * (testables, indépendantes du stockage). Le store Zustand ne fait que les appeler.
  */
 import type { CustomMission, Level, QuizResult, SavedFiche, SubjectId } from "@/lib/types";
+import { type BossRecord, bossState, fightInProgress, triesLeft } from "./boss-rules";
+import { type XpBoost, activeBoost, fmtMult, grantBoost, replayFactor } from "./boost";
 import { DUEL_REWARDS, type DuelOutcome } from "./duel";
 import { matchXp } from "./match";
 import { type AchievementDef, newlyUnlocked } from "./achievements";
@@ -59,11 +61,7 @@ export interface ChapterProgress {
   lastPlayed: number;
 }
 
-export interface BossRecord {
-  victories: number;
-  attempts: number;
-  bestTimeMs: number | null;
-}
+export type { BossRecord };
 
 export interface GameData {
   version: 1;
@@ -95,6 +93,10 @@ export interface GameData {
   xpByDay: Record<string, number>;
   fiches: SavedFiche[];
   missions: CustomMission[];
+  /** Boost d'XP en cours (boss, quêtes, coffre de série). */
+  boost?: XpBoost | null;
+  /** Missions jouées aujourd'hui (l'XP baisse quand on rejoue la même). */
+  missionPlays?: { day: string; counts: Record<string, number> };
   /** Horodatage (ms) de la dernière modification : arbitre la synchronisation serveur. */
   updatedAt: number;
 }
@@ -128,6 +130,8 @@ export function createInitialData(now = new Date()): GameData {
     feed: [],
     xpByDay: {},
     fiches: [],
+    boost: null,
+    missionPlays: { day: "", counts: {} },
     missions: [],
     updatedAt: 0,
   };
@@ -233,9 +237,13 @@ function finalize(
   now: Date,
 ): { data: GameData; summary: RewardSummary } {
   // Le rang ne se gagne plus qu'en mode classé : l'entraînement rapporte de l'XP seulement.
-  let d = addXp({ ...afterBase, rp: before.rp }, base.xp, now);
   const lines = base.lines.filter((l) => l.label !== "Points de rang");
-  let xpGained = base.xp;
+  // Boost en vigueur au début de l'activité (celui qu'elle fait gagner compte pour la suivante).
+  const boost = activeBoost(before.boost, now);
+  const boosted = boost && base.xp > 0 ? Math.round(base.xp * (boost.mult - 1)) : 0;
+  if (boosted > 0) lines.push({ label: `🚀 ${boost!.label}`, value: `+${boosted} XP` });
+  let d = addXp({ ...afterBase, rp: before.rp }, base.xp + boosted, now);
+  let xpGained = base.xp + boosted;
 
   const q = progressQuests(d, base.events);
   d = { ...d, quests: q.quests };
@@ -248,6 +256,8 @@ function finalize(
     d = addXp(d, CHEST_XP, now);
     xpGained += CHEST_XP;
     lines.push({ label: "Coffre des quêtes du jour", value: `+${CHEST_XP} XP` });
+    d = { ...d, boost: grantBoost(d.boost, 1.5, 30, "quests", now) };
+    lines.push({ label: "🚀 Boost XP ×1,5 activé", value: "30 min" });
   }
 
   // Les succès peuvent en débloquer d'autres (ex. niveau atteint grâce à l'XP d'un succès).
@@ -337,43 +347,66 @@ export type SessionInput =
 
 export function applySession(input: GameData, session: SessionInput, now = new Date()) {
   const before = refreshPeriods(input, now);
+  // Boss déjà vaincu ou perdu (3 essais épuisés) : le combat ne compte pour rien.
+  if (session.kind === "boss" && bossState(before.bosses[session.bossId], now.getTime()) !== "available") {
+    return finalize(before, before, { xp: 0, rp: 0, lines: [], events: {} }, now);
+  }
   let d = touchStreak(applyAnswerStats(before, session.subject, session.result), now);
   const { result } = session;
   const events: Partial<Record<QuestEvent, number>> = { correct: result.correct, combo: result.maxCombo };
 
   if (session.kind === "boss") {
-    const record = d.bosses[session.bossId] ?? { victories: 0, attempts: 0, bestTimeMs: null };
+    const record: BossRecord = d.bosses[session.bossId] ?? { victories: 0, attempts: 0, bestTimeMs: null };
+    // Essai déjà compté au lancement du combat (startBossFight) ; sinon on le compte maintenant.
+    const tries = fightInProgress(record, now.getTime()) ? record.tries ?? 1 : (record.tries ?? 0) + 1;
+    const flawless = session.won && tries === 1;
     d = {
       ...d,
       bosses: {
         ...d.bosses,
         [session.bossId]: {
+          ...record,
           attempts: record.attempts + 1,
+          tries,
+          pending: undefined,
           victories: record.victories + (session.won ? 1 : 0),
-          bestTimeMs: session.won
-            ? Math.min(record.bestTimeMs ?? Infinity, result.durationMs)
-            : record.bestTimeMs,
+          bestTimeMs: session.won ? Math.min(record.bestTimeMs ?? Infinity, result.durationMs) : record.bestTimeMs,
+          ...(flawless ? { flawless: true } : {}),
         },
       },
     };
     const raw = session.won
       ? session.xpReward
       : Math.max(15, Math.round(session.xpReward * 0.3 * (1 - session.bossHpLeft)));
+    const chest = session.won ? Math.round(session.xpReward * 0.5) : 0;
+    const perfect = flawless ? 150 : 0;
     const bonus = Math.round(raw * streakBonus(d.streak.count));
-    // Une défaite coûte 15 RP, sans descendre sous 0.
-    const rp = session.won ? session.rpReward : -Math.min(15, d.rp);
-    if (session.won) events.boss_win = 1;
+    if (session.won) {
+      events.boss_win = 1;
+      d = { ...d, boost: grantBoost(d.boost, 2, 30, "boss", now) };
+    }
+    const left = 3 - tries;
     const lines: RewardLine[] = [
       { label: session.won ? "Boss vaincu" : "Combat (prix de consolation)", value: `+${raw} XP` },
+      ...(chest ? [{ label: "🎁 Coffre du boss", value: `+${chest} XP` }] : []),
+      ...(perfect ? [{ label: "🏅 Trophée « Imbattable » (vaincu au 1er essai)", value: `+${perfect} XP` }] : []),
       ...(bonus > 0 ? [{ label: `Bonus de série (${d.streak.count} j)`, value: `+${bonus} XP` }] : []),
-      { label: "Points de rang", value: `${rp >= 0 ? "+" : ""}${rp} RP` },
+      ...(session.won ? [{ label: "🚀 Boost XP ×2 activé", value: "30 min" }] : []),
+      ...(!session.won ? [{ label: left > 0 ? `Essais restants pour ce boss` : "💀 Boss perdu : plus aucun essai", value: left > 0 ? `${left}/3` : "0/3" }] : []),
     ];
     const feed = session.won ? [{ kind: "boss" as const, ref: session.bossId }] : [];
-    return finalize(before, d, { xp: raw + bonus, rp, lines, events, feed }, now);
+    return finalize(before, d, { xp: raw + chest + perfect + bonus, rp: 0, lines, events, feed }, now);
   }
 
   const rewards = missionRewards(result, session.answerXp, d.streak.count);
   events.mission = 1;
+  // Rejouer la même mission le même jour rapporte de moins en moins d'XP.
+  const today = dayKey(now);
+  const playKey = session.kind === "chapter" ? session.chapterId : session.missionId;
+  const plays = d.missionPlays?.day === today ? d.missionPlays.counts : {};
+  const factor = replayFactor(plays[playKey] ?? 0);
+  d = { ...d, missionPlays: { day: today, counts: { ...plays, [playKey]: (plays[playKey] ?? 0) + 1 } } };
+  const missionXp = Math.round(rewards.xp * factor);
   if (rewards.stars === 3) events.perfect = 1;
   d = {
     ...d,
@@ -415,9 +448,19 @@ export function applySession(input: GameData, session: SessionInput, now = new D
     { label: "Mission terminée", value: `+${rewards.completionBonus} XP` },
     ...(rewards.perfectBonus ? [{ label: "Sans faute !", value: `+${rewards.perfectBonus} XP` }] : []),
     ...(rewards.streakBonusXp ? [{ label: `Bonus de série (${d.streak.count} j)`, value: `+${rewards.streakBonusXp} XP` }] : []),
-    { label: "Points de rang", value: `+${rewards.rp} RP` },
+    ...(factor < 1 ? [{ label: `Mission déjà jouée aujourd'hui (XP ×${fmtMult(factor)})`, value: `−${rewards.xp - missionXp} XP` }] : []),
   ];
-  return finalize(before, d, { xp: rewards.xp, rp: rewards.rp, lines, stars: rewards.stars, events }, now);
+  return finalize(before, d, { xp: missionXp, rp: 0, lines, stars: rewards.stars, events }, now);
+}
+
+/**
+ * Lancement d'un combat de boss : l'essai est compté tout de suite (quitter en
+ * plein combat ne le rend pas). Renvoie null si le boss ne peut plus être tenté.
+ */
+export function startBossFight(input: GameData, bossId: string, now = new Date()): GameData | null {
+  const record: BossRecord = input.bosses[bossId] ?? { victories: 0, attempts: 0, bestTimeMs: null };
+  if (bossState(record, now.getTime()) !== "available" || triesLeft(record, now.getTime()) <= 0) return null;
+  return { ...input, bosses: { ...input.bosses, [bossId]: { ...record, tries: (record.tries ?? 0) + 1, pending: now.getTime() } } };
 }
 
 export type ActivityInput =
@@ -469,6 +512,11 @@ export function applyDailyClaim(input: GameData, now = new Date()): { data: Game
     { label: `Coffre du jour ${reward.day}/7`, value: `+${reward.xp} XP` },
     ...(reward.rp ? [{ label: "Points de rang", value: `+${reward.rp} RP` }] : []),
   ];
-  const { data, summary } = finalize(before, { ...before, daily: claimed.state }, { xp: reward.xp, rp: reward.rp, lines, events: {} }, now);
+  let after: GameData = { ...before, daily: claimed.state };
+  if (reward.day === 7) {
+    after = { ...after, boost: grantBoost(after.boost, 1.5, 60, "daily", now) };
+    lines.push({ label: "🚀 Boost XP ×1,5 activé", value: "1 h" });
+  }
+  const { data, summary } = finalize(before, after, { xp: reward.xp, rp: reward.rp, lines, events: {} }, now);
   return { data, summary, reward };
 }

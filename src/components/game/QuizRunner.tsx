@@ -9,6 +9,7 @@ import { comboMultiplier, xpForAnswer } from "@/lib/game/progression";
 import type { GivenAnswer } from "@/lib/game/session";
 import type { Question, QuizResult } from "@/lib/types";
 import { QuestionCard } from "./QuestionCard";
+import { BoostChip } from "@/components/game/BoostChip";
 
 export function QuizRunner({
   questions,
@@ -140,6 +141,8 @@ export function QuizRunner({
           <Flame size={16} className={combo >= 3 ? "text-orange-400" : ""} />
           Combo ×<span key={combo} className={combo > 0 ? "qb-bump" : undefined}>{combo}</span> {combo > 0 && <span className="text-xs font-medium opacity-80">(XP ×{comboMultiplier(combo).toFixed(1)})</span>}
         </div>
+        <div className="flex items-center gap-2">
+        <BoostChip />
         <div className="relative flex items-center gap-1.5 rounded-full bg-violet-500/15 px-3 py-1 text-sm font-bold text-violet-200">
           <Sparkles size={16} /> <span key={xp} className="qb-bump tabular-nums">{xp}</span> XP
           {floating && (
@@ -147,6 +150,7 @@ export function QuizRunner({
               {floating.text}
             </span>
           )}
+        </div>
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
-import { chaptersFor } from "@/lib/content/curriculum";
+import { chaptersFor, subjectMeta, subjectsForLevel } from "@/lib/content/curriculum";
 import { chapterQuestions, factKey, hasGenerators } from "@/lib/content/generated";
 import {
   MATCH_PLAYERS,
@@ -23,7 +23,7 @@ import {
   tick,
 } from "@/lib/game/match";
 import { hashString, seededRandom, shuffle } from "@/lib/game/quests";
-import { type RankProfile, RANK_EPOCH, applyResult, currentWeek, newRankProfile, publicQuestion, rankedWeek } from "@/lib/game/ranked";
+import { DAILY_SUBJECT_BONUS, type RankProfile, RANK_EPOCH, applyResult, currentWeek, newRankProfile, publicQuestion, rankedWeek, subjectLock, subjectOfDay } from "@/lib/game/ranked";
 import { rankFromRp } from "@/lib/game/progression";
 import type { PublicProfile } from "@/lib/game/save";
 import { isCorrect } from "@/lib/game/session";
@@ -274,6 +274,10 @@ export async function joinQueue(uid: string, pseudo: string, subject: SubjectId)
     if (m && phaseAt(m, Date.now()).phase !== "done") return { matchId: m.id };
   }
   const save = await getSave(uid);
+  const lock = subjectLock(rank.history, subject);
+  if (lock > 0) {
+    throw new Error(`Tu as joué 3 de tes 10 dernières parties en ${subjectMeta(subject).name} : joue encore ${lock} partie${lock > 1 ? "s" : ""} dans d'autres matières pour la débloquer.`);
+  }
   const ticket: Ticket = { id: newId(), uid, pseudo, subject, level: save?.save.profile?.level ?? "seconde", rp: rank.rp, at: Date.now() };
   return withLock(queueLock(subject, ticket.level), async () => {
     const store = getStore();
@@ -365,6 +369,7 @@ async function createMatch(tickets: Ticket[]): Promise<Match> {
     botPlans: {},
     away: {},
     finishedAt: null,
+    bonus: tickets[0].subject === dailySubject(tickets[0].level),
   };
   m.votes = botVotes(m);
   await saveMatch(m);
@@ -399,12 +404,22 @@ export async function advance(m: Match, now = Date.now()): Promise<Match> {
 }
 
 /** Points de rang de fin de partie, pour chaque joueur humain. */
+/** Matière du jour pour un niveau. */
+export const dailySubject = (level: Level, now = new Date()) => subjectOfDay(subjectsForLevel(level).map((s) => s.id), now) as SubjectId;
+
+/** Parties à jouer ailleurs avant de pouvoir rejouer chaque matière (0 = libre). */
+export function subjectLocks(rank: RankProfile, level: Level): Record<string, number> {
+  return Object.fromEntries(subjectsForLevel(level).map((s) => [s.id, subjectLock(rank.history, s.id)]));
+}
+
 export function deltas(m: Match): Record<string, number> {
   const s = standings(m);
   return Object.fromEntries(
     s.map((row) => {
       const p = m.players.find((x) => x.id === row.playerId)!;
-      return [p.id, rpDelta(row.place, p.rp, row.correct, m.questions.length)];
+      const d = rpDelta(row.place, p.rp, row.correct, m.questions.length);
+      // Matière du jour : +25 % sur les points gagnés (les pertes restent normales).
+      return [p.id, m.bonus && d > 0 ? Math.round(d * (1 + DAILY_SUBJECT_BONUS)) : d];
     }),
   );
 }
@@ -502,6 +517,7 @@ export function viewFor(m: Match, uid: string, now = Date.now()) {
     question: q ? (phase === "question" && !mine ? publicQuestion(q) : q) : null,
     mine,
     away: q ? !!m.away[uid]?.includes(index) : false,
+    bonus: !!m.bonus,
   };
 }
 

@@ -18,6 +18,7 @@ export async function POST(req: Request) {
   try {
     return Response.json(await joinQueue(session.uid, session.pseudo, subject as SubjectId), { headers: NO_STORE });
   } catch (error) {
+    if (error instanceof Error && error.message.startsWith("Tu as joué")) return jsonError(error.message, 409);
     return storageDown(error);
   }
 }

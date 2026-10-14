@@ -9,6 +9,7 @@
 import type { Level, Question, SubjectId } from "@/lib/types";
 import { RANK_TIERS, rankFromRp } from "./progression";
 import { hashString, seededRandom } from "./quests";
+import { questionTimeMs } from "./timing";
 
 export const MATCH_QUESTIONS = 10;
 export const MATCH_PLAYERS = 3;
@@ -20,7 +21,8 @@ export const REVEAL_MS = 3500;
 /** Marge pour le trajet réseau d'une réponse envoyée juste avant la fin du chrono. */
 export const ANSWER_GRACE_MS = 1500;
 
-export const questionMs = (q: Pick<Question, "type">) => (q.type === "numeric" ? 30_000 : 20_000);
+/** Temps de réponse : adapté à la question (12 s pour un vrai/faux de cours, jusqu'à 60 s pour un calcul). */
+export const questionMs = (q: Pick<Question, "type" | "prompt" | "difficulty" | "calc">) => questionTimeMs(q);
 
 export interface MatchPlayer {
   id: string;
@@ -72,6 +74,8 @@ export interface Match {
   /** Questions perdues parce que le joueur a quitté l'appli. */
   away: Record<string, number[]>;
   finishedAt: number | null;
+  /** Partie dans la matière du jour : +25 % de points de rang gagnés. */
+  bonus?: boolean;
 }
 
 // ─────────────────────────── Bots ───────────────────────────
@@ -136,7 +140,8 @@ export function planBotAnswer(bot: MatchPlayer, q: Question, r: () => number, mo
   const chars = visibleLength(q.prompt) + (q.type === "mcq" ? q.choices.reduce((n, c) => n + visibleLength(c), 0) * 0.6 : 0);
   const readSpeed = 13 + speed * 14; // caractères par seconde
   const reading = (chars / readSpeed) * 1000;
-  const thinkMedian = (6500 - speed * 4500) * (q.type === "numeric" ? 1.9 : q.type === "truefalse" ? 0.6 : 1);
+  // Réflexion proportionnelle au temps prévu pour la question (un calcul long prend plus de temps qu'une question de cours).
+  const thinkMedian = (6500 - speed * 4500) * (limit / 20_000) * (q.type === "numeric" ? 1.25 : q.type === "truefalse" ? 0.75 : 1);
   let think = logNormal(r, thinkMedian, 0.45);
   if (!correct) think *= r() < 0.5 ? 0.65 : 1.4; // trop vite, ou après hésitation
   if (r() < 0.06) think += 2000 + r() * 4000; // distraction

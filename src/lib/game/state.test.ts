@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { acknowledgeLeague, applyActivity, applyDailyClaim, applySession, createInitialData, refreshPeriods } from "./state";
+import { bossState, keepBossProgress, triesLeft } from "./boss-rules";
+import { startBossFight } from "./state";
 
 const now = new Date(2026, 9, 12, 10);
 const perfect = { correct: 5, total: 5, maxCombo: 5, durationMs: 30_000, answers: [] };
@@ -28,15 +30,63 @@ describe("applySession", () => {
     expect(b.chapters.c.attempts).toBe(2);
   });
 
-  it("gère victoire et défaite contre un boss", () => {
+  it("boss vaincu : coffre, boost ×2 et plus rejouable", () => {
     const d0 = createInitialData(now);
-    const win = applySession(d0, { kind: "boss", bossId: "derivatus", subject: "maths", result: perfect, won: true, xpReward: 350, rpReward: 80, bossHpLeft: 0 }, now);
-    expect(win.data.bosses.derivatus.victories).toBe(1);
+    const boss = { kind: "boss" as const, bossId: "derivatus", subject: "maths" as const, result: perfect, xpReward: 350, rpReward: 80 };
+    const win = applySession(d0, { ...boss, won: true, bossHpLeft: 0 }, now);
+    expect(win.data.bosses.derivatus).toMatchObject({ victories: 1, tries: 1, flawless: true });
     expect(win.data.rp).toBe(0);
-    const lose = applySession(win.data, { kind: "boss", bossId: "derivatus", subject: "maths", result: perfect, won: false, xpReward: 350, rpReward: 80, bossHpLeft: 0.5 }, now);
-    expect(lose.data.rp).toBe(0);
-    expect(lose.data.bosses.derivatus.attempts).toBe(2);
+    expect(win.data.boost).toMatchObject({ mult: 2, source: "boss" });
+    expect(win.summary.lines.some((l) => l.label.includes("Coffre du boss"))).toBe(true);
     expect(win.summary.lines.some((l) => l.label === "Points de rang")).toBe(false);
+    // Rejouer un boss vaincu ne rapporte plus rien et ne compte pas d'essai.
+    const again = applySession(win.data, { ...boss, won: true, bossHpLeft: 0 }, now);
+    expect(again.summary.xpGained).toBe(0);
+    expect(again.data.bosses.derivatus.tries).toBe(1);
+  });
+
+  it("boss : 3 défaites et il est perdu pour toujours", () => {
+    let d = createInitialData(now);
+    const lose = { kind: "boss" as const, bossId: "hydre-log", subject: "maths" as const, result: perfect, won: false, xpReward: 500, rpReward: 0, bossHpLeft: 0.5 };
+    for (let i = 0; i < 3; i++) d = applySession(d, lose, now).data;
+    expect(bossState(d.bosses["hydre-log"])).toBe("lost");
+    expect(triesLeft(d.bosses["hydre-log"])).toBe(0);
+    const fourth = applySession(d, { ...lose, won: true, bossHpLeft: 0 }, now);
+    expect(fourth.summary.xpGained).toBe(0);
+    expect(fourth.data.bosses["hydre-log"].victories).toBe(0);
+  });
+
+  it("boss : quitter en plein combat compte quand même l'essai", () => {
+    let d = createInitialData(now);
+    for (let i = 0; i < 3; i++) d = startBossFight(d, "sphinx-fonctions", now)!;
+    expect(triesLeft(d.bosses["sphinx-fonctions"], now.getTime())).toBe(0);
+    // Le 3e combat, encore en cours, peut être gagné…
+    const win = applySession(d, { kind: "boss", bossId: "sphinx-fonctions", subject: "maths", result: perfect, won: true, xpReward: 250, rpReward: 0, bossHpLeft: 0 }, now);
+    expect(win.data.bosses["sphinx-fonctions"]).toMatchObject({ victories: 1, tries: 3 });
+    // …mais abandonné, le boss est perdu.
+    const later = new Date(now.getTime() + 31 * 60_000);
+    expect(bossState(d.bosses["sphinx-fonctions"], later.getTime())).toBe("lost");
+    expect(startBossFight(d, "sphinx-fonctions", later)).toBeNull();
+  });
+
+  it("le serveur ne rend jamais d'essais de boss", () => {
+    const merged = keepBossProgress({ derivatus: { victories: 0, attempts: 5, tries: 2 } }, { derivatus: { victories: 0, attempts: 1, tries: 0 } });
+    expect(merged.derivatus).toMatchObject({ tries: 2, attempts: 5 });
+  });
+
+  it("une mission rejouée le même jour rapporte de moins en moins", () => {
+    let d = createInitialData(now);
+    const play = { kind: "chapter" as const, chapterId: "maths-2-nombres", subject: "maths" as const, result: perfect, answerXp: 100 };
+    const gains = [0, 1, 2].map(() => {
+      const r = applySession(d, play, now);
+      d = r.data;
+      return r.summary.lines.find((l) => l.label.startsWith("Mission déjà jouée"))?.value ?? null;
+    });
+    expect(gains[0]).toBeNull();
+    expect(gains[1]).toMatch(/^−/);
+    expect(gains[2]).toMatch(/^−/);
+    const tomorrow = new Date(now.getTime() + 86_400_000);
+    expect(applySession(d, play, tomorrow).summary.lines.some((l) => l.label.startsWith("Mission déjà jouée"))).toBe(false);
   });
 
   it("réinitialise les quêtes quand le jour change", () => {

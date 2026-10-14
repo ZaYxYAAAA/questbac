@@ -23,6 +23,10 @@ export function significantDigits(n: number): number {
 const SCIENTIFIC = /\\times\s*10\^|×\s*10\^|10\^\{?-?\d/;
 /** Nombre décimal écrit dans l'énoncé (« 4,7 », « 4{,}7 », « 0.25 »). */
 const DECIMAL_IN_TEXT = /\d(?:\{,\}|,|\.)\d/;
+/** Fraction dont un terme a au moins 2 chiffres : \frac{8}{17}, 15/17. */
+const BIG_FRACTION = /\\d?frac\{-?\d+\}\{\d{2,}\}|\\d?frac\{\d{2,}\}\{\d+\}|\b\d+\s*\/\s*\d{2,}\b/;
+/** Racine d'un nombre à au moins 2 chiffres. */
+const ROOT = /\\sqrt\{?\d{2,}/;
 const TWO_DECIMALS_IN_TEXT = /\d(?:\{,\}|,|\.)\d\d/;
 
 /** Valeur d'un choix de QCM s'il s'agit d'un nombre simple (pas une fraction ni une expression). */
@@ -70,6 +74,8 @@ function hardValue(value: number, prompt: string): boolean {
 export function needsCalculator(q: AnyQuestion): boolean {
   if (q.type === "truefalse") return false;
   if (!/\d/.test(q.prompt)) return false;
+  // Fractions à grands nombres ou racines (cos x = 8/17 → sin x = √(1 − 64/289)) : pas de tête.
+  if (BIG_FRACTION.test(q.prompt) || ROOT.test(q.prompt)) return true;
   if (q.type === "numeric") return (SCIENTIFIC.test(q.prompt) && significantDigits(q.answer) >= 2) || hardValue(q.answer, q.prompt);
   const right = q.choices[q.answer];
   if (right === undefined) return false;

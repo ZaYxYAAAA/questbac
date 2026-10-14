@@ -20,6 +20,8 @@ import { LEVELS, levelLabel, schoolSubjects } from "@/lib/content/curriculum";
 import { ACHIEVEMENTS } from "@/lib/game/achievements";
 import { RANK_TIERS, levelFromXp } from "@/lib/game/progression";
 import { TIER_REWARDS, activeTierReward, playerFrame, unlockedTiers } from "@/lib/game/ranks";
+import { BOSSES } from "@/lib/content/bosses";
+import { bossState } from "@/lib/game/boss-rules";
 import { subjectProgress, xpHistory } from "@/lib/game/selectors";
 import { useCloud } from "@/lib/store/cloud-sync";
 import { useGame } from "@/lib/store/game-store";
@@ -88,6 +90,8 @@ export default function ProfilePage() {
           </div>
         ))}
       </div>
+
+      <BossTrophies />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
@@ -281,6 +285,38 @@ function TitlesAndFrames() {
           );
         })}
       </div>
+    </Card>
+  );
+}
+
+/** Collection des trophées de boss : 🏆 vaincu, 🏅 vaincu au premier essai, 🪦 perdu. */
+function BossTrophies() {
+  const bosses = useGame((s) => s.bosses);
+  const won = BOSSES.filter((b) => bossState(bosses[b.id]) === "defeated").length;
+  return (
+    <Card>
+      <SectionTitle icon={<span>🏆</span>}>Trophées de boss · {won}/{BOSSES.length}</SectionTitle>
+      <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
+        {BOSSES.map((b) => {
+          const r = bosses[b.id];
+          const state = bossState(r);
+          return (
+            <Link
+              key={b.id}
+              href={`/boss/${b.id}`}
+              title={b.name}
+              className={clsx(
+                "relative flex aspect-square flex-col items-center justify-center rounded-2xl border text-3xl transition hover:-translate-y-0.5",
+                state === "defeated" ? (r?.flawless ? "border-amber-300/60 bg-amber-400/15" : "border-emerald-400/40 bg-emerald-500/10") : "border-white/10 bg-slate-900/70",
+              )}
+            >
+              <span className={clsx(state !== "defeated" && "opacity-40 grayscale")}>{state === "lost" ? "🪦" : state === "defeated" ? b.emoji : "❔"}</span>
+              {state === "defeated" && <span className="absolute -right-1 -top-1 text-base">{r?.flawless ? "🏅" : "🏆"}</span>}
+            </Link>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-xs text-slate-500">🏅 vaincu du premier coup · 🏆 vaincu · 🪦 perdu après 3 essais</p>
     </Card>
   );
 }

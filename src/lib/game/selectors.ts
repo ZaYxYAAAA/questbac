@@ -5,6 +5,7 @@ import { hasLocalQuestions } from "@/lib/content/questions";
 import type { Boss, Level, SubjectId } from "@/lib/types";
 import { dayKey } from "./progression";
 import type { GameData } from "./state";
+import { bossState, triesLeft } from "./boss-rules";
 
 export const chapterStars = (d: GameData, chapterId: string) => d.chapters[chapterId]?.stars ?? 0;
 
@@ -20,12 +21,17 @@ export function bossStatus(d: GameData, boss: Boss, level: Level) {
   const completed = chapters.filter((c) => chapterStars(d, c.id) > 0).length;
   const required = Math.min(boss.unlockChapters, chapters.length);
   const record = d.bosses[boss.id];
+  const state = bossState(record);
   return {
     unlocked: completed >= required,
     completed,
     required,
-    defeated: (record?.victories ?? 0) > 0,
+    defeated: state === "defeated",
+    /** 3 essais ratés : le boss ne peut plus être tenté. */
+    lost: state === "lost",
+    flawless: Boolean(record?.flawless),
     attempts: record?.attempts ?? 0,
+    triesLeft: triesLeft(record),
   };
 }
 

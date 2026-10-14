@@ -601,7 +601,7 @@ function Results({ view, onClose, onReplay }: { view: MatchView; onClose: () => 
       <div className="grid grid-cols-2 gap-2">
         <div className={clsx("qb-pop rounded-2xl border p-3 text-center", delta >= 0 ? "border-emerald-400/30 bg-emerald-500/10" : "border-rose-400/30 bg-rose-500/10")} style={{ animationDelay: "0.5s" }}>
           <p className={clsx("text-3xl font-black tabular-nums", delta >= 0 ? "text-emerald-300" : "text-rose-300")}>{rp >= 0 ? "+" : ""}{rp}</p>
-          <p className="text-xs text-slate-400">points de rang</p>
+          <p className="text-xs text-slate-400">points de rang{view.bonus && delta > 0 ? " · ⭐ +25 %" : ""}</p>
         </div>
         <div className="qb-pop rounded-2xl border border-violet-400/30 bg-violet-500/10 p-3 text-center" style={{ animationDelay: "0.6s" }}>
           <p className="text-3xl font-black tabular-nums text-violet-200">+{xp}</p>
