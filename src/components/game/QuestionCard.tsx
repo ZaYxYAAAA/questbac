@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { ArrowRight, Check, Clock, Lightbulb, X } from "lucide-react";
+import { Calculator } from "@/components/game/Calculator";
 import { Markdown } from "@/components/ui/Markdown";
 import { type GivenAnswer, isCorrect } from "@/lib/game/session";
 import type { Question } from "@/lib/types";
@@ -137,9 +138,14 @@ export function QuestionCard({
       <div className="text-lg leading-relaxed text-white sm:text-xl">
         <Markdown>{question.prompt}</Markdown>
       </div>
+      {question.calc && !revealed && (
+        <div>
+          <Calculator onUse={question.type === "numeric" ? (v) => setNumeric(v) : undefined} />
+        </div>
+      )}
 
       {question.type === "mcq" && (
-        <div className="grid gap-2.5 sm:grid-cols-2">
+        <div className="qb-stagger grid gap-2.5 sm:grid-cols-2">
           {question.choices.map((choice, i) => (
             <button key={i} type="button" disabled={locked} onClick={() => submit(i)} className={choiceClass(i === question.answer, given === i)}>
               <span
@@ -159,7 +165,7 @@ export function QuestionCard({
       )}
 
       {question.type === "truefalse" && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="qb-stagger grid grid-cols-2 gap-3">
           {[true, false].map((v) => (
             <button key={String(v)} type="button" disabled={locked} onClick={() => submit(v)} className={clsx(choiceClass(v === question.answer, given === v), "min-h-16 justify-center py-4 text-lg font-bold")}>
               {v ? "✅ Vrai" : "❌ Faux"}

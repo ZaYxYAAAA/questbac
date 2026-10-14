@@ -26,6 +26,7 @@ import { PHYSIQUE } from "./gen/physique";
 import { SES_ANGLAIS } from "./gen/ses-anglais";
 import { SVT } from "./gen/svt";
 import { questionsForChapter } from "./questions";
+import { withCalc } from "@/lib/game/calculator";
 
 const BASE_GENERATORS: Record<string, Generator[]> = {
   ...MATHS_SECONDE,
@@ -102,7 +103,7 @@ export function generateFrom(
     if (seenAt !== undefined && seenAt >= order.length * (1 - banned)) continue;
     usedFacts.add(fact);
     usedPrompts.add(prompt);
-    out.push({ ...q, id: `${idPrefix}-${stamp}-${out.length}` } as Question);
+    out.push(withCalc({ ...q, id: `${idPrefix}-${stamp}-${out.length}` } as Question));
   }
   return out;
 }

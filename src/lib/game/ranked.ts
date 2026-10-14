@@ -88,5 +88,5 @@ export const rankedWeek = (now = new Date()) => weekKey(parisDate(now));
 export function publicQuestion(q: Question): Question {
   if (q.type === "mcq") return { ...q, answer: -1, explanation: "" };
   if (q.type === "truefalse") return { ...q, answer: false, explanation: "" };
-  return { id: q.id, type: "numeric", prompt: q.prompt, unit: q.unit, difficulty: q.difficulty, answer: 0, explanation: "" };
+  return { id: q.id, type: "numeric", prompt: q.prompt, unit: q.unit, difficulty: q.difficulty, answer: 0, explanation: "", ...(q.calc ? { calc: true } : {}) };
 }

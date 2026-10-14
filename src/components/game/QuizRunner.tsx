@@ -117,8 +117,8 @@ export function QuizRunner({
                   <span
                     key={i}
                     className={clsx(
-                      "h-2 flex-1 rounded-full transition-colors",
-                      a ? (a.correct ? "bg-emerald-400" : "bg-rose-500") : i === index ? "bg-violet-400" : "bg-slate-800",
+                      "h-2 flex-1 rounded-full transition-colors duration-500",
+                      a ? (a.correct ? "bg-emerald-400" : "bg-rose-500") : i === index ? "animate-pulse bg-violet-400" : "bg-slate-800",
                     )}
                   />
                 );
@@ -138,10 +138,10 @@ export function QuizRunner({
           )}
         >
           <Flame size={16} className={combo >= 3 ? "text-orange-400" : ""} />
-          Combo ×{combo} {combo > 0 && <span className="text-xs font-medium opacity-80">(XP ×{comboMultiplier(combo).toFixed(1)})</span>}
+          Combo ×<span key={combo} className={combo > 0 ? "qb-bump" : undefined}>{combo}</span> {combo > 0 && <span className="text-xs font-medium opacity-80">(XP ×{comboMultiplier(combo).toFixed(1)})</span>}
         </div>
         <div className="relative flex items-center gap-1.5 rounded-full bg-violet-500/15 px-3 py-1 text-sm font-bold text-violet-200">
-          <Sparkles size={16} /> {xp} XP
+          <Sparkles size={16} /> <span key={xp} className="qb-bump tabular-nums">{xp}</span> XP
           {floating && (
             <span key={floating.id} className="qb-float pointer-events-none absolute -top-5 right-2 text-sm font-black text-amber-300">
               {floating.text}

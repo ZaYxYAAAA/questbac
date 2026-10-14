@@ -170,7 +170,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           ) : !profile ? (
             <Onboarding />
           ) : (
-            children
+            <div key={pathname} className="qb-page">{children}</div>
           )}
         </main>
       </div>

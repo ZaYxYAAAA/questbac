@@ -25,6 +25,8 @@ interface QuestionBase {
    * question inverse et le vrai/faux sur une même notion (pas de répétition déguisée).
    */
   fact?: string;
+  /** Calcul pas faisable de tête : la calculatrice est proposée. */
+  calc?: boolean;
 }
 
 export interface McqQuestion extends QuestionBase {

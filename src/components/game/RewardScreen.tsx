@@ -26,7 +26,7 @@ export async function celebrate(intensity: "small" | "big" = "small") {
   frame();
 }
 
-function useCountUp(target: number, duration = 1200) {
+export function useCountUp(target: number, duration = 1200) {
   const [value, setValue] = useState(0);
   useEffect(() => {
     const start = performance.now();

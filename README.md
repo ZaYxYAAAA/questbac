@@ -158,6 +158,19 @@ pourront tourner telles quelles côté serveur.
   (ticket), `match:<id>` (partie), `match:settled:<id>` (points distribués une seule fois).
   Le serveur recopie le rang dans la sauvegarde (`rp`), et fait foi.
 
+## Calculatrice
+
+- Proposée seulement sur les questions de calcul pas faisables de tête (`needsCalculator`,
+  src/lib/game/calculator.ts) : résultat décimal avec 3 chiffres significatifs ou plus à partir
+  de données décimales, 3 décimales ou plus, grands nombres, mantisse d'écriture scientifique,
+  valeur « arrondie ». Jamais pour une question de cours ni un calcul simple (`7!`, `5 × 2`,
+  `0,7 × 0,9`). Le drapeau `calc` est posé à la génération et reste sur la question publique du
+  classé (environ 3 % des questions, surtout en physique-chimie).
+- Calculatrice scientifique intégrée (feuille en bas d'écran) : + − × ÷, puissances, racine,
+  sin/cos/tan (degrés ou radians), ln, log, π, ×10ⁿ, parenthèses ; évaluation sans `eval`.
+  « Mettre … en réponse » remplit la réponse libre. En classé, elle évite de sortir de l'appli
+  (ce qui ferait perdre la question).
+
 ## Questions générées
 
 - `src/lib/content/gen/` : un fichier par matière (maths 2nde / 1re / Tle, physique-chimie, SVT,

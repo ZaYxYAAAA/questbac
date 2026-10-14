@@ -21,6 +21,8 @@ type Scope = "tous" | "amis";
 type Playing = { subject: SubjectId; matchId?: string | null; key: number };
 
 const MEDALS = ["🥇", "🥈", "🥉"];
+/** Noms courts pour les tuiles étroites. */
+const SHORT: Partial<Record<SubjectId, string>> = { maths: "Maths" };
 const fmt = (n: number) => n.toLocaleString("fr-FR");
 
 export default function RankedPage() {
@@ -95,17 +97,18 @@ export default function RankedPage() {
           <h2 className="flex items-center gap-2 text-lg font-black text-white"><Swords size={18} className="text-amber-300" /> Lancer une partie</h2>
           <p className="text-sm text-slate-400">3 joueurs · 10 questions en même temps · les bonnes réponses d&apos;abord, la vitesse départage.</p>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className="qb-stagger grid grid-cols-2 gap-2 sm:grid-cols-3">
           {subjectsForLevel(level).map((s) => (
             <button
               key={s.id}
               type="button"
               disabled={!rank || !!rank.active}
               onClick={() => play(s.id)}
-              className={clsx("group flex items-center gap-2.5 rounded-2xl bg-gradient-to-br p-3 text-left shadow-lg transition active:scale-[0.97] disabled:opacity-50", s.gradient)}
+              className={clsx("group relative flex items-center gap-2.5 overflow-hidden rounded-2xl bg-gradient-to-br p-3 text-left shadow-lg transition duration-200 hover:-translate-y-0.5 hover:shadow-xl active:scale-[0.96] disabled:pointer-events-none disabled:opacity-40 disabled:saturate-50", s.gradient)}
             >
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-black/25 text-xl">{s.emoji}</span>
-              <span className="min-w-0 flex-1 break-words text-sm font-black leading-tight text-white">{s.name}</span>
+              <span className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-black/25 text-xl transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6">{s.emoji}</span>
+              <span className="min-w-0 flex-1 text-sm font-black leading-tight text-white [hyphens:auto]" lang="fr">{SHORT[s.id] ?? s.name}</span>
               <Play size={16} className="shrink-0 text-white/80 transition group-hover:scale-110" fill="currentColor" />
             </button>
           ))}
@@ -136,9 +139,9 @@ export default function RankedPage() {
         {!rank ? (
           <div className="h-40 animate-pulse rounded-2xl bg-slate-900/60" />
         ) : tab === "rangs" ? (
-          <RankBoard rows={scope === "amis" ? board.filter((r) => r.friend || r.isMe) : board} />
+          <RankBoard key={scope} rows={scope === "amis" ? board.filter((r) => r.friend || r.isMe) : board} />
         ) : (
-          <XpBoard rows={scope === "amis" ? xp.filter((r) => r.friend || r.isMe) : xp} />
+          <XpBoard key={scope} rows={scope === "amis" ? xp.filter((r) => r.friend || r.isMe) : xp} />
         )}
         {tab === "rangs" && <Ladder rp={rank?.rp ?? 0} />}
       </section>
@@ -148,18 +151,24 @@ export default function RankedPage() {
 
 function MyRankCard({ rank }: { rank: MyRank }) {
   const info = rankFromRp(rank.rp);
+  // La barre se remplit à l'affichage.
+  const [fill, setFill] = useState(0);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setFill(info.progress));
+    return () => cancelAnimationFrame(id);
+  }, [info.progress]);
   const week = rank.weekDelta;
   return (
-    <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/80 p-4">
+    <section className="qb-fade-up relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/80 p-4">
       <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full opacity-30 blur-3xl" style={{ background: info.tier.color }} />
       <div className="relative flex items-center gap-4">
-        <RankEmblem tierId={info.tier.id} division={info.division} size="lg" />
+        <RankEmblem tierId={info.tier.id} division={info.division} size="lg" className="qb-emblem" />
         <div className="min-w-0 flex-1">
           <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Mon rang</p>
           <p className="truncate text-2xl font-black text-white">{info.label}</p>
           <p className="text-sm text-slate-300"><b className="text-white">{fmt(rank.rp)}</b> points de rang</p>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
-            <div className="h-full rounded-full bg-gradient-to-r from-amber-300 to-orange-500" style={{ width: `${Math.round(info.progress * 100)}%` }} />
+            <div className="h-full rounded-full bg-gradient-to-r from-amber-300 to-orange-500 transition-[width] duration-1000 [transition-timing-function:var(--qb-ease)]" style={{ width: `${Math.round(fill * 100)}%` }} />
           </div>
           {info.nextLabel && <p className="mt-1 text-xs text-slate-500">{info.rpToNext} pts avant {info.nextLabel}</p>}
         </div>
@@ -208,9 +217,9 @@ function Empty({ text }: { text: string }) {
 function RankBoard({ rows }: { rows: ReturnType<typeof useRanked.getState>["board"] }) {
   if (rows.length === 0) return <Empty text="Personne n'a encore joué en classé. Lance la première partie !" />;
   return (
-    <div className="divide-y divide-white/5 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70">
+    <div className="qb-stagger divide-y divide-white/5 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70">
       {rows.map((r) => (
-        <div key={r.id} className={clsx("flex items-center gap-2.5 px-3 py-2", r.isMe && "bg-violet-500/15")}>
+        <div key={r.id} className={clsx("flex items-center gap-2.5 px-3 py-2 transition-colors hover:bg-white/[0.03]", r.isMe && "bg-violet-500/15")}>
           <Place place={r.place} />
           <Avatar emoji={r.avatar} photo={r.photoThumb} rp={r.rp} size="sm" name={r.pseudo} />
           <span className="min-w-0 flex-1">
@@ -235,9 +244,9 @@ function RankBoard({ rows }: { rows: ReturnType<typeof useRanked.getState>["boar
 function XpBoard({ rows }: { rows: ReturnType<typeof useRanked.getState>["xp"] }) {
   if (rows.length === 0) return <Empty text="Ajoute des amis pour comparer votre XP." />;
   return (
-    <div className="divide-y divide-white/5 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70">
+    <div className="qb-stagger divide-y divide-white/5 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70">
       {rows.map((r) => (
-        <div key={r.id} className={clsx("flex items-center gap-2.5 px-3 py-2", r.isMe && "bg-violet-500/15")}>
+        <div key={r.id} className={clsx("flex items-center gap-2.5 px-3 py-2 transition-colors hover:bg-white/[0.03]", r.isMe && "bg-violet-500/15")}>
           <Place place={r.place} />
           <Avatar emoji={r.avatar} photo={r.photoThumb} rp={r.rp} size="sm" name={r.pseudo} />
           <span className="min-w-0 flex-1">

@@ -4,7 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { Check, Clock, Lightbulb, LogOut, RotateCcw, X } from "lucide-react";
 import { Avatar } from "@/components/game/Avatar";
+import { Calculator } from "@/components/game/Calculator";
 import { RankEmblem } from "@/components/game/RankEmblem";
+import { celebrate, useCountUp } from "@/components/game/RewardScreen";
 import { Button } from "@/components/ui/Button";
 import { Markdown } from "@/components/ui/Markdown";
 import { chapterById, subjectMeta } from "@/lib/content/curriculum";
@@ -38,6 +40,11 @@ export function LiveMatch({
   const [view, setView] = useState<MatchView | null>(null);
   const [searchStart] = useState(() => Date.now());
   const [now, setNow] = useState(() => Date.now());
+  /** Mes résultats question par question (bande de progression). */
+  const [results, setResults] = useState<(boolean | null)[]>([]);
+  /** Places gagnées (+) ou perdues (−) à la dernière question. */
+  const [moves, setMoves] = useState<Record<string, number>>({});
+  const places = useRef<{ index: number; byId: Record<string, number> } | null>(null);
   const offset = useRef(0);
   const ticket = useRef<string | null>(null);
   const closeRef = useRef(onClose);
@@ -143,6 +150,29 @@ export function LiveMatch({
     };
   }, [matchId]);
 
+  // ── Mes résultats et mouvements au classement, question après question ──
+  useEffect(() => {
+    if (!view || view.index < 0) return;
+    const me = view.players.find((p) => p.isMe);
+    const known = view.mine ? view.mine.correct : view.away ? false : (view.phase === "reveal" || view.phase === "done") && me?.last ? me.last.correct : undefined;
+    if (known !== undefined) {
+      setResults((r) => {
+        if (r[view.index] === known) return r;
+        const next = [...r];
+        next[view.index] = known;
+        return next;
+      });
+    }
+  }, [view]);
+  useEffect(() => {
+    if (!view || view.phase !== "reveal") return;
+    const byId = Object.fromEntries(view.players.map((p) => [p.id, p.place]));
+    const prev = places.current;
+    if (prev?.index === view.index) return;
+    setMoves(prev && prev.index === view.index - 1 ? Object.fromEntries(view.players.map((p) => [p.id, (prev.byId[p.id] ?? p.place) - p.place])) : {});
+    places.current = { index: view.index, byId };
+  }, [view]);
+
   // ── Fin : XP de la partie (une seule fois) et rang à jour ──
   useEffect(() => {
     if (view?.phase !== "done") return;
@@ -156,7 +186,10 @@ export function LiveMatch({
     } catch {
       // Stockage indisponible : l'XP sera quand même comptée une fois pour cet écran.
     }
-    if (!already) useGame.getState().recordActivity({ kind: "ranked", place: me.place, correct: me.score });
+    if (!already) {
+      useGame.getState().recordActivity({ kind: "ranked", place: me.place, correct: me.score });
+      if (me.place === 1) void celebrate("big");
+    }
     void loadRanked();
   }, [view?.phase, view?.id]);
 
@@ -165,44 +198,57 @@ export function LiveMatch({
     if (view && view.phase !== "done" && !window.confirm("Quitter la partie ? Les questions restantes compteront fausses.")) return;
     onClose();
   };
+  const inGame = view && (view.phase === "question" || view.phase === "reveal");
+  const screenKey = !view ? "search" : `${view.phase}-${view.phase === "question" || view.phase === "reveal" ? view.index : ""}`;
 
   return (
-    <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-950">
-      <div className={clsx("pointer-events-none fixed inset-x-0 top-0 h-72 bg-gradient-to-br opacity-30 [mask-image:linear-gradient(to_bottom,black,transparent)]", meta.gradient)} />
+    <div className="fixed inset-0 z-[70] overflow-y-auto overscroll-contain bg-slate-950">
+      <div className={clsx("pointer-events-none fixed inset-x-0 top-0 h-80 bg-gradient-to-br opacity-30 transition-opacity duration-700 [mask-image:linear-gradient(to_bottom,black,transparent)]", meta.gradient)} />
       <div className="relative mx-auto flex min-h-full max-w-xl flex-col gap-4 px-4 pb-8 pt-[max(1rem,env(safe-area-inset-top))]">
-        <header className="flex items-center gap-2">
-          <span className="text-xl">{meta.emoji}</span>
-          <p className="min-w-0 flex-1 truncate text-sm font-bold text-white">
-            {meta.name} <span className="font-medium text-slate-400">· classé</span>
-          </p>
-          {view && (view.phase === "question" || view.phase === "reveal") && (
-            <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-black text-white">{view.index + 1}/{view.total}</span>
-          )}
-          <button type="button" onClick={quit} aria-label="Quitter" className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-slate-300 hover:text-white">
-            {view?.phase === "done" ? <X size={18} /> : <LogOut size={16} />}
-          </button>
+        <header className="space-y-2.5">
+          <div className="flex items-center gap-2">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-lg">{meta.emoji}</span>
+            <p className="min-w-0 flex-1 truncate text-sm font-bold text-white">
+              {meta.name} <span className="font-medium text-slate-400">· classé</span>
+            </p>
+            {inGame && (
+              <span key={view.index} className="qb-pop rounded-full bg-white/10 px-2.5 py-1 text-xs font-black tabular-nums text-white">
+                {view.index + 1}/{view.total}
+              </span>
+            )}
+            <button type="button" onClick={quit} aria-label="Quitter" className="qb-press grid h-9 w-9 place-items-center rounded-full bg-white/10 text-slate-300 hover:text-white">
+              {view?.phase === "done" ? <X size={18} /> : <LogOut size={16} />}
+            </button>
+          </div>
+          {inGame && <ProgressStrip total={view.total} current={view.index} results={results} />}
         </header>
 
-        {!view ? (
-          <Searching found={!!matchId} startedAt={searchStart} now={now} />
-        ) : view.phase === "vote" ? (
-          <Vote view={view} now={serverNow} onVote={async (c) => {
-            const sentAt = Date.now();
-            try {
-              receive(await voteChapter(view.id, c), sentAt);
-            } catch {
-              // Le prochain rafraîchissement montrera l'état réel.
-            }
-          }} />
-        ) : view.phase === "intro" ? (
-          <Intro view={view} now={serverNow} />
-        ) : view.phase === "question" ? (
-          <Ask key={view.index} view={view} now={serverNow} onAnswered={(v, sentAt) => receive(v, sentAt)} />
-        ) : view.phase === "reveal" ? (
-          <Reveal view={view} now={serverNow} />
-        ) : (
-          <Results view={view} onClose={onClose} onReplay={() => onReplay(view.subject as SubjectId)} />
-        )}
+        <div key={screenKey} className="qb-fade-up flex flex-1 flex-col gap-4">
+          {!view ? (
+            <Searching found={!!matchId} startedAt={searchStart} now={now} />
+          ) : view.phase === "vote" ? (
+            <Vote
+              view={view}
+              now={serverNow}
+              onVote={async (c) => {
+                const sentAt = Date.now();
+                try {
+                  receive(await voteChapter(view.id, c), sentAt);
+                } catch {
+                  // Le prochain rafraîchissement montrera l'état réel.
+                }
+              }}
+            />
+          ) : view.phase === "intro" ? (
+            <Intro view={view} now={serverNow} />
+          ) : view.phase === "question" ? (
+            <Ask view={view} now={serverNow} onAnswered={(v, sentAt) => receive(v, sentAt)} />
+          ) : view.phase === "reveal" ? (
+            <Reveal view={view} now={serverNow} moves={moves} />
+          ) : (
+            <Results view={view} onClose={onClose} onReplay={() => onReplay(view.subject as SubjectId)} />
+          )}
+        </div>
       </div>
     </div>
   );
@@ -215,12 +261,23 @@ function Searching({ found, startedAt, now }: { found: boolean; startedAt: numbe
   const rp = useGame((s) => s.rp);
   const secs = Math.floor((now - startedAt) / 1000);
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-6 py-10 text-center">
-      <div className="flex items-end gap-4">
-        {profile && <Avatar emoji={profile.avatar} photo={profile.photoThumb} rp={rp} size="lg" />}
+    <div className="flex flex-1 flex-col items-center justify-center gap-8 py-10 text-center">
+      <div className="relative grid h-40 w-40 place-items-center">
+        {!found && [0, 1, 2].map((i) => <span key={i} className="qb-radar absolute inset-8 rounded-full border-2 border-amber-300/50" style={{ animationDelay: `${i * 0.73}s` }} />)}
+        {found && <span className="qb-pop absolute inset-4 rounded-full bg-emerald-400/15 ring-2 ring-emerald-400/50" />}
+        {profile && <Avatar emoji={profile.avatar} photo={profile.photoThumb} rp={rp} size="xl" />}
+      </div>
+      <div className="flex items-center gap-3">
         {[0, 1].map((i) => (
-          <span key={i} className={clsx("grid h-16 w-16 place-items-center rounded-full border-2 border-dashed text-2xl", found ? "border-emerald-400 text-emerald-300" : "animate-pulse border-white/20 text-slate-500")}>
-            {found ? "✓" : "?"}
+          <span
+            key={`${i}-${found}`}
+            className={clsx(
+              "grid h-12 w-12 place-items-center rounded-full border-2 text-xl font-black",
+              found ? "qb-drop border-emerald-400 bg-emerald-400/15 text-emerald-300" : "border-dashed border-white/20 text-slate-500",
+            )}
+            style={found ? { animationDelay: `${i * 0.12}s` } : undefined}
+          >
+            {found ? "✓" : <span className="animate-pulse">?</span>}
           </span>
         ))}
       </div>
@@ -236,17 +293,23 @@ function Searching({ found, startedAt, now }: { found: boolean; startedAt: numbe
 }
 
 function Vote({ view, now, onVote }: { view: MatchView; now: number; onVote: (chapter: string) => void }) {
-  const left = Math.max(0, view.voteEndsAt - now);
   const voted = view.players.filter((p) => p.voted).length;
   return (
-    <div className="space-y-4">
+    <>
       <PlayersRow players={view.players} mode="vote" />
       <div className="text-center">
         <p className="text-2xl font-black text-white">Choisis le chapitre</p>
-        <p className="text-sm text-slate-400">La majorité l&apos;emporte · {voted}/{view.players.length} votes</p>
+        <p className="mt-1 flex items-center justify-center gap-2 text-sm text-slate-400">
+          La majorité l&apos;emporte
+          <span className="flex gap-1">
+            {view.players.map((p, i) => (
+              <span key={p.id} className={clsx("h-2 w-2 rounded-full transition-colors duration-300", i < voted ? "bg-amber-300" : "bg-slate-700")} />
+            ))}
+          </span>
+        </p>
       </div>
-      <TimeBar left={left} total={10_000} />
-      <div className="grid gap-3">
+      <TimeBar startsAt={view.voteEndsAt - 10_000} endsAt={view.voteEndsAt} now={now} />
+      <div className="qb-stagger grid gap-3">
         {view.chapters.map((id) => {
           const c = chapterById(id);
           const mine = view.myVote === id;
@@ -257,19 +320,19 @@ function Vote({ view, now, onVote }: { view: MatchView; now: number; onVote: (ch
               disabled={!!view.myVote}
               onClick={() => onVote(id)}
               className={clsx(
-                "rounded-2xl border-2 p-4 text-left transition active:scale-[0.98]",
-                mine ? "border-amber-400 bg-amber-400/15" : view.myVote ? "border-white/5 bg-slate-900/60 opacity-60" : "border-white/10 bg-slate-900/80 hover:border-amber-300",
+                "qb-press relative overflow-hidden rounded-2xl border-2 p-4 text-left",
+                mine ? "qb-glow-pulse border-amber-400 bg-amber-400/15" : view.myVote ? "scale-[0.98] border-white/5 bg-slate-900/60 opacity-50" : "border-white/10 bg-slate-900/80 hover:-translate-y-0.5 hover:border-amber-300",
               )}
             >
               <p className="font-black text-white">{c?.title ?? id}</p>
               {c?.summary && <p className="mt-1 line-clamp-2 text-sm text-slate-400">{c.summary}</p>}
-              {mine && <p className="mt-2 text-xs font-bold text-amber-300">✓ Ton vote</p>}
+              {mine && <p className="qb-pop mt-2 text-xs font-bold text-amber-300">✓ Ton vote</p>}
             </button>
           );
         })}
       </div>
-      {view.myVote && <p className="text-center text-sm text-slate-400">En attente des autres joueurs…</p>}
-    </div>
+      {view.myVote && <p className="qb-fade-up text-center text-sm text-slate-400">En attente des autres joueurs…</p>}
+    </>
   );
 }
 
@@ -279,12 +342,14 @@ function Intro({ view, now }: { view: MatchView; now: number }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-6 py-6 text-center">
       <PlayersRow players={view.players} mode="vote" />
-      <div>
+      <div className="qb-drop">
         <p className="text-xs font-bold uppercase tracking-wider text-amber-300">Chapitre choisi</p>
         <p className="mt-1 text-2xl font-black text-white">{c?.title ?? "…"}</p>
       </div>
-      <p key={left} className="qb-pop text-7xl font-black text-white">{left || "Go"}</p>
-      <p className="max-w-xs text-xs text-slate-400">⚠️ Reste dans l&apos;appli : si tu la quittes pendant une question, elle compte fausse.</p>
+      <div className="grid h-32 place-items-center">
+        <p key={left} className="qb-count bg-gradient-to-b from-white to-amber-200 bg-clip-text text-8xl font-black text-transparent">{left || "Go !"}</p>
+      </div>
+      <p className="max-w-xs text-xs text-slate-400">⚠️ Reste dans l&apos;appli : si tu la quittes pendant une question, elle compte fausse. La calculatrice, si besoin, est intégrée.</p>
     </div>
   );
 }
@@ -294,7 +359,6 @@ function Ask({ view, now, onAnswered }: { view: MatchView; now: number; onAnswer
   const [sending, setSending] = useState<GivenAnswer | null>(null);
   const [numeric, setNumeric] = useState("");
   const mine = view.mine;
-  const total = view.endsAt && view.startsAt ? view.endsAt - view.startsAt : 20_000;
   const left = view.endsAt ? Math.max(0, view.endsAt - now) : 0;
   const locked = !!mine || sending !== null || view.away || left === 0;
 
@@ -314,38 +378,45 @@ function Ask({ view, now, onAnswered }: { view: MatchView; now: number; onAnswer
   const given = mine?.given ?? sending;
   const choice = (isAnswer: boolean, isGiven: boolean) =>
     clsx(
-      "flex min-h-14 w-full items-center gap-3 rounded-2xl border-2 px-3.5 py-3 text-left text-base transition active:scale-[0.98]",
-      !mine && !isGiven && "border-white/10 bg-slate-800/70 hover:border-violet-400",
+      "qb-press flex min-h-14 w-full items-center gap-3 rounded-2xl border-2 px-3.5 py-3 text-left text-base",
+      !mine && !isGiven && "border-white/10 bg-slate-800/70 hover:border-violet-400 hover:bg-slate-800",
       !mine && isGiven && "animate-pulse border-violet-400 bg-violet-600/20",
-      mine && isAnswer && "border-emerald-400 bg-emerald-500/15",
-      mine && isGiven && !isAnswer && "border-rose-400 bg-rose-500/15 qb-shake",
+      mine && isAnswer && "qb-correct border-emerald-400 bg-emerald-500/15",
+      mine && isGiven && !isAnswer && "qb-shake border-rose-400 bg-rose-500/15",
       mine && !isAnswer && !isGiven && "border-white/5 bg-slate-800/40 opacity-50",
     );
 
   return (
-    <div className="space-y-4">
+    <>
       <PlayersRow players={view.players} mode="question" />
-      <TimeBar left={left} total={total} />
+      {view.startsAt && view.endsAt && <TimeBar startsAt={view.startsAt} endsAt={view.endsAt} now={now} />}
       <div className="select-none text-lg leading-relaxed text-white [-webkit-touch-callout:none] sm:text-xl" onCopy={(e) => e.preventDefault()} onContextMenu={(e) => e.preventDefault()}>
         <Markdown>{q.prompt}</Markdown>
       </div>
+      {q.calc && !mine && (
+        <div>
+          <Calculator onUse={q.type === "numeric" ? (v) => setNumeric(v) : undefined} />
+        </div>
+      )}
 
       {q.type === "mcq" && (
-        <div className="grid gap-2.5">
+        <div className="qb-stagger grid gap-2.5">
           {q.choices.map((c, i) => (
             <button key={i} type="button" disabled={locked} onClick={() => submit(i)} className={choice(i === q.answer, given === i)}>
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-slate-950/60 text-sm font-black text-slate-300">{"ABCD"[i]}</span>
+              <span className={clsx("grid h-8 w-8 shrink-0 place-items-center rounded-xl text-sm font-black transition-colors", mine && i === q.answer ? "bg-emerald-500 text-slate-950" : mine && given === i ? "bg-rose-500 text-white" : "bg-slate-950/60 text-slate-300")}>
+                {"ABCD"[i]}
+              </span>
               <span className="min-w-0 flex-1 select-none text-slate-100"><Markdown compact>{c}</Markdown></span>
-              {mine && i === q.answer && <Check className="shrink-0 text-emerald-400" size={20} />}
-              {mine && given === i && i !== q.answer && <X className="shrink-0 text-rose-400" size={20} />}
+              {mine && i === q.answer && <Check className="qb-pop shrink-0 text-emerald-400" size={20} />}
+              {mine && given === i && i !== q.answer && <X className="qb-pop shrink-0 text-rose-400" size={20} />}
             </button>
           ))}
         </div>
       )}
       {q.type === "truefalse" && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="qb-stagger grid grid-cols-2 gap-3">
           {[true, false].map((v) => (
-            <button key={String(v)} type="button" disabled={locked} onClick={() => submit(v)} className={clsx(choice(v === q.answer, given === v), "min-h-16 justify-center text-lg font-bold")}>
+            <button key={String(v)} type="button" disabled={locked} onClick={() => submit(v)} className={clsx(choice(v === q.answer, given === v), "min-h-20 justify-center text-lg font-bold")}>
               {v ? "✅ Vrai" : "❌ Faux"}
             </button>
           ))}
@@ -353,7 +424,7 @@ function Ask({ view, now, onAnswered }: { view: MatchView; now: number; onAnswer
       )}
       {q.type === "numeric" && (
         <form
-          className="flex gap-2"
+          className="qb-fade-up flex gap-2"
           onSubmit={(e) => {
             e.preventDefault();
             if (numeric.trim()) void submit(numeric.trim());
@@ -368,14 +439,14 @@ function Ask({ view, now, onAnswered }: { view: MatchView; now: number; onAnswer
               inputMode="decimal"
               placeholder="Ta réponse…"
               className={clsx(
-                "w-full rounded-xl border bg-slate-950 px-4 py-3 font-mono text-lg text-white outline-none",
-                mine ? (mine.correct ? "border-emerald-400" : "border-rose-400") : "border-white/15 focus:border-violet-400",
+                "w-full rounded-xl border-2 bg-slate-950 px-4 py-3 font-mono text-lg text-white outline-none transition-colors",
+                mine ? (mine.correct ? "border-emerald-400" : "qb-shake border-rose-400") : "border-white/15 focus:border-violet-400",
               )}
             />
             {q.unit && <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500">{q.unit}</span>}
           </div>
           {!mine && (
-            <button type="submit" disabled={locked} className="rounded-xl bg-violet-600 px-5 font-semibold text-white disabled:opacity-60">
+            <button type="submit" disabled={locked} className="qb-press rounded-xl bg-violet-600 px-5 font-semibold text-white disabled:opacity-60">
               {sending !== null ? "…" : "OK"}
             </button>
           )}
@@ -383,31 +454,32 @@ function Ask({ view, now, onAnswered }: { view: MatchView; now: number; onAnswer
       )}
 
       {mine ? (
-        <p className={clsx("qb-pop flex items-center justify-center gap-2 rounded-2xl p-3 text-sm font-bold", mine.correct ? "bg-emerald-500/15 text-emerald-300" : "bg-rose-500/15 text-rose-300")}>
+        <p className={clsx("qb-pop flex flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-2xl p-3 text-sm font-bold", mine.correct ? "bg-emerald-500/15 text-emerald-300" : "bg-rose-500/15 text-rose-300")}>
           {mine.correct ? <Check size={18} /> : <X size={18} />}
           {mine.correct ? `Juste en ${(mine.ms / 1000).toFixed(1)} s` : "Raté"}
           {q.type === "numeric" && !mine.correct && <span className="font-medium text-slate-300">· attendu {answerText(q)}</span>}
           <span className="font-medium text-slate-400">· on attend les autres</span>
         </p>
       ) : view.away ? (
-        <p className="rounded-2xl bg-rose-500/15 p-3 text-center text-sm font-bold text-rose-300">🚪 Tu as quitté l&apos;appli : question perdue</p>
+        <p className="qb-pop rounded-2xl bg-rose-500/15 p-3 text-center text-sm font-bold text-rose-300">🚪 Tu as quitté l&apos;appli : question perdue</p>
       ) : left === 0 ? (
-        <p className="flex items-center justify-center gap-2 rounded-2xl bg-rose-500/15 p-3 text-sm font-bold text-rose-300"><Clock size={16} /> Temps écoulé</p>
+        <p className="qb-pop flex items-center justify-center gap-2 rounded-2xl bg-rose-500/15 p-3 text-sm font-bold text-rose-300"><Clock size={16} /> Temps écoulé</p>
       ) : null}
-    </div>
+    </>
   );
 }
 
-function Reveal({ view, now }: { view: MatchView; now: number }) {
+function Reveal({ view, now, moves }: { view: MatchView; now: number; moves: Record<string, number> }) {
   const q = view.question;
   const next = view.nextAt ? Math.max(0, Math.ceil((view.nextAt - now) / 1000)) : 0;
   const ranked = [...view.players].sort((a, b) => a.place - b.place);
+  const me = view.players.find((p) => p.isMe);
   return (
-    <div className="space-y-4">
+    <>
       {q && (
         <div className="space-y-3 rounded-2xl border border-white/10 bg-slate-900/80 p-4">
           <div className="text-sm text-slate-400"><Markdown compact>{q.prompt}</Markdown></div>
-          <p className="flex items-baseline gap-2 font-bold text-emerald-300">
+          <p className="qb-pop flex items-baseline gap-2 font-bold text-emerald-300">
             <Check size={18} className="shrink-0 self-center" /> <span className="min-w-0"><Markdown compact>{answerText(q)}</Markdown></span>
           </p>
           {q.explanation && (
@@ -418,78 +490,104 @@ function Reveal({ view, now }: { view: MatchView; now: number }) {
           )}
         </div>
       )}
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70">
-        {ranked.map((p) => (
-          <div key={p.id} className={clsx("flex items-center gap-3 px-3 py-2.5", p.isMe && "bg-violet-500/10")}>
-            <span className="w-5 text-center font-black text-slate-400">{p.place}</span>
-            <Avatar emoji={p.avatar} photo={p.photoThumb} rp={p.rp} size="sm" name={p.pseudo} />
-            <Name p={p} />
-            <span className={clsx("shrink-0 text-sm font-bold", p.last?.correct ? "text-emerald-300" : "text-rose-300")}>
-              {p.last?.ms == null ? "⏱ —" : `${p.last.correct ? "✓" : "✗"} ${(p.last.ms / 1000).toFixed(1)} s`}
-            </span>
-            <span className="w-10 text-right font-black text-white">{p.score}</span>
-          </div>
-        ))}
+      <div className="qb-stagger space-y-2">
+        {ranked.map((p) => {
+          const move = moves[p.id] ?? 0;
+          return (
+            <div key={p.id} className={clsx("flex items-center gap-3 rounded-2xl border px-3 py-2.5", p.isMe ? "border-violet-400/40 bg-violet-500/10" : "border-white/10 bg-slate-900/70")}>
+              <span className="flex w-6 flex-col items-center leading-none">
+                <span className="font-black text-white">{p.place}</span>
+                {move !== 0 && <span className={clsx("qb-pop text-[10px] font-black", move > 0 ? "text-emerald-400" : "text-rose-400")}>{move > 0 ? "▲" : "▼"}</span>}
+              </span>
+              <Avatar emoji={p.avatar} photo={p.photoThumb} rp={p.rp} size="sm" name={p.pseudo} />
+              <Name p={p} />
+              <span className={clsx("qb-pop shrink-0 rounded-lg px-2 py-1 text-xs font-bold", p.last?.correct ? "bg-emerald-500/15 text-emerald-300" : "bg-rose-500/10 text-rose-300")}>
+                {p.last?.ms == null ? "⏱ —" : `${p.last.correct ? "✓" : "✗"} ${(p.last.ms / 1000).toFixed(1)} s`}
+              </span>
+              <span key={p.score} className={clsx("w-8 text-right text-lg font-black text-white", p.last?.correct && "qb-bump")}>{p.score}</span>
+            </div>
+          );
+        })}
       </div>
-      <p className="text-center text-sm text-slate-400">{view.index + 1 >= view.total ? "Résultats" : "Question suivante"} dans {next} s</p>
-    </div>
+      <div className="flex items-center justify-center gap-2 pt-1 text-sm text-slate-400">
+        {me && me.place === 1 && <span className="text-amber-300">Tu mènes ! ·</span>}
+        {view.index + 1 >= view.total ? "Résultats" : "Question suivante"} dans <span key={next} className="qb-bump font-black tabular-nums text-white">{next}</span> s
+      </div>
+    </>
   );
 }
 
 const MEDALS = ["🥇", "🥈", "🥉"];
+/** Ordre du podium à l'écran : 2e, 1er, 3e. */
+const PODIUM = [
+  { place: 2, height: "h-20", delay: 0.25, color: "from-slate-300/30 to-slate-500/10" },
+  { place: 1, height: "h-28", delay: 0.45, color: "from-amber-300/40 to-amber-600/10" },
+  { place: 3, height: "h-14", delay: 0.1, color: "from-orange-400/30 to-orange-700/10" },
+];
 
 function Results({ view, onClose, onReplay }: { view: MatchView; onClose: () => void; onReplay: () => void }) {
   const me = view.players.find((p) => p.isMe)!;
-  const ranked = [...view.players].sort((a, b) => a.place - b.place);
-  const before = rankFromRp(me.rp);
-  const after = rankFromRp(Math.max(0, me.rp + (me.delta ?? 0)));
-  const promoted = after.label !== before.label && (me.delta ?? 0) > 0;
   const delta = me.delta ?? 0;
+  const before = rankFromRp(me.rp);
+  const after = rankFromRp(Math.max(0, me.rp + delta));
+  const promoted = after.label !== before.label && delta > 0;
+  const rp = useCountUp(delta, 1100);
+  const xp = useCountUp(me.xp ?? 0, 1100);
+  // La barre de rang part de l'ancienne valeur puis glisse vers la nouvelle.
+  const [bar, setBar] = useState(promoted ? 0 : before.progress);
+  useEffect(() => {
+    const id = setTimeout(() => setBar(after.progress), 600);
+    return () => clearTimeout(id);
+  }, [after.progress]);
+
   return (
-    <div className="space-y-4">
-      <div className="qb-pop space-y-2 py-2 text-center">
-        <p className="text-6xl">{MEDALS[me.place - 1]}</p>
-        <p className="text-3xl font-black text-white">{me.place === 1 ? "Victoire !" : me.place === 2 ? "2e place" : "3e place"}</p>
+    <div className="space-y-5">
+      <div className="space-y-1 pt-1 text-center">
+        <p className="qb-drop text-6xl">{MEDALS[me.place - 1]}</p>
+        <p className="qb-fade-up text-3xl font-black text-white" style={{ animationDelay: "0.15s" }}>{me.place === 1 ? "Victoire !" : me.place === 2 ? "2e place" : "3e place"}</p>
         <p className="text-sm text-slate-400">{me.score}/{view.total} bonnes réponses · {(me.totalMs / 1000).toFixed(1)} s</p>
       </div>
 
+      <div className="grid grid-cols-3 items-end gap-2">
+        {PODIUM.map(({ place, height, delay, color }) => {
+          const p = view.players.find((x) => x.place === place);
+          if (!p) return <span key={place} />;
+          return (
+            <div key={place} className="flex flex-col items-center gap-1.5 text-center">
+              <div className="qb-drop" style={{ animationDelay: `${delay + 0.35}s` }}>
+                <Avatar emoji={p.avatar} photo={p.photoThumb} rp={p.rp} size={place === 1 ? "lg" : "md"} name={p.pseudo} />
+              </div>
+              <p className={clsx("max-w-full truncate text-xs font-bold", p.isMe ? "text-violet-200" : "text-white")}>{p.isMe ? "Toi" : p.pseudo}</p>
+              <p className="text-[11px] text-slate-400">{p.score}/{view.total} · {(p.totalMs / 1000).toFixed(0)} s</p>
+              <div className={clsx("qb-rise flex w-full flex-col items-center justify-start rounded-t-2xl border border-b-0 border-white/10 bg-gradient-to-b pt-2", height, color)} style={{ animationDelay: `${delay}s` }}>
+                <span className="text-2xl">{MEDALS[place - 1]}</span>
+                <span className={clsx("text-xs font-black", (p.delta ?? 0) >= 0 ? "text-emerald-300" : "text-rose-300")}>{(p.delta ?? 0) >= 0 ? "+" : ""}{p.delta ?? 0}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
       <div className="grid grid-cols-2 gap-2">
-        <div className={clsx("rounded-2xl border p-3 text-center", delta >= 0 ? "border-emerald-400/30 bg-emerald-500/10" : "border-rose-400/30 bg-rose-500/10")}>
-          <p className={clsx("text-2xl font-black", delta >= 0 ? "text-emerald-300" : "text-rose-300")}>{delta >= 0 ? "+" : ""}{delta}</p>
+        <div className={clsx("qb-pop rounded-2xl border p-3 text-center", delta >= 0 ? "border-emerald-400/30 bg-emerald-500/10" : "border-rose-400/30 bg-rose-500/10")} style={{ animationDelay: "0.5s" }}>
+          <p className={clsx("text-3xl font-black tabular-nums", delta >= 0 ? "text-emerald-300" : "text-rose-300")}>{rp >= 0 ? "+" : ""}{rp}</p>
           <p className="text-xs text-slate-400">points de rang</p>
         </div>
-        <div className="rounded-2xl border border-violet-400/30 bg-violet-500/10 p-3 text-center">
-          <p className="text-2xl font-black text-violet-200">+{me.xp ?? 0}</p>
+        <div className="qb-pop rounded-2xl border border-violet-400/30 bg-violet-500/10 p-3 text-center" style={{ animationDelay: "0.6s" }}>
+          <p className="text-3xl font-black tabular-nums text-violet-200">+{xp}</p>
           <p className="text-xs text-slate-400">XP</p>
         </div>
       </div>
 
-      <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-900/80 p-3">
-        <RankEmblem tierId={after.tier.id} division={after.division} size="sm" />
+      <div className={clsx("qb-fade-up flex items-center gap-3 rounded-2xl border p-3", promoted ? "qb-glow-pulse border-amber-300/50 bg-amber-400/10" : "border-white/10 bg-slate-900/80")} style={{ animationDelay: "0.7s" }}>
+        <RankEmblem tierId={after.tier.id} division={after.division} size="sm" className={promoted ? "qb-emblem" : undefined} />
         <div className="min-w-0 flex-1">
           <p className="font-black text-white">{promoted ? `⬆️ Promu ${after.label} !` : after.label}</p>
           <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-800">
-            <div className="h-full rounded-full bg-gradient-to-r from-amber-300 to-orange-500" style={{ width: `${Math.round(after.progress * 100)}%` }} />
+            <div className="h-full rounded-full bg-gradient-to-r from-amber-300 to-orange-500 transition-[width] duration-1000 [transition-timing-function:var(--qb-ease)]" style={{ width: `${Math.round(bar * 100)}%` }} />
           </div>
           {after.nextLabel && <p className="mt-1 text-xs text-slate-500">{after.rpToNext} pts avant {after.nextLabel}</p>}
         </div>
-      </div>
-
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70">
-        {ranked.map((p) => (
-          <div key={p.id} className={clsx("flex items-center gap-3 px-3 py-2.5", p.isMe && "bg-violet-500/10")}>
-            <span className="w-6 text-center text-lg">{MEDALS[p.place - 1]}</span>
-            <Avatar emoji={p.avatar} photo={p.photoThumb} rp={p.rp} size="sm" name={p.pseudo} />
-            <Name p={p} />
-            <span className="text-right text-sm">
-              <b className="text-white">{p.score}/{view.total}</b>
-              <span className="block text-[11px] text-slate-500">{(p.totalMs / 1000).toFixed(0)} s</span>
-            </span>
-            <span className={clsx("w-12 text-right text-sm font-black", (p.delta ?? 0) >= 0 ? "text-emerald-300" : "text-rose-300")}>
-              {(p.delta ?? 0) >= 0 ? "+" : ""}{p.delta ?? 0}
-            </span>
-          </div>
-        ))}
       </div>
 
       <div className="flex gap-2">
@@ -522,13 +620,26 @@ function PlayersRow({ players, mode }: { players: Player[]; mode: "vote" | "ques
       {players.map((p) => {
         const done = mode === "vote" ? p.voted : p.answered;
         return (
-          <div key={p.id} className={clsx("relative flex flex-col items-center gap-1 rounded-2xl border px-1 py-2", p.isMe ? "border-violet-400/40 bg-violet-500/10" : "border-white/10 bg-slate-900/70")}>
+          <div
+            key={p.id}
+            className={clsx(
+              "relative flex flex-col items-center gap-1 rounded-2xl border px-1 py-2 transition-colors duration-300",
+              p.isMe ? "border-violet-400/40 bg-violet-500/10" : done ? "border-emerald-400/30 bg-emerald-500/5" : "border-white/10 bg-slate-900/70",
+            )}
+          >
             <div className="relative">
               <Avatar emoji={p.avatar} photo={p.photoThumb} rp={p.rp} size="sm" name={p.pseudo} />
               {done && <span className="qb-pop absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-emerald-500 text-[10px] font-black text-slate-950">✓</span>}
             </div>
             <p className="max-w-full truncate text-xs font-bold text-white">{p.isMe ? "Toi" : p.pseudo}</p>
-            {mode === "question" ? <p className="text-xs font-black text-amber-300">{p.score} pt{p.score > 1 ? "s" : ""}</p> : <p className="truncate text-[10px] text-slate-500">{p.label}</p>}
+            {mode === "question" ? (
+              <p className="text-xs font-black text-amber-300">
+                <span key={p.score} className="qb-bump tabular-nums">{p.score}</span> pt{p.score > 1 ? "s" : ""}
+              </p>
+            ) : (
+              <p className="truncate text-[10px] text-slate-500">{p.label}</p>
+            )}
+            {mode === "question" && !done && !p.isMe && <span className="absolute bottom-1 right-2 animate-pulse text-[10px] text-slate-500">…</span>}
           </div>
         );
       })}
@@ -536,17 +647,41 @@ function PlayersRow({ players, mode }: { players: Player[]; mode: "vote" | "ques
   );
 }
 
-function TimeBar({ left, total }: { left: number; total: number }) {
-  const ratio = Math.max(0, Math.min(1, left / total));
+/** Mes 10 questions : juste (vert), fausse (rouge), en cours (pulse). */
+function ProgressStrip({ total, current, results }: { total: number; current: number; results: (boolean | null)[] }) {
+  return (
+    <div className="flex gap-1" aria-label={`Question ${current + 1} sur ${total}`}>
+      {Array.from({ length: total }, (_, i) => {
+        const r = results[i];
+        return (
+          <span
+            key={i}
+            className={clsx(
+              "h-1.5 flex-1 rounded-full transition-colors duration-500",
+              r === true ? "bg-emerald-400" : r === false ? "bg-rose-500" : i === current ? "animate-pulse bg-white/60" : i < current ? "bg-slate-600" : "bg-slate-800",
+            )}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+/** Chrono : la barre se vide en continu (animation CSS calée sur l'heure du serveur). */
+function TimeBar({ startsAt, endsAt, now }: { startsAt: number; endsAt: number; now: number }) {
+  const total = Math.max(1, endsAt - startsAt);
+  // Position de départ calculée une seule fois : ensuite, le navigateur anime seul.
+  const [elapsed] = useState(() => Math.min(total, Math.max(0, now - startsAt)));
+  const left = Math.max(0, endsAt - now);
+  const urgent = left <= 5000;
   return (
     <div className="flex items-center gap-2">
-      <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-800">
-        <div
-          className={clsx("h-full rounded-full transition-[width] duration-200 ease-linear", ratio > 0.5 ? "bg-emerald-400" : ratio > 0.2 ? "bg-amber-400" : "bg-rose-500")}
-          style={{ width: `${ratio * 100}%` }}
-        />
+      <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-800">
+        <div className="qb-drain h-full w-full rounded-full" style={{ "--qb-dur": `${total}ms`, "--qb-delay": `${-elapsed}ms` } as React.CSSProperties} />
       </div>
-      <span className={clsx("w-8 text-right font-mono text-sm font-bold tabular-nums", ratio > 0.2 ? "text-slate-300" : "text-rose-400")}>{Math.ceil(left / 1000)}</span>
+      <span key={urgent ? Math.ceil(left / 1000) : "calm"} className={clsx("w-8 text-right font-mono text-sm font-bold tabular-nums", urgent ? "qb-bump text-rose-400" : "text-slate-300")}>
+        {Math.ceil(left / 1000)}
+      </span>
     </div>
   );
 }
