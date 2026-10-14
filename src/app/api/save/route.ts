@@ -1,6 +1,6 @@
 import { MAX_SAVE_BYTES, parseSave } from "@/lib/game/save";
 import { currentSession, getSave, jsonError, putSave, readJson, storageDown } from "@/lib/server/accounts";
-import { rankForSave } from "@/lib/server/ranked";
+import { rankForSave } from "@/lib/server/match";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

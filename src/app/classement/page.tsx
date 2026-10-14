@@ -1,96 +1,56 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import { ChevronDown, Play, Swords } from "lucide-react";
-import { RankLadder } from "@/components/game/RankLadder";
-import { HelpSheet } from "@/components/ranked/HelpSheet";
-import { type MatchStart, RankedMatch } from "@/components/ranked/RankedMatch";
-import { RankedBadge } from "@/components/ranked/RankedBadge";
-import { FriendsStandings, GroupStandings, TopStandings } from "@/components/ranked/Standings";
-import { StatusCard } from "@/components/ranked/StatusCard";
-import { WeekResults } from "@/components/ranked/WeekResults";
+import { Avatar } from "@/components/game/Avatar";
+import { RankEmblem } from "@/components/game/RankEmblem";
+import { LiveMatch } from "@/components/ranked/LiveMatch";
 import { Button } from "@/components/ui/Button";
 import { Tabs } from "@/components/ui/Tabs";
-import { buildLeaderboard, realEntries } from "@/lib/game/leaderboard";
-import { levelFromXp } from "@/lib/game/progression";
-import { MATCH_SIZE, PLACEMENT_MATCHES, type RankedSubject, rankedSubjectMeta } from "@/lib/game/ranked";
-import { activeTierReward, playerFrame } from "@/lib/game/ranks";
+import { subjectMeta, subjectsForLevel } from "@/lib/content/curriculum";
+import { RANK_TIERS, rankFromRp } from "@/lib/game/progression";
 import { useCloud } from "@/lib/store/cloud-sync";
 import { useGame } from "@/lib/store/game-store";
-import { loadPlayers, usePlayers } from "@/lib/store/players-store";
-import { type RankView, type RankedOverview, jokerRanked, loadRanked, nextRanked, startRanked, useRanked } from "@/lib/store/ranked-store";
-import { useToasts } from "@/lib/store/toast-store";
+import { type MyRank, loadRanked, useRanked } from "@/lib/store/match-store";
+import type { SubjectId } from "@/lib/types";
 
-type View = "jouer" | "classement";
-type Board = "groupe" | "amis" | "top";
+type Board = "rangs" | "xp";
+type Scope = "tous" | "amis";
+type Playing = { subject: SubjectId; matchId?: string | null; key: number };
+
+const MEDALS = ["🥇", "🥈", "🥉"];
+const fmt = (n: number) => n.toLocaleString("fr-FR");
 
 export default function RankedPage() {
   const { user, checked } = useCloud();
-  const { overview, error, fetchedAt } = useRanked();
-  const [view, setView] = useState<View>("jouer");
-  const [board, setBoard] = useState<Board>("groupe");
-  const [subject, setSubject] = useState<RankedSubject>("general");
-  const [match, setMatch] = useState<MatchStart | null>(null);
-  const [starting, setStarting] = useState<RankedSubject | null>(null);
-  /** Matière choisie, en attente de confirmation des règles. */
-  const [ready, setReady] = useState<RankedSubject | null>(null);
-  const [help, setHelp] = useState(false);
-  const [now, setNow] = useState(() => Date.now());
+  const profile = useGame((s) => s.profile);
+  const { rank, board, xp, error } = useRanked();
+  const [playing, setPlaying] = useState<Playing | null>(null);
+  const [tab, setTab] = useState<Board>("rangs");
+  const [scope, setScope] = useState<Scope>("tous");
 
   useEffect(() => {
     const asked = new URLSearchParams(window.location.search).get("vue");
-    if (asked === "classement" || asked === "groupe" || asked === "rangs") setView("classement");
-    const id = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(id);
+    if (asked === "xp") setTab("xp");
   }, []);
 
   useEffect(() => {
-    if (user) void loadRanked(subject);
-  }, [user, subject]);
+    if (user) void loadRanked();
+  }, [user]);
 
-  const play = useCallback(async (s: RankedSubject) => {
-    setStarting(s);
-    try {
-      setMatch(await startRanked(s));
-    } catch (e) {
-      useToasts.getState().push({ emoji: "⚠️", title: "Manche impossible", body: e instanceof Error ? e.message : undefined, tone: "rose" });
-    } finally {
-      setStarting(null);
-    }
-  }, []);
-
-  const resume = async () => {
-    const active = overview?.active;
-    if (!active) return;
-    try {
-      const r = await nextRanked(active.id);
-      if ("lost" in r) {
-        useToasts.getState().push({ emoji: "🚪", title: "Manche perdue", body: r.lost.outcome.kind === "lost" ? r.lost.outcome.reason : undefined, tone: "rose" });
-        void loadRanked(subject);
-        return;
-      }
-      setMatch({ ...r.next, id: active.id, subject: active.subject });
-    } catch (e) {
-      useToasts.getState().push({ emoji: "⚠️", title: e instanceof Error ? e.message : "Erreur", tone: "rose" });
-      void loadRanked(subject);
-    }
-  };
-
-  if (match) {
+  if (playing) {
     return (
-      <RankedMatch
-        key={match.id}
-        start={match}
+      <LiveMatch
+        key={playing.key}
+        subject={playing.subject}
+        matchId={playing.matchId}
         onClose={() => {
-          setMatch(null);
-          void loadRanked(subject);
+          setPlaying(null);
+          void loadRanked();
         }}
-        onReplay={(s) => {
-          setMatch(null);
-          void play(s);
-        }}
+        onReplay={(subject) => setPlaying({ subject, key: Date.now() })}
       />
     );
   }
@@ -100,240 +60,227 @@ export default function RankedPage() {
       <div className="space-y-3 rounded-3xl border border-amber-400/30 bg-gradient-to-br from-amber-500/15 to-slate-900 p-6 text-center">
         <p className="text-5xl">⚔️</p>
         <p className="text-xl font-black text-white">Mode classé</p>
-        <p className="text-sm text-slate-300">Un rang par matière, des groupes chaque semaine. Il faut un compte : tes manches sont corrigées par le serveur pour que le classement reste juste.</p>
+        <p className="text-sm text-slate-300">
+          Des parties à 3 joueurs en direct, un classement général des rangs et un classement de l&apos;XP. Il faut un compte : les parties sont arbitrées par le serveur.
+        </p>
         <Link href="/profil?onglet=compte" className="inline-flex rounded-xl bg-violet-600 px-4 py-2 font-semibold text-white">Créer mon compte</Link>
       </div>
     );
   }
 
-  const loaded = overview && overview.subject === subject ? overview : null;
-  const rank = overview?.ranks.find((r) => r.subject === subject);
-  const endsIn = overview ? overview.endsInMs - (now - fetchedAt) : 0;
-  const choose = (s: RankedSubject) => {
-    setSubject(s);
-    setReady(s);
-  };
+  const level = profile?.level ?? "seconde";
+  const play = (subject: SubjectId) => setPlaying({ subject, key: Date.now() });
 
   return (
-    <div className="space-y-4">
-      {ready && <RulesSheet subject={ready} busy={starting !== null} onCancel={() => setReady(null)} onGo={() => { const s = ready; setReady(null); void play(s); }} />}
-      {help && <HelpSheet onClose={() => setHelp(false)} />}
+    <div className="space-y-5">
+      {error && !rank && <p className="rounded-xl bg-rose-500/15 p-3 text-sm text-rose-300">{error}</p>}
+      {!rank && !error && <div className="h-48 animate-pulse rounded-3xl bg-slate-900/60" />}
 
-      {error && !overview && <p className="rounded-xl bg-rose-500/15 p-3 text-sm text-rose-300">{error}</p>}
-      {!overview && !error && <div className="h-64 animate-pulse rounded-3xl bg-slate-900/60" />}
-
-      {overview && (
+      {rank && (
         <>
-          <WeekResults ranks={overview.ranks} />
-          {overview.pendingLoss && <PendingLoss loss={overview.pendingLoss} onDone={() => loadRanked(subject)} />}
-          {overview.active && (
+          {rank.active && (
             <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-amber-400/40 bg-amber-500/10 p-3">
-              <p className="flex-1 text-sm text-amber-100">
-                Manche en cours : <b>{rankedSubjectMeta(overview.active.subject).name}</b> (question {overview.active.index + 1}/{overview.active.total})
-              </p>
-              <Button variant="gold" onClick={resume}><Play size={16} /> Reprendre</Button>
+              <p className="flex-1 text-sm text-amber-100">⚔️ Tu as une partie en cours.</p>
+              <Button variant="gold" onClick={() => setPlaying({ subject: subjectsForLevel(level)[0].id, matchId: rank.active, key: Date.now() })}>
+                <Play size={16} /> Reprendre
+              </Button>
             </div>
           )}
-
-          {rank && (
-            <StatusCard
-              subject={subject}
-              rank={rank}
-              rows={loaded?.group ?? []}
-              endsIn={endsIn}
-              busy={starting !== null}
-              onPlay={() => setReady(subject)}
-              onHelp={() => setHelp(true)}
-            />
-          )}
-
-          <Tabs<View>
-            value={view}
-            onChange={setView}
-            className="w-full [&>button]:flex-1"
-            options={[
-              { value: "jouer", label: "🎮 Matières" },
-              { value: "classement", label: "🏆 Classements" },
-            ]}
-          />
-
-          {view === "jouer" && <SubjectList ranks={overview.ranks} current={subject} onChoose={choose} onSelect={setSubject} />}
-
-          {view === "classement" && (
-            <div className="space-y-3">
-              <SubjectChips ranks={overview.ranks} value={subject} onChange={setSubject} />
-              <div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-900/80 p-1 text-sm font-semibold">
-                {([["groupe", "Mon groupe"], ["amis", "Amis"], ["top", "Top"]] as const).map(([b, label]) => (
-                  <button key={b} type="button" onClick={() => setBoard(b)} className={clsx("rounded-lg py-1.5 transition", board === b ? "bg-amber-400 text-slate-950" : "text-slate-400")}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-              {!loaded ? (
-                <div className="h-40 animate-pulse rounded-2xl bg-slate-900/60" />
-              ) : board === "groupe" ? (
-                rank?.placed ? (
-                  <GroupStandings rows={loaded.group} par={rank.par} />
-                ) : (
-                  <p className="rounded-2xl border border-dashed border-white/10 p-5 text-center text-sm text-slate-400">
-                    Termine tes {PLACEMENT_MATCHES} manches de placement en {rankedSubjectMeta(subject).name} pour rejoindre un groupe.
-                  </p>
-                )
-              ) : board === "amis" ? (
-                <FriendsStandings rows={loaded.friends} />
-              ) : (
-                <>
-                  <TopStandings rows={loaded.top} players={loaded.players} />
-                  <Ladder />
-                </>
-              )}
-            </div>
-          )}
+          <MyRankCard rank={rank} />
         </>
       )}
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="flex items-center gap-2 text-lg font-black text-white"><Swords size={18} className="text-amber-300" /> Lancer une partie</h2>
+          <p className="text-sm text-slate-400">3 joueurs · 10 questions en même temps · les bonnes réponses d&apos;abord, la vitesse départage.</p>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {subjectsForLevel(level).map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              disabled={!rank || !!rank.active}
+              onClick={() => play(s.id)}
+              className={clsx("group flex items-center gap-2.5 rounded-2xl bg-gradient-to-br p-3 text-left shadow-lg transition active:scale-[0.97] disabled:opacity-50", s.gradient)}
+            >
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-black/25 text-xl">{s.emoji}</span>
+              <span className="min-w-0 flex-1 break-words text-sm font-black leading-tight text-white">{s.name}</span>
+              <Play size={16} className="shrink-0 text-white/80 transition group-hover:scale-110" fill="currentColor" />
+            </button>
+          ))}
+        </div>
+        {rank && rank.history.length > 0 && <History rank={rank} />}
+      </section>
+
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-black text-white">🏆 Classements</h2>
+          <div className="flex gap-1 rounded-full bg-slate-900/80 p-1 text-xs font-bold">
+            {(["tous", "amis"] as const).map((s) => (
+              <button key={s} type="button" onClick={() => setScope(s)} className={clsx("rounded-full px-3 py-1 transition", scope === s ? "bg-white text-slate-950" : "text-slate-400")}>
+                {s === "tous" ? "Tous" : "Amis"}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Tabs<Board>
+          value={tab}
+          onChange={setTab}
+          className="w-full [&>button]:flex-1"
+          options={[
+            { value: "rangs", label: "🏅 Rangs" },
+            { value: "xp", label: "⭐ XP totale" },
+          ]}
+        />
+        {!rank ? (
+          <div className="h-40 animate-pulse rounded-2xl bg-slate-900/60" />
+        ) : tab === "rangs" ? (
+          <RankBoard rows={scope === "amis" ? board.filter((r) => r.friend || r.isMe) : board} />
+        ) : (
+          <XpBoard rows={scope === "amis" ? xp.filter((r) => r.friend || r.isMe) : xp} />
+        )}
+        {tab === "rangs" && <Ladder rp={rank?.rp ?? 0} />}
+      </section>
     </div>
   );
 }
 
-/** Toutes les matières : rang, avancement de la semaine, et un bouton pour jouer. */
-function SubjectList({ ranks, current, onChoose, onSelect }: { ranks: RankView[]; current: RankedSubject; onChoose: (s: RankedSubject) => void; onSelect: (s: RankedSubject) => void }) {
+function MyRankCard({ rank }: { rank: MyRank }) {
+  const info = rankFromRp(rank.rp);
+  const week = rank.weekDelta;
+  return (
+    <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/80 p-4">
+      <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full opacity-30 blur-3xl" style={{ background: info.tier.color }} />
+      <div className="relative flex items-center gap-4">
+        <RankEmblem tierId={info.tier.id} division={info.division} size="lg" />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Mon rang</p>
+          <p className="truncate text-2xl font-black text-white">{info.label}</p>
+          <p className="text-sm text-slate-300"><b className="text-white">{fmt(rank.rp)}</b> points de rang</p>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
+            <div className="h-full rounded-full bg-gradient-to-r from-amber-300 to-orange-500" style={{ width: `${Math.round(info.progress * 100)}%` }} />
+          </div>
+          {info.nextLabel && <p className="mt-1 text-xs text-slate-500">{info.rpToNext} pts avant {info.nextLabel}</p>}
+        </div>
+      </div>
+      <div className="relative mt-4 grid grid-cols-3 gap-2 text-center">
+        <Stat label="cette semaine" value={`${week > 0 ? "+" : ""}${week}`} tone={week > 0 ? "up" : week < 0 ? "down" : undefined} />
+        <Stat label={rank.games > 1 ? "parties" : "partie"} value={String(rank.games)} />
+        <Stat label={rank.wins > 1 ? "victoires" : "victoire"} value={String(rank.wins)} />
+      </div>
+    </section>
+  );
+}
+
+function Stat({ label, value, tone }: { label: string; value: string; tone?: "up" | "down" }) {
+  return (
+    <div className="rounded-2xl bg-slate-950/50 px-2 py-2">
+      <p className={clsx("text-lg font-black", tone === "up" ? "text-emerald-300" : tone === "down" ? "text-rose-300" : "text-white")}>{value}</p>
+      <p className="text-[11px] text-slate-500">{label}</p>
+    </div>
+  );
+}
+
+function History({ rank }: { rank: MyRank }) {
+  return (
+    <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+      {rank.history.slice(0, 8).map((h) => (
+        <div key={h.at} className="flex shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-slate-900/70 px-2.5 py-1.5 text-xs">
+          <span>{subjectMeta(h.subject as SubjectId)?.emoji}</span>
+          <span>{MEDALS[h.place - 1]}</span>
+          <span className="text-slate-300">{h.correct}/10</span>
+          <span className={clsx("font-black", h.delta >= 0 ? "text-emerald-300" : "text-rose-300")}>{h.delta >= 0 ? "+" : ""}{h.delta}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Place({ place }: { place: number }) {
+  return <span className={clsx("w-7 shrink-0 text-center font-black", place <= 3 ? "text-lg" : "text-sm text-slate-500")}>{MEDALS[place - 1] ?? place}</span>;
+}
+
+function Empty({ text }: { text: string }) {
+  return <p className="rounded-2xl border border-dashed border-white/10 p-5 text-center text-sm text-slate-400">{text}</p>;
+}
+
+function RankBoard({ rows }: { rows: ReturnType<typeof useRanked.getState>["board"] }) {
+  if (rows.length === 0) return <Empty text="Personne n'a encore joué en classé. Lance la première partie !" />;
   return (
     <div className="divide-y divide-white/5 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70">
-      {ranks.map((r) => {
-        const m = rankedSubjectMeta(r.subject);
-        const line = !r.placed
-          ? `Placement ${PLACEMENT_MATCHES - r.placementLeft}/${PLACEMENT_MATCHES}`
-          : r.played === 0
-            ? "Pas joué cette semaine"
-            : `${r.played} manche${r.played > 1 ? "s" : ""} · moyenne ${r.avg}/${r.par}`;
-        return (
-          <div key={r.subject} className={clsx("flex items-center gap-3 px-3 py-2.5", current === r.subject && "bg-amber-400/[0.07]")}>
-            <button type="button" onClick={() => onSelect(r.subject)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-              <span className={clsx("grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br text-xl", m.gradient)}>{m.emoji}</span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-bold text-white">{m.name}</span>
-                <span className="block truncate text-xs text-slate-500">{line}</span>
-              </span>
-              {r.placed && <RankedBadge step={r.step} size="sm" />}
-            </button>
-            <button type="button" onClick={() => onChoose(r.subject)} aria-label={`Jouer en ${m.name}`} className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-amber-300 to-orange-500 text-slate-950 active:scale-95">
-              <Play size={15} className="ml-0.5" fill="currentColor" />
-            </button>
-          </div>
-        );
-      })}
+      {rows.map((r) => (
+        <div key={r.id} className={clsx("flex items-center gap-2.5 px-3 py-2", r.isMe && "bg-violet-500/15")}>
+          <Place place={r.place} />
+          <Avatar emoji={r.avatar} photo={r.photoThumb} rp={r.rp} size="sm" name={r.pseudo} />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-bold text-white">{r.pseudo}{r.isMe && <span className="ml-1.5 text-[10px] text-violet-300">toi</span>}</span>
+            <span className="flex items-center gap-1 text-[11px] text-slate-400">
+              <RankEmblem tierId={rankFromRp(r.rp).tier.id} size="xs" className="!h-4 !w-4 !text-[9px]" />
+              {r.label} · {r.games} partie{r.games > 1 ? "s" : ""}
+            </span>
+          </span>
+          <span className="text-right">
+            <span className="block text-sm font-black text-white">{fmt(r.rp)}</span>
+            <span className={clsx("block text-[11px] font-bold", r.weekDelta > 0 ? "text-emerald-400" : r.weekDelta < 0 ? "text-rose-400" : "text-slate-600")}>
+              {r.weekDelta > 0 ? `▲ ${r.weekDelta}` : r.weekDelta < 0 ? `▼ ${-r.weekDelta}` : "= 0"}
+            </span>
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
 
-function SubjectChips({ ranks, value, onChange }: { ranks: RankView[]; value: RankedSubject; onChange: (s: RankedSubject) => void }) {
+function XpBoard({ rows }: { rows: ReturnType<typeof useRanked.getState>["xp"] }) {
+  if (rows.length === 0) return <Empty text="Ajoute des amis pour comparer votre XP." />;
   return (
-    <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none]">
-      {ranks.map((r) => {
-        const m = rankedSubjectMeta(r.subject);
-        return (
-          <button
-            key={r.subject}
-            type="button"
-            onClick={() => onChange(r.subject)}
-            className={clsx("flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition", value === r.subject ? "bg-white text-slate-950" : "bg-slate-800/70 text-slate-300")}
-          >
-            <span>{m.emoji}</span>
-            {m.name}
-          </button>
-        );
-      })}
+    <div className="divide-y divide-white/5 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70">
+      {rows.map((r) => (
+        <div key={r.id} className={clsx("flex items-center gap-2.5 px-3 py-2", r.isMe && "bg-violet-500/15")}>
+          <Place place={r.place} />
+          <Avatar emoji={r.avatar} photo={r.photoThumb} rp={r.rp} size="sm" name={r.pseudo} />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-bold text-white">{r.pseudo}{r.isMe && <span className="ml-1.5 text-[10px] text-violet-300">toi</span>}</span>
+            <span className="block text-[11px] text-slate-400">Niveau {r.playerLevel}</span>
+          </span>
+          <span className="text-right">
+            <span className="block text-sm font-black text-violet-200">{fmt(r.xp)} XP</span>
+            <span className={clsx("block text-[11px] font-bold", r.weeklyXp > 0 ? "text-emerald-400" : "text-slate-600")}>+{fmt(r.weeklyXp)} cette sem.</span>
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
 
-/** Échelle complète des rangs (repliée par défaut). */
-function Ladder() {
+/** Les paliers de rang (repliés par défaut). */
+function Ladder({ rp }: { rp: number }) {
   const [open, setOpen] = useState(false);
-  const game = useGame();
-  const profile = game.profile!;
-  const selfId = useCloud((s) => s.user?.id ?? null);
-  const players = usePlayers((s) => s.players);
-  useEffect(() => {
-    if (open) void loadPlayers(true);
-  }, [open]);
-  const entries = useMemo(
-    () =>
-      buildLeaderboard(
-        {
-          pseudo: profile.pseudo,
-          avatar: profile.avatar,
-          photo: profile.photo ?? profile.photoThumb,
-          titleId: activeTierReward(profile.titleId, game.peakRp).tierId,
-          frameId: playerFrame(profile, game.peakRp) ?? undefined,
-          level: profile.level,
-          playerLevel: levelFromXp(game.xp).level,
-          weeklyXp: game.weekly.xp,
-          rp: game.rp,
-        },
-        "global",
-        realEntries(players, selfId),
-      ),
-    [profile, game.xp, game.weekly.xp, game.rp, game.peakRp, players, selfId],
-  );
+  const current = useMemo(() => rankFromRp(rp).tier.id, [rp]);
   return (
     <div>
       <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-center gap-1 py-2 text-sm font-semibold text-slate-400 hover:text-white">
-        Échelle des rangs, titres et cadres <ChevronDown size={16} className={clsx("transition", open && "rotate-180")} />
+        Les rangs et comment monter <ChevronDown size={16} className={clsx("transition", open && "rotate-180")} />
       </button>
-      {open && <RankLadder entries={entries} />}
-    </div>
-  );
-}
-
-function RulesSheet({ subject, busy, onCancel, onGo }: { subject: RankedSubject; busy: boolean; onCancel: () => void; onGo: () => void }) {
-  const m = rankedSubjectMeta(subject);
-  return (
-    <div className="fixed inset-0 z-[60] grid place-items-end bg-slate-950/80 p-3 backdrop-blur-sm sm:place-items-center" onClick={onCancel}>
-      <div className="qb-pop w-full max-w-md space-y-4 rounded-3xl border border-amber-400/40 bg-slate-900 p-5" onClick={(e) => e.stopPropagation()}>
-        <p className="text-xs font-bold uppercase tracking-wider text-amber-300">{m.emoji} {m.name} · manche classée</p>
-        <p className="text-2xl font-black text-white">Reste dans l&apos;appli jusqu&apos;à la fin</p>
-        <ul className="space-y-2 text-sm text-slate-300">
-          <li>⏱️ {MATCH_SIZE} questions avec un chrono : plus tu réponds vite, plus tu marques.</li>
-          <li>⚠️ <b className="text-white">1re sortie</b> de l&apos;appli : la question en cours compte fausse.</li>
-          <li>🚪 <b className="text-white">2e sortie</b> ou plus de 10 s dehors : manche perdue (0 point).</li>
-          <li>🃏 Un appel, une fausse manip ? <b className="text-white">1 joker par jour</b>.</li>
-        </ul>
-        <div className="flex gap-2">
-          <Button variant="secondary" className="flex-1" onClick={onCancel}>Plus tard</Button>
-          <Button variant="gold" className="flex-1 py-3" disabled={busy} onClick={onGo}>
-            <Swords size={16} /> C&apos;est parti
-          </Button>
+      {open && (
+        <div className="space-y-3 rounded-2xl border border-white/10 bg-slate-900/70 p-3">
+          <ul className="space-y-1 text-sm text-slate-300">
+            <li>🥇 1re place : <b className="text-emerald-300">+20 à +30</b> pts · 🥈 2e : <b className="text-emerald-300">+2 à +9</b> · 🥉 3e : <b className="text-rose-300">−6 à −27</b></li>
+            <li>Plus ton rang est haut, moins tu gagnes et plus tu perds. 10/10 : <b className="text-white">+5</b> bonus.</li>
+            <li>Les flèches ▲▼ du classement montrent les points gagnés ou perdus depuis lundi.</li>
+          </ul>
+          <div className="grid grid-cols-4 gap-2">
+            {RANK_TIERS.map((t) => (
+              <div key={t.id} className={clsx("flex flex-col items-center gap-1 rounded-xl p-2 text-center", t.id === current && "bg-white/10 ring-1 ring-amber-300/50")}>
+                <RankEmblem tierId={t.id} size="sm" locked={t.minRp > rp && t.id !== current} />
+                <span className="text-[11px] font-bold text-white">{t.name}</span>
+                <span className="text-[10px] text-slate-500">{fmt(t.minRp)}</span>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function PendingLoss({ loss, onDone }: { loss: NonNullable<RankedOverview["pendingLoss"]>; onDone: () => void }) {
-  const [busy, setBusy] = useState(false);
-  const decide = async (use: boolean) => {
-    setBusy(true);
-    try {
-      await jokerRanked(loss.id, use);
-      useToasts.getState().push({ emoji: use ? "🃏" : "✔️", title: use ? "Manche annulée par ton joker" : "Manche comptée (0 point)", tone: "emerald" });
-      onDone();
-    } catch (e) {
-      useToasts.getState().push({ emoji: "⚠️", title: e instanceof Error ? e.message : "Erreur", tone: "rose" });
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <div className="space-y-3 rounded-2xl border border-rose-500/40 bg-rose-500/10 p-4 text-sm text-rose-100">
-      <p>
-        🚪 Manche de <b>{rankedSubjectMeta(loss.subject).name}</b> perdue : {loss.reason}.
-        {loss.jokerAvailable ? " Un appel, une fausse manip ? Ton joker du jour peut l'annuler." : " Ton joker du jour est déjà utilisé."}
-      </p>
-      <div className="flex flex-wrap gap-2">
-        {loss.jokerAvailable && <Button variant="gold" disabled={busy} onClick={() => decide(true)}>🃏 Utiliser mon joker</Button>}
-        <Button variant="secondary" disabled={busy} onClick={() => decide(false)}>Accepter le 0</Button>
-      </div>
+      )}
     </div>
   );
 }

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { RankedProfileGrid } from "@/components/ranked/RankedProfileGrid";
 import clsx from "clsx";
 import { Lock } from "lucide-react";
 import { AccountSection } from "@/components/layout/AccountSection";
@@ -81,8 +80,6 @@ export default function ProfilePage() {
 
       {tab === "stats" && (
         <>
-      <RankedProfileGrid />
-
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
         {stats.map((s) => (
           <div key={s.label} className="rounded-2xl border border-white/10 bg-slate-900/70 p-2.5 text-center">
@@ -215,7 +212,7 @@ function TitlesAndFrames() {
 
   return (
     <Card>
-      <SectionTitle icon={<span>🏅</span>} action={<Link href="/classement?vue=rangs" className="text-sm text-violet-300 hover:text-violet-200">Tous les rangs →</Link>}>
+      <SectionTitle icon={<span>🏅</span>} action={<Link href="/classement" className="text-sm text-violet-300 hover:text-violet-200">Tous les rangs →</Link>}>
         Titres et cadres
       </SectionTitle>
       <p className="mb-3 text-sm text-slate-400">

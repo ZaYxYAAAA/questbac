@@ -4,6 +4,7 @@
  */
 import type { CustomMission, Level, QuizResult, SavedFiche, SubjectId } from "@/lib/types";
 import { DUEL_REWARDS, type DuelOutcome } from "./duel";
+import { matchXp } from "./match";
 import { type AchievementDef, newlyUnlocked } from "./achievements";
 import { type DailyReward, type DailyState, claimDaily } from "./daily";
 import type { LeagueState } from "./league";
@@ -423,7 +424,8 @@ export type ActivityInput =
   | { kind: "lab"; labId: string }
   | { kind: "fiche"; fiche: SavedFiche }
   | { kind: "forge"; mission: CustomMission }
-  | { kind: "duel"; outcome: DuelOutcome };
+  | { kind: "duel"; outcome: DuelOutcome }
+  | { kind: "ranked"; place: number; correct: number };
 
 /** Activités hors quiz : ouverture d'un labo, fiche générée, mission forgée. */
 export function applyActivity(input: GameData, activity: ActivityInput, now = new Date()) {
@@ -441,6 +443,10 @@ export function applyActivity(input: GameData, activity: ActivityInput, now = ne
   } else if (activity.kind === "forge") {
     d = { ...d, missions: [activity.mission, ...d.missions], stats: { ...d.stats, missionsForged: d.stats.missionsForged + 1 } };
     events.forge = 1;
+  } else if (activity.kind === "ranked") {
+    const xp = matchXp(activity.place, activity.correct);
+    const lines: RewardLine[] = [{ label: `Partie classée : ${activity.place}${activity.place === 1 ? "re" : "e"} place, ${activity.correct}/10`, value: `+${xp} XP` }];
+    return finalize(before, d, { xp, rp: 0, lines, events }, now);
   } else {
     const reward = DUEL_REWARDS[activity.outcome];
     const lines: RewardLine[] = [

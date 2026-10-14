@@ -1,5 +1,5 @@
 import { listPlayers, storageDown } from "@/lib/server/accounts";
-import { resetRanksIfNeeded } from "@/lib/server/ranked";
+import { resetRanksIfNeeded } from "@/lib/server/match";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

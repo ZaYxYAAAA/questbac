@@ -1,39 +1,21 @@
-import { isRankedSubject, rankRewards } from "@/lib/game/ranked";
 import { currentSession, jsonError, storageDown } from "@/lib/server/accounts";
-import { activeMatch, groupFor, loadProfile, pendingLossInfo, profileViews, settleIfNeeded, weekInfo } from "@/lib/server/ranked";
+import { getMatch, getRank, rankBoard, resetRanksIfNeeded, xpBoard } from "@/lib/server/match";
+import { phaseAt } from "@/lib/game/match";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/**
- * GET /api/ranked?subject=maths — mes rangs par matière, mon groupe de la
- * semaine et le haut du classement de la matière demandée.
- */
-export async function GET(req: Request) {
+/** GET /api/ranked — mon rang, ma partie en cours, le classement général des rangs et celui de l'XP. */
+export async function GET() {
   const session = await currentSession();
   if (!session) return jsonError("Connecte-toi pour jouer en classé.", 401);
-  const asked = new URL(req.url).searchParams.get("subject") ?? "general";
-  const subject = isRankedSubject(asked) ? asked : "general";
   try {
-    await settleIfNeeded();
-    const { profile, level } = await loadProfile(session.uid, session.pseudo);
-    const [group, active, pendingLoss] = await Promise.all([groupFor(session.uid, subject), activeMatch(session.uid, session.pseudo), pendingLossInfo(profile)]);
+    await resetRanksIfNeeded();
+    const me = await getRank(session.uid, session.pseudo);
+    const active = me.active ? await getMatch(me.active) : null;
+    const { seen: _seen, ...rank } = me;
     return Response.json(
-      {
-        level,
-        subject,
-        ranks: profileViews(profile, level),
-        group: group.rows,
-        top: group.top,
-        friends: group.friends,
-        players: group.players,
-        pendingLoss,
-        active: active ? { id: active.id, subject: active.subject, index: active.index, total: active.questions.length } : null,
-        seasons: profile.seasons ?? {},
-        ...rankRewards(profile),
-        season: profile.season,
-        ...weekInfo(),
-      },
+      { rank: { ...rank, active: active && phaseAt(active, Date.now()).phase !== "done" ? active.id : null }, board: await rankBoard(session.uid), xp: await xpBoard(session.uid) },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {

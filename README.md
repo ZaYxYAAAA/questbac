@@ -2,7 +2,7 @@
 
 Application de révision gamifiée pour la **Seconde**, la **Première** et la **Terminale** (voie générale) :
 missions par chapitre, combos, étoiles, niveaux, rangs, boss chronométrés, quêtes du jour,
-mode **classé** par matière, duels entre amis et **labos de maths interactifs**.
+mode **classé** en parties à 3 en direct, duels entre amis et **labos de maths interactifs**.
 Aucune IA payante : toutes les questions sont générées par l'application elle-même.
 
 ## Démarrage
@@ -28,9 +28,9 @@ npm run dev                  # http://localhost:3000
 | 🎯 **Missions** | Questions **générées à chaque partie** pour les 149 chapitres (valeurs tirées au hasard en sciences, grandes banques de connaissances ailleurs), sans retomber sur une question déjà vue ; QCM / vrai-faux / réponse numérique, combos, explications |
 | 💀 **Boss** | 18 boss (un par matière/niveau, plus El Toro Gramático en espagnol) : PV, 3 cœurs, chrono, coups critiques, phase « enragé », déblocage par chapitres |
 | 🏆 **Progression** | XP & niveaux, rangs Bronze → Légende avec divisions (gagnés en classé), séries de jours, 19 succès, 3 quêtes du jour + coffre |
-| ⚔️ **Classé** | Manches corrigées par le serveur, un rang par matière, groupes de la semaine et promotions le dimanche, anti-triche |
+| ⚔️ **Classé** | Parties à 3 en direct (matchmaking 3 s puis bots de ton niveau), vote du chapitre, classement général des rangs et de l'XP, anti-triche |
 | 🧪 **Labo** | 10 labos : traceur universel (paramètres animables, dérivée), affine, vecteurs & produit scalaire, second degré, sécante → tangente, cercle trigo, suites (toile d'araignée), exp/ln, intégrales (Riemann), loi binomiale |
-| 👤 **Profil** | Radar de maîtrise, réussite par matière, XP sur 14 jours, échelle des rangs, succès, compte & sauvegarde, réglages |
+| 👤 **Profil** | Radar de maîtrise, réussite par matière, XP sur 14 jours, succès, compte & sauvegarde, réglages |
 | ☁️ **Comptes** | Pseudo + mot de passe, progression sauvegardée en ligne et retrouvée sur tous les appareils, export / import JSON |
 
 ## Sauvegarde et comptes
@@ -113,7 +113,7 @@ pourront tourner telles quelles côté serveur.
 - **Inviter** partage un lien `/invite/QB-XXXXXX` : la personne qui l'ouvre devient ton amie
   dès qu'elle est connectée (même si elle crée son compte à ce moment-là).
 - On peut aussi saisir le code d'un ami. Connaître le code suffit : pas de demande à accepter.
-- L'onglet **Classement → Amis** compare la semaine (XP) et le rang (RP) entre amis.
+- L'onglet **Classé → Classements**, filtre **Amis**, compare rangs et XP totale entre amis.
 - Données serveur : `friends:<id>` (liste symétrique, 100 amis max) et l'index `friendcodes`.
 
 ## Duels entre amis
@@ -127,8 +127,8 @@ pourront tourner telles quelles côté serveur.
 - Les questions sont générées à la création et enregistrées : mêmes questions, même ordre pour les deux.
 - Chacun joue quand il veut, dans les 72 h. Le serveur **recalcule le score** à partir des
   réponses envoyées : plus de bonnes réponses gagne, puis le temps total le plus court.
-- Récompenses (une seule fois par joueur, tous appareils confondus) : victoire +120 XP +25 RP,
-  égalité +60 XP +10 RP, défaite +30 XP. Expiré avec un seul joueur : victoire par forfait.
+- Récompenses (une seule fois par joueur, tous appareils confondus) : victoire +120 XP,
+  égalité +60 XP, défaite +30 XP (le rang ne se gagne qu'en classé). Expiré avec un seul joueur : victoire par forfait.
 - Une pastille ⚔️ dans l'en-tête signale les duels où c'est ton tour.
 - Données serveur : `duel:<id>` et `duels:<id de compte>` (40 derniers duels).
 
@@ -136,30 +136,27 @@ pourront tourner telles quelles côté serveur.
 
 - Navigation à 5 onglets : Accueil, **Entraînement** (Carte, Boss, Labo : XP
   seulement), **Classé** au centre, Social (Amis, Duels, fil d'actu), Profil.
-- Le rang ne se gagne qu'en classé. Un rang par matière et un rang **Général** (mélange des
-  matières du niveau). Placement en 5 manches par matière, Général compris (jusqu'à
-  Or III). `RANK_EPOCH` (src/lib/game/ranked.ts) : l'augmenter remet tous les rangs à zéro
-  (profils classés, rang des sauvegardes et des profils publics, titres et cadres), sans
-  toucher à l'XP. Époque 2 : rangs gagnés trop vite quand les questions se répétaient.
-- Manche : 10 questions tirées par le serveur, envoyées une à une, chronométrées (30 s en
-  Bronze → 15 s au sommet, +15 s en réponse libre) et corrigées par le serveur. 7 points par
-  bonne réponse + jusqu'à 3 pour la vitesse (sur 100).
-- Semaine (heure de Paris) : groupes de 20 joueurs max, de rangs voisins. Seules les
-  10 meilleures manches comptent, 3 au minimum pour être classé. Dimanche à minuit : le haut
-  du groupe monte d'une division, le bas descend (groupes de 6+) ; atteindre l'objectif de sa
-  division (moyenne ≥ 50 en Bronze … 95 en Légende sur 5 manches) fait aussi monter. Dès
-  Platine, une semaine sans jouer fait perdre une division.
-- Saisons = trimestres scolaires : meilleur rang conservé au profil, puis chacun redescend
-  d'un palier.
-- Anti-triche : sortie de l'appli détectée (`visibilitychange`, `pagehide`, envoi par
-  `sendBeacon`) et signal de présence toutes les 5 s. 1re sortie : la question compte fausse ;
-  2e sortie, plus de 10 s dehors ou signal coupé 12 s : manche perdue (0 point), avec un joker
-  par jour pour l'annuler. Texte non copiable. Manches suspectes (réponses plus rapides que la
-  lecture, temps identiques) et signalements de joueurs : à 3 alertes ou 3 signalements en
-  14 jours, les promotions sont bloquées.
-- Stockage : hash `ranked` (profil classé par compte), `rkm:<id>` (manche), `rk:settled:<semaine>`
-  (clôture faite une fois, aussi déclenchée par le cron quotidien). Le rang Général est recopié
-  dans la sauvegarde par le serveur (`rp`), qui fait foi.
+- Le rang (points de rang, Bronze III → Légende) ne se gagne qu'en classé. `RANK_EPOCH`
+  (src/lib/game/ranked.ts) : l'augmenter remet tous les rangs à zéro, sans toucher à l'XP.
+  Époque 3 : passage aux parties à 3.
+- **Matchmaking** : on choisit une matière ; une file par matière et par niveau. Dès 3 joueurs,
+  la partie se lance ; au bout de 3 s, les places vides sont prises par des **bots** du rang du
+  joueur (réussite et vitesse selon le palier, temps de réponse « humains » : lecture, réflexion
+  log-normale, hésitations, séries, distractions). Les bots sont signalés par une étiquette.
+- **Vote** : 2 chapitres tirés au hasard dans la matière, 10 s pour voter, la majorité gagne.
+- **Partie** : 10 questions en même temps pour les 3 joueurs (20 s, 30 s en réponse libre),
+  tirées, chronométrées et corrigées par le serveur ; les questions déjà vues sont évitées.
+  Classement : bonnes réponses d'abord, puis temps total (une question sans réponse compte
+  le temps maximum). Le téléphone interroge le serveur chaque seconde.
+- **Points de rang** : 1re place +30 (Bronze) → +20 (Légende), 2e +9 → +2, 3e −6 → −27 ;
+  10/10 : +5. XP : 12 par bonne réponse + 80 / 40 / 15 selon la place.
+- **Classements** (onglet Classé) : général des rangs avec l'évolution de la semaine (▲▼ depuis
+  lundi, heure de Paris) et général de l'XP totale ; filtre Amis.
+- Anti-triche : sortie de l'appli (`visibilitychange`, `pagehide`, `sendBeacon`) pendant une
+  question = question perdue ; texte non copiable ; la réponse n'est envoyée qu'après validation.
+- Stockage : hash `rank3` (profil de rang), `mmq:<matière>:<niveau>` (file), `mmt:<id>`
+  (ticket), `match:<id>` (partie), `match:settled:<id>` (points distribués une seule fois).
+  Le serveur recopie le rang dans la sauvegarde (`rp`), et fait foi.
 
 ## Questions générées
 
