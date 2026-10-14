@@ -5,6 +5,8 @@ import { chapterQuestions, factKey, hasGenerators } from "@/lib/content/generate
 import {
   MATCH_PLAYERS,
   type Match,
+  type PlayerAnswer,
+  type Vote,
   type MatchPlayer,
   QUEUE_WAIT_MS,
   VOTE_MS,
@@ -203,7 +205,59 @@ const queueLock = (s: SubjectId, l: Level) => `mml:${s}:${l}`;
 const ticketKey = (id: string) => `mmt:${id}`;
 const matchKey = (id: string) => `match:${id}`;
 
-export const getMatch = (id: string) => getStore().get<Match>(matchKey(id));
+/**
+ * Actions des joueurs humains (réponses, sorties d'appli, votes) : chacune dans
+ * son propre champ du hash `mact:<id>`, écrit une seule fois (HSETNX). Le
+ * document de la partie n'est réécrit qu'aux changements de phase, sous verrou :
+ * une requête concurrente ne peut donc plus effacer une réponse.
+ */
+const actsKey = (id: string) => `mact:${id}`;
+const answerField = (uid: string, i: number) => `a:${uid}:${i}`;
+const awayField = (uid: string, i: number) => `w:${uid}:${i}`;
+const voteField = (uid: string) => `v:${uid}`;
+
+/** Ajoute au document les actions enregistrées à part. */
+export function mergeActions(m: Match, acts: Record<string, unknown>): Match {
+  for (const [field, value] of Object.entries(acts)) {
+    const kind = field.slice(0, 2);
+    if (kind === "v:") {
+      const uid = field.slice(2);
+      if (!m.votes[uid]) m.votes[uid] = value as Vote;
+      continue;
+    }
+    const cut = field.lastIndexOf(":");
+    const uid = field.slice(2, cut);
+    const i = Number(field.slice(cut + 1));
+    if (!Number.isInteger(i) || i < 0) continue;
+    if (kind === "a:") {
+      const list = (m.answers[uid] ??= []);
+      if (!list[i]) list[i] = value as PlayerAnswer;
+    } else if (kind === "w:") {
+      const list = (m.away[uid] ??= []);
+      if (!list.includes(i)) list.push(i);
+    }
+  }
+  // Une réponse enregistrée l'emporte sur une sortie signalée en même temps.
+  for (const [uid, list] of Object.entries(m.away)) m.away[uid] = list.filter((i) => !m.answers[uid]?.[i]);
+  return m;
+}
+
+/** Les actions d'un document, au format du hash (pour les fusionner dans une autre version). */
+function actionsOf(m: Match): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const p of m.players.filter((x) => !x.bot)) {
+    if (m.votes[p.id]) out[voteField(p.id)] = m.votes[p.id];
+    (m.answers[p.id] ?? []).forEach((a, i) => a && (out[answerField(p.id, i)] = a));
+    for (const i of m.away[p.id] ?? []) out[awayField(p.id, i)] = 1;
+  }
+  return out;
+}
+
+export async function getMatch(id: string): Promise<Match | null> {
+  const store = getStore();
+  const [m, acts] = await Promise.all([store.get<Match>(matchKey(id)), store.hgetall<unknown>(actsKey(id))]);
+  return m ? mergeActions(m, acts) : null;
+}
 const saveMatch = (m: Match) => getStore().set(matchKey(m.id), m);
 
 async function freshQueue(subject: SubjectId, level: Level, now: number): Promise<Ticket[]> {
@@ -329,11 +383,17 @@ export async function advance(m: Match, now = Date.now()): Promise<Match> {
   if (!m.chapterId) {
     for (const p of m.players.filter((x) => !x.bot)) seen = seen.concat((await getRank(p.id, p.pseudo)).seen ?? []);
   }
-  const changed = tick(m, now, (chapterId, seed, level) => {
-    void level;
-    return chapterQuestions(chapterId, 10, seededRandom(hashString(`q:${seed}`)), seen).map((q, i) => ({ ...q, id: `mq-${i}` }));
-  });
-  if (changed) await saveMatch(m);
+  const make = (chapterId: string, seed: string) =>
+    chapterQuestions(chapterId, 10, seededRandom(hashString(`q:${seed}`)), seen).map((q, i) => ({ ...q, id: `mq-${i}` }));
+  if (tick(structuredClone(m), now, make)) {
+    // Changement de phase : sous verrou, sur la version la plus récente (avec toutes les actions).
+    await withLock(`mlk:${m.id}`, async () => {
+      const fresh = (await getMatch(m.id)) ?? m;
+      mergeActions(fresh, actionsOf(m));
+      if (tick(fresh, now, make)) await saveMatch(fresh);
+      Object.assign(m, fresh);
+    });
+  }
   if (m.finishedAt !== null && now >= m.finishedAt) await settle(m);
   return m;
 }
@@ -367,8 +427,9 @@ async function settle(m: Match) {
 
 export async function vote(m: Match, uid: string, chapter: string) {
   if (m.chapterId || !m.chapters.includes(chapter) || m.votes[uid]) return false;
-  m.votes[uid] = { chapter, at: Date.now() };
-  await saveMatch(m);
+  const v: Vote = { chapter, at: Date.now() };
+  if (!(await getStore().hcreate(actsKey(m.id), voteField(uid), v))) return false;
+  m.votes[uid] = v;
   return true;
 }
 
@@ -380,14 +441,15 @@ export async function answer(m: Match, uid: string, index: number, given: string
   const correct = typeof given !== "string" || given.trim() !== "" ? isCorrect(q, given) : false;
   const status = submitAnswer(m, uid, index, given, correct, now);
   if (status !== "ok") return { status };
-  await saveMatch(m);
+  if (!(await getStore().hcreate(actsKey(m.id), answerField(uid, index), m.answers[uid][index]))) return { status: "already" as const };
   await advance(m, Date.now());
   return { status, correct, question: q };
 }
 
 export async function away(m: Match, uid: string) {
   await advance(m);
-  if (markAway(m, uid, Date.now())) await saveMatch(m);
+  const { index } = phaseAt(m, Date.now());
+  if (markAway(m, uid, Date.now())) await getStore().hcreate(actsKey(m.id), awayField(uid, index), 1);
 }
 
 // ─────────────────────────── Vue envoyée au téléphone ───────────────────────────

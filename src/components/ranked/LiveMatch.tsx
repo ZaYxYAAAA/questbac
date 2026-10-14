@@ -50,9 +50,20 @@ export function LiveMatch({
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
 
+  /** Aller-retour le plus court mesuré : c'est lui qui donne le décalage d'horloge le plus fiable. */
+  const bestRtt = useRef(Infinity);
+  /** Heure d'envoi de la dernière vue affichée : une réponse plus ancienne arrivée en retard est ignorée. */
+  const lastSent = useRef(0);
+
   const receive = useCallback((v: MatchView, sentAt: number) => {
-    // Décalage d'horloge avec le serveur (milieu de l'aller-retour).
-    offset.current = v.serverNow - (sentAt + Date.now()) / 2;
+    const rtt = Date.now() - sentAt;
+    if (rtt <= bestRtt.current * 1.5) {
+      // Décalage d'horloge avec le serveur (milieu de l'aller-retour).
+      offset.current = v.serverNow - (sentAt + Date.now()) / 2;
+      bestRtt.current = Math.min(bestRtt.current, rtt);
+    }
+    if (sentAt < lastSent.current) return;
+    lastSent.current = sentAt;
     setView(v);
   }, []);
 
@@ -355,24 +366,39 @@ function Intro({ view, now }: { view: MatchView; now: number }) {
 }
 
 function Ask({ view, now, onAnswered }: { view: MatchView; now: number; onAnswered: (v: MatchView, sentAt: number) => void }) {
-  const q = view.question!;
   const [sending, setSending] = useState<GivenAnswer | null>(null);
+  /** Réponse confirmée par le serveur (gardée même si une vue en retard ne l'a pas encore). */
+  const [confirmed, setConfirmed] = useState<{ answer: NonNullable<MatchView["mine"]>; question: Question } | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
   const [numeric, setNumeric] = useState("");
-  const mine = view.mine;
+  const mine = view.mine ?? confirmed?.answer ?? null;
+  const q = view.mine ? view.question! : confirmed?.question ?? view.question!;
   const left = view.endsAt ? Math.max(0, view.endsAt - now) : 0;
   const locked = !!mine || sending !== null || view.away || left === 0;
 
   const submit = async (given: GivenAnswer) => {
     if (locked) return;
     setSending(given);
-    const sentAt = Date.now();
-    try {
-      const r = await sendAnswer(view.id, view.index, given);
-      onAnswered(r.view, sentAt);
-      if (r.status !== "ok" && r.status !== "already") setSending(null);
-    } catch {
-      setSending(null);
+    setProblem(null);
+    // Réseau capricieux : on renvoie la réponse (le serveur ne garde que la première).
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const sentAt = Date.now();
+      try {
+        const r = await sendAnswer(view.id, view.index, given);
+        if (r.status === "ok" && r.question && r.correct !== undefined) {
+          setConfirmed({ answer: { given, correct: r.correct, ms: r.view.mine?.ms ?? Math.max(0, sentAt - (view.startsAt ?? sentAt)) }, question: r.question });
+        }
+        onAnswered(r.view, sentAt);
+        if (r.status === "ok" || r.status === "already") return;
+        setSending(null);
+        setProblem(r.status === "late" ? "Trop tard : le temps était écoulé." : r.status === "away" ? "Question perdue : tu as quitté l'appli." : "Cette question est terminée.");
+        return;
+      } catch {
+        await new Promise((res) => setTimeout(res, 400 * (attempt + 1)));
+      }
     }
+    setSending(null);
+    setProblem("Connexion perdue : ta réponse n'est pas partie. Réessaie !");
   };
 
   const given = mine?.given ?? sending;
@@ -460,6 +486,10 @@ function Ask({ view, now, onAnswered }: { view: MatchView; now: number; onAnswer
           {q.type === "numeric" && !mine.correct && <span className="font-medium text-slate-300">· attendu {answerText(q)}</span>}
           <span className="font-medium text-slate-400">· on attend les autres</span>
         </p>
+      ) : problem ? (
+        <p className="qb-pop rounded-2xl bg-amber-500/15 p-3 text-center text-sm font-bold text-amber-200">⚠️ {problem}</p>
+      ) : sending !== null ? (
+        <p className="flex items-center justify-center gap-2 p-3 text-sm font-semibold text-slate-400"><span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-500 border-t-white" /> Envoi de ta réponse…</p>
       ) : view.away ? (
         <p className="qb-pop rounded-2xl bg-rose-500/15 p-3 text-center text-sm font-bold text-rose-300">🚪 Tu as quitté l&apos;appli : question perdue</p>
       ) : left === 0 ? (

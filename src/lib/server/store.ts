@@ -21,6 +21,8 @@ export interface KvStore {
   create(key: string, value: unknown): Promise<boolean>;
   del(key: string): Promise<void>;
   hset(hash: string, field: string, value: unknown): Promise<void>;
+  /** Écrit le champ seulement s'il n'existe pas encore (HSETNX) ; renvoie false sinon. */
+  hcreate(hash: string, field: string, value: unknown): Promise<boolean>;
   hgetall<T>(hash: string): Promise<Record<string, T>>;
   /** Plusieurs champs d'un hash (null pour un champ absent), dans l'ordre demandé. */
   hmget<T>(hash: string, fields: string[]): Promise<(T | null)[]>;
@@ -62,6 +64,7 @@ export function redisStore(url: string, token: string): KvStore {
     create: async (key, value) => (await cmd("SET", key, JSON.stringify(value), "NX")) === "OK",
     del: async (key) => void (await cmd("DEL", key)),
     hset: async (hash, field, value) => void (await cmd("HSET", hash, field, JSON.stringify(value))),
+    hcreate: async (hash, field, value) => (await cmd<number>("HSETNX", hash, field, JSON.stringify(value))) === 1,
     hgetall: async <T>(hash: string) => {
       const flat = (await cmd<string[] | null>("HGETALL", hash)) ?? [];
       const out: Record<string, T> = {};
@@ -123,6 +126,14 @@ export function fileStore(dir: string, kind: StorageKind = "file"): KvStore {
         const all = (await read<Record<string, unknown>>(`hash:${hash}`)) ?? {};
         all[field] = value;
         await write(`hash:${hash}`, all);
+      }),
+    hcreate: (hash, field, value) =>
+      serial(async () => {
+        const all = (await read<Record<string, unknown>>(`hash:${hash}`)) ?? {};
+        if (Object.hasOwn(all, field)) return false;
+        all[field] = value;
+        await write(`hash:${hash}`, all);
+        return true;
       }),
     hgetall: async <T>(hash: string) => (await read<Record<string, T>>(`hash:${hash}`)) ?? {},
     hmget: async <T>(hash: string, fields: string[]) => {
