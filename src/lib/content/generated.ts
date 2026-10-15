@@ -7,7 +7,7 @@ import type { Level, Question, SubjectId } from "@/lib/types";
 import { hashString, shuffle } from "@/lib/game/quests";
 import { CHAPTERS, chapterById } from "./curriculum";
 import type { Generator, Memo, Rand } from "./gen/kit";
-import { CULTURE } from "./gen/culture";
+import { CULTURE, CULTURE_TIERS, TIERS, type Tier } from "./gen/culture";
 import { ESPAGNOL } from "./gen/espagnol";
 import { EXTRA_HISTOIRE } from "./gen/extra-histoire";
 import { EXTRA_LETTRES } from "./gen/extra-lettres";
@@ -110,9 +110,48 @@ export function generateFrom(
   return out;
 }
 
-/** Questions d'un chapitre : générateurs + banque fixe du chapitre. */
+/**
+ * Questions d'un chapitre : générateurs + banque fixe du chapitre.
+ * Les thèmes à niveaux (Culture générale) mélangent les 3 niveaux (voir `tierMix`).
+ */
 export function chapterQuestions(chapterId: string, count: number, r: Rand = Math.random, avoid?: Seen): Question[] {
+  if (hasTiers(chapterId)) return mixedTierQuestions(chapterId, count, r, avoid);
   return generateFrom(CHAPTER_GENERATORS[chapterId] ?? [], count, r, avoid, chapterId, questionsForChapter(chapterId));
+}
+
+export type { Tier };
+export const TIER_LABELS: Record<Tier, string> = { 1: "Basique", 2: "Intermédiaire", 3: "Expert" };
+export const hasTiers = (chapterId: string) => chapterId in CULTURE_TIERS;
+
+/** Questions d'un seul niveau d'un thème. */
+export function tierQuestions(chapterId: string, tier: Tier, count: number, r: Rand = Math.random, avoid?: Seen): Question[] {
+  return generateFrom(CULTURE_TIERS[chapterId]?.[tier] ?? [], count, r, avoid, `${chapterId}-n${tier}`);
+}
+
+/** Répartition par niveau : la moitié en Intermédiaire, le reste partagé (au hasard) entre Basique et Expert. */
+export function tierMix(count: number, r: Rand = Math.random): Record<Tier, number> {
+  const medium = Math.round(count / 2);
+  const rest = count - medium;
+  const basic = Math.floor(rest / 2) + (rest % 2 === 1 && r() < 0.5 ? 1 : 0);
+  return { 1: basic, 2: medium, 3: rest - basic };
+}
+
+/** Partie classée : les 3 niveaux mélangés dans un ordre aléatoire, avec une majorité d'Intermédiaire. */
+export function mixedTierQuestions(chapterId: string, count: number, r: Rand = Math.random, avoid?: Seen): Question[] {
+  const mix = tierMix(count, r);
+  const picked = TIERS.flatMap((t) => tierQuestions(chapterId, t, mix[t], r, avoid));
+  // Un niveau trop court ? On complète avec les autres.
+  if (picked.length < count) {
+    const used = new Set(picked.map(factKey));
+    for (const q of tierQuestions(chapterId, 2, count * 2, r, avoid).concat(tierQuestions(chapterId, 1, count, r, avoid), tierQuestions(chapterId, 3, count, r, avoid))) {
+      if (picked.length >= count) break;
+      if (!used.has(factKey(q))) {
+        used.add(factKey(q));
+        picked.push(q);
+      }
+    }
+  }
+  return shuffle(picked, r).map((q, i) => ({ ...q, id: `${chapterId}-mix-${i}-${q.id}` }));
 }
 
 const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { acknowledgeLeague, applyActivity, applyDailyClaim, applySession, createInitialData, refreshPeriods } from "./state";
 import { bossState, keepBossProgress, triesLeft } from "./boss-rules";
-import { startBossFight } from "./state";
+import { startBossFight, tierUnlocked } from "./state";
 
 const now = new Date(2026, 9, 12, 10);
 const perfect = { correct: 5, total: 5, maxCombo: 5, durationMs: 30_000, answers: [] };
@@ -154,5 +154,31 @@ describe("coffre quotidien, meilleur rang et fil", () => {
     expect(win.data.rp).toBe(280);
     expect(win.data.peakRp).toBe(280);
     expect(win.data.feed.map((e) => e.kind)).toEqual(expect.arrayContaining(["boss", "achievement"]));
+  });
+});
+
+describe("niveaux de la Culture générale", () => {
+  const play = (tier: 1 | 2 | 3, correct: number, total = 6) =>
+    ({ kind: "chapter", chapterId: "cg-capitales", subject: "culture", result: { ...perfect, correct, total }, answerXp: 40, tier }) as const;
+
+  it("débloque le niveau suivant à 70 %, pas en dessous", () => {
+    const d0 = createInitialData(now);
+    expect(tierUnlocked(d0.chapters["cg-capitales"], 2)).toBe(false);
+    const fail = applySession(d0, play(1, 3), now).data;
+    expect(tierUnlocked(fail.chapters["cg-capitales"], 2)).toBe(false);
+    const pass = applySession(fail, play(1, 5), now);
+    expect(tierUnlocked(pass.data.chapters["cg-capitales"], 2)).toBe(true);
+    expect(tierUnlocked(pass.data.chapters["cg-capitales"], 3)).toBe(false);
+    expect(pass.summary.lines.some((l) => l.label.includes("Intermédiaire débloqué"))).toBe(true);
+    // Rater un niveau supérieur ne fait pas perdre le niveau acquis.
+    const after = applySession(pass.data, play(2, 0), now).data;
+    expect(after.chapters["cg-capitales"].tier).toBe(1);
+  });
+  it("les niveaux supérieurs rapportent plus d'XP", () => {
+    const d0 = createInitialData(now);
+    const basic = applySession(d0, play(1, 6), now).summary.xpGained;
+    const expert = applySession(d0, play(3, 6), now).summary;
+    expect(expert.xpGained).toBeGreaterThan(basic);
+    expect(expert.lines.some((l) => l.label === "Bonus niveau Expert")).toBe(true);
   });
 });

@@ -6,8 +6,12 @@ const mcq = (prompt: string, choices: string[], difficulty: 1 | 2 | 3 = 1) => ({
 
 describe("temps adapté à la question", () => {
   it("court pour une question de cours", () => {
-    expect(questionTimeMs({ type: "truefalse", prompt: "Le Soleil est une étoile.", difficulty: 1 })).toBe(12_000);
-    expect(questionTimeMs(mcq("Capitale du Pérou ?", ["Lima", "Quito", "Bogota", "Caracas"]))).toBe(15_000);
+    expect(questionTimeMs({ type: "truefalse", prompt: "Le Soleil est une étoile.", difficulty: 1 })).toBe(10_000);
+    expect(questionTimeMs(mcq("Capitale du Pérou ?", ["Lima", "Quito", "Bogota", "Caracas"]))).toBe(12_000);
+  });
+  it("un choix sans calcul garde peu de temps, même difficile ; un calcul garde le sien", () => {
+    expect(questionTimeMs(mcq("Capitale du Bhoutan ?", ["Thimphou", "Katmandou"], 3))).toBe(16_000);
+    expect(questionTimeMs(mcq("$2^5 = ?$", ["$32$", "$10$"]))).toBeGreaterThanOrEqual(28_000);
   });
   it("plus long pour un calcul, encore plus en plusieurs étapes", () => {
     const racines = questionTimeMs(mcq("Les racines de $x^2 - 5x + 6$ sont :", ["$2$ et $3$", "$1$ et $6$"], 2));

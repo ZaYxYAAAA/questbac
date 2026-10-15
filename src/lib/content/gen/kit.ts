@@ -164,6 +164,8 @@ export interface PairOptions {
   claim?: (a: string, b: string) => string;
   /** Explication commune. */
   explain?: (a: string, b: string) => string;
+  /** Table plus large où piocher les leurres (par défaut, `items`). */
+  pool?: readonly Pair[];
 }
 
 /**
@@ -173,11 +175,12 @@ export interface PairOptions {
  */
 export function pairs(items: readonly Pair[], o: PairOptions): Generator[] {
   const explain = o.explain ?? ((a: string, b: string) => `${a} → ${b}.`);
+  const pool = o.pool ?? items;
   const gens: Generator[] = [
     withMemo(
       (r) => {
         const [a, b] = pick(r, items);
-        return withFact(mcq(r, o.ask(a), b, items.filter(([x, y]) => x !== a && y !== b).map(([, y]) => y), explain(a, b)), a, b);
+        return withFact(mcq(r, o.ask(a), b, pool.filter(([x, y]) => x !== a && y !== b).map(([, y]) => y), explain(a, b)), a, b);
       },
       items.map(([a, b]) => ({ front: o.ask(a), back: b })),
     ),
@@ -186,7 +189,7 @@ export function pairs(items: readonly Pair[], o: PairOptions): Generator[] {
     const reverse = o.reverse;
     gens.push((r) => {
       const [a, b] = pick(r, items);
-      return withFact(mcq(r, reverse(b), a, items.filter(([x, y]) => y !== b && x !== a).map(([x]) => x), explain(a, b)), a, b);
+      return withFact(mcq(r, reverse(b), a, pool.filter(([x, y]) => y !== b && x !== a).map(([x]) => x), explain(a, b)), a, b);
     });
   }
   if (o.claim) {
@@ -194,7 +197,7 @@ export function pairs(items: readonly Pair[], o: PairOptions): Generator[] {
     gens.push((r) => {
       const [a, b] = pick(r, items);
       if (r() < 0.5) return withFact(tf(claim(a, b), true, explain(a, b)), a, b);
-      const others = items.filter(([x, y]) => x !== a && y !== b);
+      const others = pool.filter(([x, y]) => x !== a && y !== b);
       const [, wrong] = pick(r, others);
       return withFact(tf(claim(a, wrong), false, explain(a, b)), a, b);
     });

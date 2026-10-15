@@ -110,10 +110,10 @@ export function QuizRunner({
         <Link href={exitHref} aria-label="Quitter la mission" className="rounded-lg p-1.5 text-slate-400 hover:bg-white/5 hover:text-white">
           <X size={22} />
         </Link>
-        <div className="flex-1">
-          <div className="mb-1 flex justify-between text-xs text-slate-400">
-            <span className="truncate font-semibold text-slate-200">{title}{subtitle && <span className="text-slate-500"> · {subtitle}</span>}</span>
-            <span>{index + 1} / {questions.length}</span>
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 flex justify-between gap-2 text-xs text-slate-400">
+            <span className="min-w-0 truncate font-semibold text-slate-200">{title}{subtitle && <span className="text-slate-500"> · {subtitle}</span>}</span>
+            <span className="shrink-0 tabular-nums">{index + 1} / {questions.length}</span>
           </div>
           {questions.length <= 20 ? (
             <div className="flex gap-1" aria-label={`Question ${index + 1} sur ${questions.length}`}>

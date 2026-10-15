@@ -5,6 +5,7 @@ import clsx from "clsx";
 import { Play, Sparkles, Swords, Zap } from "lucide-react";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { chaptersFor, subjectMeta } from "@/lib/content/curriculum";
+import { CULTURE_FACTS } from "@/lib/content/gen/culture";
 import { dayKey } from "@/lib/game/progression";
 import { hashString } from "@/lib/game/quests";
 import { chapterStars } from "@/lib/game/selectors";
@@ -30,6 +31,9 @@ const THEME_EMOJI: Record<string, string> = {
   "cg-gastronomie": "🍝",
 };
 
+const TOTAL_FACTS = Object.values(CULTURE_FACTS).reduce((n, t) => n + t[1] + t[2] + t[3], 0);
+const TIER_NAMES = ["Basique", "Intermédiaire", "Expert"];
+
 /** Culture générale : une matière à part, hors programme, la même pour tous les niveaux. */
 export default function CulturePage() {
   const game = useGame();
@@ -49,7 +53,7 @@ export default function CulturePage() {
             <span className="qb-bob text-5xl">🌍</span>
             <div className="min-w-0">
               <h1 className="text-3xl font-black text-white">Culture générale</h1>
-              <p className="text-sm text-white/85">{themes.length} thèmes · plus de 750 faits · hors programme, pour tous les niveaux</p>
+              <p className="text-sm text-white/85">{themes.length} thèmes · {Math.floor(TOTAL_FACTS / 50) * 50}+ faits · 3 niveaux : Basique, Intermédiaire, Expert</p>
             </div>
           </div>
           <div>
@@ -92,6 +96,7 @@ export default function CulturePage() {
         <div className="qb-stagger grid grid-cols-2 gap-3 lg:grid-cols-4">
           {themes.map((c) => {
             const s = chapterStars(game, c.id);
+            const level = game.chapters[c.id]?.tier ?? 0;
             return (
               <Link
                 key={c.id}
@@ -104,7 +109,14 @@ export default function CulturePage() {
                 <span className="text-3xl transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110">{THEME_EMOJI[c.id] ?? "🌍"}</span>
                 <span className="text-sm font-black leading-tight text-white">{c.title}</span>
                 <span className="line-clamp-2 text-[11px] leading-snug text-slate-400">{c.summary}</span>
-                <span className="mt-auto text-xs tracking-widest">{[1, 2, 3].map((n) => (n <= s ? "⭐" : "☆")).join("")}</span>
+                <span className="mt-auto flex items-center justify-between gap-1">
+                  <span className="text-xs tracking-widest">{[1, 2, 3].map((n) => (n <= s ? "⭐" : "☆")).join("")}</span>
+                  <span className="flex gap-0.5" title={level ? `Niveau ${TIER_NAMES[level - 1]} réussi` : "Aucun niveau réussi"} aria-label={`${level}/3 niveaux réussis`}>
+                    {[1, 2, 3].map((n) => (
+                      <span key={n} className={clsx("h-1.5 w-3 rounded-full", n <= level ? ["bg-emerald-400", "bg-sky-400", "bg-fuchsia-400"][n - 1] : "bg-white/15")} />
+                    ))}
+                  </span>
+                </span>
               </Link>
             );
           })}

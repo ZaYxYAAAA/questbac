@@ -59,7 +59,16 @@ export interface ChapterProgress {
   bestScore: number; // 0..1
   attempts: number;
   lastPlayed: number;
+  /** Thèmes à niveaux (Culture générale) : plus haut niveau réussi (0 à 3). */
+  tier?: number;
 }
+
+/** Score à atteindre pour réussir un niveau et débloquer le suivant. */
+export const TIER_PASS = 0.7;
+/** Bonus d'XP selon le niveau joué (Basique, Intermédiaire, Expert). */
+export const TIER_XP_BONUS = [0, 0, 0.25, 0.5] as const;
+/** Niveaux accessibles : le Basique, puis chaque niveau dont le précédent est réussi. */
+export const tierUnlocked = (progress: ChapterProgress | undefined, tier: number) => tier <= 1 || (progress?.tier ?? 0) >= tier - 1;
 
 export type { BossRecord };
 
@@ -331,7 +340,7 @@ function applyAnswerStats(d: GameData, subject: SubjectId, result: QuizResult): 
 }
 
 export type SessionInput =
-  | { kind: "chapter"; chapterId: string; subject: SubjectId; result: QuizResult; answerXp: number }
+  | { kind: "chapter"; chapterId: string; subject: SubjectId; result: QuizResult; answerXp: number; tier?: 1 | 2 | 3 }
   | { kind: "custom"; missionId: string; subject: SubjectId; result: QuizResult; answerXp: number }
   | {
       kind: "boss";
@@ -406,7 +415,10 @@ export function applySession(input: GameData, session: SessionInput, now = new D
   const plays = d.missionPlays?.day === today ? d.missionPlays.counts : {};
   const factor = replayFactor(plays[playKey] ?? 0);
   d = { ...d, missionPlays: { day: today, counts: { ...plays, [playKey]: (plays[playKey] ?? 0) + 1 } } };
-  const missionXp = Math.round(rewards.xp * factor);
+  const baseMissionXp = Math.round(rewards.xp * factor);
+  const tier = session.kind === "chapter" ? session.tier : undefined;
+  const tierXp = tier ? Math.round(baseMissionXp * TIER_XP_BONUS[tier]) : 0;
+  const missionXp = baseMissionXp + tierXp;
   if (rewards.stars === 3) events.perfect = 1;
   d = {
     ...d,
@@ -429,6 +441,7 @@ export function applySession(input: GameData, session: SessionInput, now = new D
           bestScore: Math.max(prev?.bestScore ?? 0, score),
           attempts: (prev?.attempts ?? 0) + 1,
           lastPlayed: now.getTime(),
+          ...(tier || prev?.tier ? { tier: Math.max(prev?.tier ?? 0, tier && score >= TIER_PASS && result.total >= 4 ? tier : 0) } : {}),
         },
       },
     };
@@ -448,7 +461,11 @@ export function applySession(input: GameData, session: SessionInput, now = new D
     { label: "Mission terminée", value: `+${rewards.completionBonus} XP` },
     ...(rewards.perfectBonus ? [{ label: "Sans faute !", value: `+${rewards.perfectBonus} XP` }] : []),
     ...(rewards.streakBonusXp ? [{ label: `Bonus de série (${d.streak.count} j)`, value: `+${rewards.streakBonusXp} XP` }] : []),
-    ...(factor < 1 ? [{ label: `Mission déjà jouée aujourd'hui (XP ×${fmtMult(factor)})`, value: `−${rewards.xp - missionXp} XP` }] : []),
+    ...(factor < 1 ? [{ label: `Mission déjà jouée aujourd'hui (XP ×${fmtMult(factor)})`, value: `−${rewards.xp - baseMissionXp} XP` }] : []),
+    ...(tierXp ? [{ label: `Bonus niveau ${tier === 3 ? "Expert" : "Intermédiaire"}`, value: `+${tierXp} XP` }] : []),
+    ...(tier && tier < 3 && score >= TIER_PASS && result.total >= 4 && (input.chapters[session.kind === "chapter" ? session.chapterId : ""]?.tier ?? 0) < tier
+      ? [{ label: `🔓 Niveau ${tier === 1 ? "Intermédiaire" : "Expert"} débloqué`, value: "" }]
+      : []),
   ];
   return finalize(before, d, { xp: missionXp, rp: 0, lines, stars: rewards.stars, events }, now);
 }

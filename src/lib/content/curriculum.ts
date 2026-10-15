@@ -226,7 +226,7 @@ export const CHAPTERS: Chapter[] = [
   ch("es-t-argumenter", "espagnol", "terminale", "Argumenter en espagnol", "Connecteurs, opinion, futur, conditionnel, phrases en si."),
 
   // ───────────── Culture générale (hors programme, tous niveaux) ─────────────
-  ch("cg-capitales", "culture", "seconde", "Capitales du monde", "Plus de 90 pays : Europe, Amériques, Asie, Afrique, Océanie, et les pièges classiques."),
+  ch("cg-capitales", "culture", "seconde", "Capitales du monde", "120 pays sur 3 niveaux : des grandes capitales aux plus pointues, et les pièges classiques."),
   ch("cg-geo-monde", "culture", "seconde", "Géographie du monde", "Records, océans, montagnes, fleuves, détroits et monnaies."),
   ch("cg-france", "culture", "seconde", "France : régions et départements", "Chefs-lieux, numéros de départements, fleuves, villes et sommets."),
   ch("cg-histoire", "culture", "seconde", "Grandes dates et personnages", "Les dates à connaître de l'Antiquité à nos jours, et qui a fait quoi."),
