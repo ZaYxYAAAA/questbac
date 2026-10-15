@@ -36,6 +36,12 @@ export interface Profile {
   titleId?: string;
   /** Palier dont le cadre d'avatar est porté (par défaut : celui du rang actuel). */
   frameId?: string;
+  /** Bannière choisie (voir banners.ts), ou « photo » pour l'image envoyée. */
+  bannerId?: string;
+  /** Bannière envoyée : JPEG 720 × 240 en data URL. */
+  banner?: string;
+  /** Miniature 240 × 80 de la bannière, partagée dans le classement. */
+  bannerThumb?: string;
 }
 
 /** Événement du fil d'actualité, stocké sous forme de données (texte calculé à l'affichage). */

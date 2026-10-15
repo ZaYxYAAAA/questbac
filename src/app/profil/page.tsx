@@ -7,10 +7,11 @@ import { Lock } from "lucide-react";
 import { AccountSection } from "@/components/layout/AccountSection";
 import { Avatar } from "@/components/game/Avatar";
 import { AccuracyBars, MasteryRadar, XpBarChart } from "@/components/game/Charts";
+import { BannerUpload } from "@/components/game/BannerEditor";
 import { PhotoPicker } from "@/components/game/PhotoPicker";
+import { ProfileBanner } from "@/components/game/ProfileBanner";
 import { PlayerTitle } from "@/components/game/PlayerTitle";
 import { RankEmblem } from "@/components/game/RankEmblem";
-import { RankBadge } from "@/components/game/RankBadge";
 import { Button } from "@/components/ui/Button";
 import { Tabs } from "@/components/ui/Tabs";
 import { Card, SectionTitle } from "@/components/ui/Card";
@@ -18,7 +19,9 @@ import { NotificationsCard } from "@/components/layout/NotificationsCard";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { LEVELS, levelLabel, schoolSubjects } from "@/lib/content/curriculum";
 import { ACHIEVEMENTS } from "@/lib/game/achievements";
-import { RANK_TIERS, levelFromXp } from "@/lib/game/progression";
+import { BANNERS, PHOTO_BANNER, RARITY_STYLE, isBannerUnlocked, unlockLabel } from "@/lib/game/banners";
+import { RANK_TIERS, levelFromXp, rankFromRp } from "@/lib/game/progression";
+import { activeBannerId, bannerContext } from "@/lib/game/save";
 import { TIER_REWARDS, activeTierReward, playerFrame, unlockedTiers } from "@/lib/game/ranks";
 import { BOSSES } from "@/lib/content/bosses";
 import { bossState } from "@/lib/game/boss-rules";
@@ -38,11 +41,15 @@ export default function ProfilePage() {
   const subjects = schoolSubjects(profile.level);
   const accuracy = game.stats.answered ? Math.round((game.stats.correct / game.stats.answered) * 100) : 0;
   const unlocked = ACHIEVEMENTS.filter((a) => game.achievements[a.id]).length;
-  const [tab, setTab] = useState<"stats" | "succes" | "reglages">("stats");
-  // Lien « Créer mon compte » (?onglet=compte) : ouvre directement les réglages du compte.
+  const [tab, setTab] = useState<"stats" | "carte" | "succes" | "reglages">("stats");
+  // Lien « Créer mon compte » (?onglet=compte) : ouvre directement les réglages du compte ; ?onglet=carte : la personnalisation.
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("onglet") === "compte") setTab("reglages");
+    const asked = new URLSearchParams(window.location.search).get("onglet");
+    if (asked === "compte") setTab("reglages");
+    if (asked === "carte") setTab("carte");
   }, []);
+  const bannerId = activeBannerId(profile, bannerContext(game));
+  const rank = rankFromRp(game.rp);
 
   const stats = [
     { label: "Missions", value: game.stats.missions, emoji: "🗺️" },
@@ -55,17 +62,35 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-wrap items-center gap-4 rounded-3xl border border-white/10 bg-gradient-to-br from-violet-700/30 to-slate-950 p-4 sm:p-6">
-        <Avatar emoji={profile.avatar} photo={profile.photo} name={profile.pseudo} size="lg" rp={game.rp} frame={playerFrame(profile, game.peakRp)} className="m-1" />
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-2xl font-black text-white sm:text-3xl">{profile.pseudo}</h1>
-          <PlayerTitle titleId={profile.titleId} peakRp={game.peakRp} />
+      <section className="qb-fade-up overflow-hidden rounded-3xl border bg-slate-900/80" style={{ borderColor: `${rank.tier.color}55`, boxShadow: `0 0 50px -20px ${rank.tier.color}` }}>
+        <ProfileBanner bannerId={bannerId} image={profile.banner ?? profile.bannerThumb} peakRp={game.peakRp} shade={false} className="h-28 sm:h-36">
+          <button type="button" onClick={() => setTab("carte")} className="absolute right-3 top-3 rounded-full bg-slate-950/60 px-3 py-1 text-xs font-bold text-white backdrop-blur hover:bg-slate-950/80">
+            🎨 Personnaliser
+          </button>
+          <div className="h-28 sm:h-36" />
+        </ProfileBanner>
+        <div className="space-y-3 px-4 pb-4 sm:px-6">
+          <div className="flex items-end gap-3">
+            <Avatar emoji={profile.avatar} photo={profile.photo} name={profile.pseudo} size="xl" rp={game.rp} frame={playerFrame(profile, game.peakRp)} emblem={false} className="-mt-12 shrink-0 ring-4 ring-slate-900" />
+            <div className="min-w-0 flex-1 pb-1">
+              <h1 className="truncate text-2xl font-black text-white sm:text-3xl">{profile.pseudo}</h1>
+              <PlayerTitle titleId={profile.titleId} peakRp={game.peakRp} />
+            </div>
+          </div>
           <p className="text-sm text-slate-400">{levelLabel(profile.level)} · inscrit le {new Date(profile.createdAt).toLocaleDateString("fr-FR")}</p>
-          <div className="mt-1.5"><RankBadge rp={game.rp} size="md" /></div>
-        </div>
-        <div className="w-full sm:max-w-xs">
-          <div className="mb-1 flex justify-between text-xs text-slate-400"><span>Niveau {level.level}</span><span>{level.current}/{level.needed} XP</span></div>
-          <ProgressBar value={level.progress} height="h-3" />
+          <div className="flex flex-wrap items-center gap-3">
+            <Link href="/classement" className="flex shrink-0 items-center gap-2 rounded-2xl bg-slate-950/50 py-1 pl-1 pr-3 hover:bg-slate-950/80">
+              <RankEmblem tierId={rank.tier.id} division={rank.division} size="md" />
+              <span>
+                <span className="block text-sm font-black" style={{ color: rank.tier.color }}>{rank.label}</span>
+                <span className="block text-xs text-slate-400">{game.rp.toLocaleString("fr-FR")} pts</span>
+              </span>
+            </Link>
+            <div className="min-w-[10rem] flex-1">
+              <div className="mb-1 flex justify-between text-xs text-slate-400"><span>Niveau {level.level}</span><span>{level.current}/{level.needed} XP</span></div>
+              <ProgressBar value={level.progress} height="h-3" />
+            </div>
+          </div>
         </div>
       </section>
 
@@ -75,6 +100,7 @@ export default function ProfilePage() {
         className="w-full flex-nowrap sm:w-auto [&>button]:flex-1 sm:[&>button]:flex-none"
         options={[
           { value: "stats", label: "Stats" },
+          { value: "carte", label: "🎨 Carte" },
           { value: "succes", label: `Succès ${unlocked}/${ACHIEVEMENTS.length}` },
           { value: "reglages", label: "Réglages" },
         ]}
@@ -116,9 +142,15 @@ export default function ProfilePage() {
         </>
       )}
 
+      {tab === "carte" && (
+        <>
+          <BannerChooser />
+          <TitlesAndFrames />
+        </>
+      )}
+
       {tab === "succes" && (
         <>
-      <TitlesAndFrames />
 
       <Card>
         <SectionTitle icon={<span>🏆</span>} action={<span className="text-sm text-slate-400">{unlocked}/{ACHIEVEMENTS.length}</span>}>Succès</SectionTitle>
@@ -199,6 +231,105 @@ export default function ProfilePage() {
   );
 }
 
+/** Choix de la bannière : libres, gagnées (rang, niveau, boss, série, succès) ou image envoyée. */
+function BannerChooser() {
+  const game = useGame();
+  const profile = game.profile!;
+  const ctx = bannerContext(game);
+  const active = activeBannerId(profile, ctx);
+  const owned = BANNERS.filter((b) => isBannerUnlocked(b, ctx)).length;
+  const rank = rankFromRp(game.rp);
+
+  return (
+    <Card>
+      <SectionTitle icon={<span>🖼️</span>} action={<span className="text-sm text-slate-400">{owned}/{BANNERS.length}</span>}>Bannière</SectionTitle>
+      <p className="mb-3 text-sm text-slate-400">Elle s&apos;affiche en haut de ta fiche et derrière ta ligne dans le classement. Monte en rang, bats des boss et garde ta série pour en gagner.</p>
+
+      {/* Aperçu : ta ligne dans le classement */}
+      <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-slate-900">
+        <div className="relative flex items-center gap-2.5 px-3 py-2.5">
+          <ProfileBanner bannerId={active} image={profile.bannerThumb} peakRp={game.peakRp} fx={false} shade={false} className="!absolute inset-y-0 right-0 w-2/3 opacity-40 [mask-image:linear-gradient(90deg,transparent,#000)]" />
+          <span className="relative w-7 text-center text-sm font-black text-slate-400">12</span>
+          <Avatar emoji={profile.avatar} photo={profile.photoThumb ?? profile.photo} name={profile.pseudo} size="sm" rp={game.rp} frame={playerFrame(profile, game.peakRp)} />
+          <span className="relative min-w-0 flex-1">
+            <span className="block truncate font-bold text-white">{profile.pseudo}</span>
+            <span className="flex items-center gap-1 text-[11px]"><RankEmblem tierId={rank.tier.id} size="2xs" /><span className="font-semibold" style={{ color: rank.tier.color }}>{rank.label}</span></span>
+          </span>
+          <span className="relative text-sm font-black text-white">{game.rp.toLocaleString("fr-FR")}</span>
+        </div>
+        <p className="border-t border-white/5 px-3 py-1 text-[10px] uppercase tracking-wider text-slate-500">Aperçu dans le classement</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <button
+          type="button"
+          aria-pressed={!active}
+          onClick={() => game.updateProfile({ bannerId: undefined })}
+          className={clsx("qb-press overflow-hidden rounded-2xl border text-left transition", !active ? "border-violet-400 ring-2 ring-violet-400/50" : "border-white/10 hover:border-white/30")}
+        >
+          <ProfileBanner peakRp={game.peakRp} shade={false} className="h-16" />
+          <span className="block px-2 py-1.5">
+            <span className="block truncate text-xs font-bold text-white">Selon mon rang</span>
+            <span className="block text-[10px] text-slate-500">Change quand tu montes</span>
+          </span>
+        </button>
+        {BANNERS.map((b) => {
+          const open = isBannerUnlocked(b, ctx);
+          const selected = active === b.id;
+          return (
+            <button
+              key={b.id}
+              type="button"
+              disabled={!open}
+              aria-pressed={selected}
+              aria-label={open ? b.name : `${b.name} (verrouillée : ${unlockLabel(b.unlock)})`}
+              onClick={() => game.updateProfile({ bannerId: b.id })}
+              className={clsx(
+                "qb-press relative overflow-hidden rounded-2xl border text-left transition",
+                selected ? "border-violet-400 ring-2 ring-violet-400/50" : open ? "border-white/10 hover:border-white/30" : "cursor-not-allowed border-white/5",
+              )}
+            >
+              <ProfileBanner bannerId={b.id} shade={false} fx={open} className={clsx("h-16", !open && "opacity-60 saturate-50")} />
+              {!open && <span className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-slate-950/70"><Lock size={14} className="text-white/90" /></span>}
+              <span className="block px-2 py-1.5">
+                <span className="block truncate text-xs font-bold text-white">{b.name}</span>
+                <span className={clsx("block truncate text-[10px]", open ? RARITY_STYLE[b.rarity] : "text-slate-500")}>
+                  {open ? b.rarity : unlockLabel(b.unlock)}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-4 space-y-2 rounded-2xl border border-dashed border-white/15 p-3">
+        <p className="text-sm font-bold text-white">📷 Ma propre image</p>
+        {profile.bannerThumb && (
+          <button
+            type="button"
+            aria-pressed={active === PHOTO_BANNER}
+            onClick={() => game.updateProfile({ bannerId: PHOTO_BANNER })}
+            className={clsx("qb-press block w-full overflow-hidden rounded-xl border", active === PHOTO_BANNER ? "border-violet-400 ring-2 ring-violet-400/50" : "border-white/10")}
+          >
+            <ProfileBanner bannerId={PHOTO_BANNER} image={profile.banner ?? profile.bannerThumb} shade={false} className="aspect-[3/1] w-full" />
+          </button>
+        )}
+        <BannerUpload
+          hasImage={Boolean(profile.bannerThumb)}
+          onChange={(r) =>
+            game.updateProfile(
+              r
+                ? { banner: r.banner, bannerThumb: r.bannerThumb, bannerId: PHOTO_BANNER }
+                : { banner: undefined, bannerThumb: undefined, ...(profile.bannerId === PHOTO_BANNER ? { bannerId: undefined } : {}) },
+            )
+          }
+        />
+        <p className="text-xs text-slate-500">Format large (3 × 1). Reste correct : les autres joueurs la voient.</p>
+      </div>
+    </Card>
+  );
+}
+
 /** « Cadre de bronze » → « Bronze ». */
 function shortFrame(frame: string) {
   const short = frame.replace(/^Cadre (de |d'|du )?/, "");
@@ -241,7 +372,7 @@ function TitlesAndFrames() {
                 selected ? "border-violet-400 bg-violet-600/20" : open ? "border-white/10 bg-slate-800/60 hover:border-white/25" : "cursor-not-allowed border-white/5 bg-slate-900/40",
               )}
             >
-              <RankEmblem tierId={r.tierId} size="sm" locked={!open} className="!h-10 !w-10 !text-xl" />
+              <RankEmblem tierId={r.tierId} size="sm" locked={!open} />
               <span className="min-w-0">
                 <span className="block truncate text-sm font-bold" style={{ color: open ? tier.color : undefined }}>{open ? r.title : "???"}</span>
                 <span className="block truncate text-[11px] text-slate-500">

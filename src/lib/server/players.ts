@@ -1,0 +1,77 @@
+import "server-only";
+import { PHOTO_BANNER } from "@/lib/game/banners";
+import { MAX_BANNER_CHARS, isPhotoDataUrl } from "@/lib/game/photo";
+import { rankFromRp } from "@/lib/game/progression";
+import { type MatchHistory, RANK_EPOCH, type RankProfile, currentWeek, rankedWeek } from "@/lib/game/ranked";
+import type { PublicProfile } from "@/lib/game/save";
+import type { GameData } from "@/lib/game/state";
+import { publicPlayerId } from "./auth";
+import { friendIds } from "./friends";
+import { getStore } from "./store";
+
+/**
+ * Fiche publique d'un joueur (ouverte depuis le classement ou les amis).
+ * Index `pubids` : identifiant public → id de compte, rempli à chaque sauvegarde.
+ */
+
+export const indexPublicId = (accountId: string) => getStore().hset("pubids", publicPlayerId(accountId), accountId);
+
+/** Retrouve le compte d'un identifiant public (index, sinon parcours des joueurs connus). */
+export async function accountForPublicId(publicId: string): Promise<string | null> {
+  const store = getStore();
+  const [hit] = await store.hmget<string>("pubids", [publicId]);
+  if (hit) return hit;
+  const known = new Set([...Object.keys(await store.hgetall("players")), ...Object.keys(await store.hgetall(`rank${RANK_EPOCH}`))]);
+  for (const id of known) {
+    if (publicPlayerId(id) === publicId) {
+      await store.hset("pubids", publicId, id);
+      return id;
+    }
+  }
+  return null;
+}
+
+export interface PlayerCard {
+  player: PublicProfile & { banner?: string };
+  rank: { rp: number; peak: number; label: string; games: number; wins: number; weekDelta: number; history: MatchHistory[] } | null;
+  isMe: boolean;
+  friend: boolean;
+}
+
+export async function playerCard(viewer: string, publicId: string): Promise<PlayerCard | null> {
+  const uid = await accountForPublicId(publicId);
+  if (!uid) return null;
+  const store = getStore();
+  const [[pub], [rank], friends] = await Promise.all([
+    store.hmget<PublicProfile>("players", [uid]),
+    store.hmget<RankProfile>(`rank${RANK_EPOCH}`, [uid]),
+    friendIds(viewer),
+  ]);
+  if (!pub && !rank) return null;
+  const r = rank ? currentWeek(rank, rankedWeek()) : null;
+  const base: PublicProfile = pub ?? {
+    id: publicId,
+    pseudo: r!.pseudo,
+    avatar: "🙂",
+    level: "premiere",
+    playerLevel: 1,
+    rp: r!.rp,
+    xp: 0,
+    weeklyXp: 0,
+    week: "",
+    updatedAt: 0,
+  };
+  let banner: string | undefined;
+  if (base.bannerId === PHOTO_BANNER) {
+    const full = (await store.get<{ save: GameData }>(`save:${uid}`))?.save.profile?.banner;
+    if (isPhotoDataUrl(full, MAX_BANNER_CHARS)) banner = full;
+  }
+  return {
+    player: { ...base, id: publicId, ...(r ? { rp: r.rp } : {}), ...(banner ? { banner } : {}) },
+    rank: r
+      ? { rp: r.rp, peak: Math.max(r.peak, r.rp), label: rankFromRp(r.rp).label, games: r.games, wins: r.wins, weekDelta: r.weekDelta, history: r.history.slice(0, 8) }
+      : null,
+    isMe: uid === viewer,
+    friend: friends.includes(uid),
+  };
+}

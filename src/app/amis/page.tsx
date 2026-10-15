@@ -5,7 +5,9 @@ import { NewsFeed } from "@/components/game/NewsFeed";
 import { type FormEvent, useEffect, useState } from "react";
 import { Copy, Share2, UserMinus, UserPlus } from "lucide-react";
 import { Avatar } from "@/components/game/Avatar";
+import { PlayerSheet, type PlayerPreview } from "@/components/game/PlayerSheet";
 import { PlayerTitle } from "@/components/game/PlayerTitle";
+import { ProfileBanner } from "@/components/game/ProfileBanner";
 import { RankBadge } from "@/components/game/RankBadge";
 import { Button } from "@/components/ui/Button";
 import { levelLabel } from "@/lib/content/curriculum";
@@ -21,6 +23,7 @@ export default function FriendsPage() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [open, setOpen] = useState<PlayerPreview | null>(null);
   const push = useToasts((s) => s.push);
 
   useEffect(() => {
@@ -110,20 +113,28 @@ export default function FriendsPage() {
           <p className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-slate-500">Pas encore d&apos;amis : partage ton lien d&apos;invitation !</p>
         )}
         {sorted.map((f) => (
-          <div key={f.id} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-900/70 p-3">
-            <Avatar emoji={f.avatar} photo={f.photoThumb} name={f.pseudo} size="md" rp={f.rp} frame={f.frameId} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-bold text-white">{f.pseudo}</p>
-              <PlayerTitle titleId={f.titleId ?? rankFromRp(f.rp).tier.id} className="text-[10px]" />
-              <p className="text-xs text-slate-500">Niv. {f.playerLevel} · {levelLabel(f.level)} · {currentWeeklyXp(f, now)} XP cette semaine</p>
-            </div>
-            <span className="hidden sm:block"><RankBadge rp={f.rp} size="sm" /></span>
-            <Link href={`/duels?ami=${encodeURIComponent(f.id)}`} aria-label={`Défier ${f.pseudo}`} className="rounded-xl bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-500">⚔️ Défier</Link>
+          <div key={f.id} className="relative flex items-center gap-3 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70 p-3">
+            <ProfileBanner bannerId={f.bannerId} image={f.bannerThumb} peakRp={f.stats?.peakRp ?? f.rp} fx={false} shade={false} className="!absolute inset-y-0 right-0 w-2/3 opacity-30 [mask-image:linear-gradient(90deg,transparent,#000)]" />
+            <button
+              type="button"
+              onClick={() => setOpen({ ...f, friend: true })}
+              aria-label={`Voir le profil de ${f.pseudo}`}
+              className="relative flex min-w-0 flex-1 items-center gap-3 text-left"
+            >
+              <Avatar emoji={f.avatar} photo={f.photoThumb} name={f.pseudo} size="md" rp={f.rp} frame={f.frameId} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-bold text-white">{f.pseudo}</span>
+                <PlayerTitle titleId={f.titleId ?? rankFromRp(f.rp).tier.id} className="text-[10px]" />
+                <span className="block text-xs text-slate-400">Niv. {f.playerLevel} · {levelLabel(f.level)} · {currentWeeklyXp(f, now)} XP cette semaine</span>
+              </span>
+            </button>
+            <span className="relative hidden sm:block"><RankBadge rp={f.rp} size="sm" /></span>
+            <Link href={`/duels?ami=${encodeURIComponent(f.id)}`} aria-label={`Défier ${f.pseudo}`} className="relative rounded-xl bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-500">⚔️ Défier</Link>
             <button
               type="button"
               aria-label={`Retirer ${f.pseudo} de mes amis`}
               onClick={() => confirm(`Retirer ${f.pseudo} de tes amis ?`) && removeFriend(f.id).catch((e) => push({ emoji: "⚠️", title: e.message, tone: "rose" }))}
-              className="rounded-xl p-2 text-slate-500 hover:bg-rose-600 hover:text-white"
+              className="relative rounded-xl p-2 text-slate-500 hover:bg-rose-600 hover:text-white"
             >
               <UserMinus size={18} />
             </button>
@@ -132,6 +143,7 @@ export default function FriendsPage() {
       </section>
 
       <NewsFeed />
+      {open && <PlayerSheet key={open.id} player={open} onClose={() => setOpen(null)} />}
     </div>
   );
 }

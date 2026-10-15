@@ -87,7 +87,37 @@ export async function rankForSave(uid: string): Promise<{ rp: number; peakRp: nu
   return { rp: p?.rp ?? 0, peakRp: p?.peak ?? 0 };
 }
 
-export interface BoardRow {
+/** Habillage d'une ligne de classement : titre, cadre et bannière choisis par le joueur. */
+export interface RowLook {
+  titleId?: string;
+  frameId?: string;
+  bannerId?: string;
+  bannerThumb?: string;
+}
+
+/** Nombre de premières lignes qui reçoivent la miniature de bannière envoyée (poids de la réponse). */
+const BANNER_ROWS = 30;
+
+function look(pub: PublicProfile | null | undefined): RowLook {
+  if (!pub) return {};
+  return {
+    ...(pub.titleId ? { titleId: pub.titleId } : {}),
+    ...(pub.frameId ? { frameId: pub.frameId } : {}),
+    ...(pub.bannerId ? { bannerId: pub.bannerId } : {}),
+    ...(pub.bannerThumb ? { bannerThumb: pub.bannerThumb } : {}),
+  };
+}
+
+/** Retire les miniatures de bannière hors du haut du classement, de mes amis et de moi. */
+function trimBanners<T extends RowLook & { place: number; isMe: boolean; friend: boolean }>(rows: T[]): T[] {
+  return rows.map((r) => {
+    if (!r.bannerThumb || r.place <= BANNER_ROWS || r.isMe || r.friend) return r;
+    const { bannerThumb: _b, bannerId: _i, ...rest } = r;
+    return rest as T;
+  });
+}
+
+export interface BoardRow extends RowLook {
   id: string;
   pseudo: string;
   avatar: string;
@@ -129,6 +159,7 @@ export async function rankBoard(uid: string): Promise<BoardRow[]> {
         pseudo: p.pseudo,
         avatar: pub?.avatar ?? "🙂",
         ...(pub?.photoThumb ? { photoThumb: pub.photoThumb } : {}),
+        ...look(pub),
         rp: p.rp,
         label: rankFromRp(p.rp).label,
         weekDelta: p.weekDelta,
@@ -140,10 +171,10 @@ export async function rankBoard(uid: string): Promise<BoardRow[]> {
     })
     .filter((r) => r.games > 0 || r.isMe)
     .sort((a, b) => b.rp - a.rp || b.weekDelta - a.weekDelta);
-  return topWithMe(rows);
+  return trimBanners(topWithMe(rows));
 }
 
-export interface XpRow {
+export interface XpRow extends RowLook {
   id: string;
   pseudo: string;
   avatar: string;
@@ -168,6 +199,7 @@ export async function xpBoard(uid: string): Promise<XpRow[]> {
       pseudo: p.pseudo,
       avatar: p.avatar ?? "🙂",
       ...(p.photoThumb ? { photoThumb: p.photoThumb } : {}),
+      ...look(p),
       xp: p.xp ?? 0,
       playerLevel: p.playerLevel ?? 1,
       weeklyXp: p.week === week ? p.weeklyXp ?? 0 : 0,
@@ -176,7 +208,7 @@ export async function xpBoard(uid: string): Promise<XpRow[]> {
       friend: friends.has(id),
     }))
     .sort((a, b) => b.xp - a.xp);
-  return topWithMe(rows);
+  return trimBanners(topWithMe(rows));
 }
 
 // ─────────────────────────── File d'attente ───────────────────────────

@@ -4,6 +4,7 @@ import { clientKey, rateLimit } from "@/lib/server/rate-limit";
 import { normalizeFriendCode } from "@/lib/friend-code";
 import { currentSession, jsonError, readJson, storageDown } from "@/lib/server/accounts";
 import { sendPush } from "@/lib/server/push";
+import { accountForPublicId } from "@/lib/server/players";
 import { accountIdForCode, addFriendship, friendCodeOf, friendProfiles, registerFriendCode, removeFriendship } from "@/lib/server/friends";
 
 export const runtime = "nodejs";
@@ -24,9 +25,9 @@ export async function GET() {
   }
 }
 
-const AddBody = z.object({ code: z.string().max(20) });
+const AddBody = z.union([z.object({ code: z.string().max(20) }), z.object({ id: z.string().min(1).max(64) })]);
 
-/** POST /api/friends { code } — devient ami avec le titulaire du code. */
+/** POST /api/friends { code } ou { id } — devient ami avec le titulaire du code (ou depuis sa fiche). */
 export async function POST(req: Request) {
   const session = await currentSession();
   if (!session) return needLogin();
@@ -36,14 +37,15 @@ export async function POST(req: Request) {
   const read = await readJson(req, 1_000);
   if (!read.ok) return read.response;
   const parsed = AddBody.safeParse(read.body);
-  const code = parsed.success ? normalizeFriendCode(parsed.data.code) : null;
-  if (!code) return jsonError("Code d'ami invalide (format QB-XXXXXX).", 400);
+  const byId = parsed.success && "id" in parsed.data ? parsed.data.id : null;
+  const code = parsed.success && "code" in parsed.data ? normalizeFriendCode(parsed.data.code) : null;
+  if (!code && !byId) return jsonError("Code d'ami invalide (format QB-XXXXXX).", 400);
 
   try {
-    const other = await accountIdForCode(code);
-    if (!other) return jsonError("Aucun joueur n'a ce code.", 404);
+    const other = byId ? await accountForPublicId(byId) : await accountIdForCode(code!);
+    if (!other) return jsonError(byId ? "Joueur introuvable." : "Aucun joueur n'a ce code.", 404);
     const result = await addFriendship(session.uid, other);
-    if (result === "self") return jsonError("C'est ton propre code !", 400);
+    if (result === "self") return jsonError(byId ? "C'est toi !" : "C'est ton propre code !", 400);
     if (result === "full") return jsonError("Limite de 100 amis atteinte.", 409);
     const friends = await friendProfiles(session.uid);
     if (result === "added") after(() => sendPush(other, { title: "👥 Nouvel ami", body: `${session.pseudo} t'a ajouté(e) en ami. Lance-lui un défi !`, url: "/amis", tag: "friends" }));

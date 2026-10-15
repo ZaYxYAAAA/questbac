@@ -5,6 +5,7 @@ import { type PublicProfile, publicProfileFrom } from "@/lib/game/save";
 import type { GameData } from "@/lib/game/state";
 import { type SessionPayload, hashPassword, persistedSecret, pseudoKey, publicPlayerId, randomSecret, resolveSessionSecret, signToken, verifyToken } from "./auth";
 import { registerFriendCode } from "./friends";
+import { indexPublicId } from "./players";
 import { getStore } from "./store";
 
 /**
@@ -73,6 +74,7 @@ export async function putSave(account: { id: string; pseudo: string }, save: Gam
   await store.set(`save:${account.id}`, { save, updatedAt: save.updatedAt } satisfies StoredSave);
   await store.hset("players", account.id, publicProfileFrom({ publicId: publicPlayerId(account.id), pseudo: account.pseudo }, save));
   await registerFriendCode(account.id);
+  await indexPublicId(account.id);
 }
 
 export async function listPlayers(limit = 200): Promise<PublicProfile[]> {

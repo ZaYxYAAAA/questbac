@@ -4,7 +4,8 @@
  */
 import { z } from "zod";
 import type { Level } from "@/lib/types";
-import { MAX_PHOTO_CHARS, MAX_THUMB_CHARS, isPhotoDataUrl } from "./photo";
+import { type BannerContext, PHOTO_BANNER, bannerById, isBannerUnlocked } from "./banners";
+import { MAX_BANNER_CHARS, MAX_BANNER_THUMB_CHARS, MAX_PHOTO_CHARS, MAX_THUMB_CHARS, isPhotoDataUrl } from "./photo";
 import { levelFromXp, rankFromRp, weekKey } from "./progression";
 import { activeTierReward, unlockedTiers } from "./ranks";
 import { type GameData, createInitialData } from "./state";
@@ -68,6 +69,9 @@ function migrateProfile(profile: Record<string, unknown>): Record<string, unknow
   }
   if (out.photo !== undefined && !isPhotoDataUrl(out.photo, MAX_PHOTO_CHARS)) delete out.photo;
   if (out.photoThumb !== undefined && !isPhotoDataUrl(out.photoThumb, MAX_THUMB_CHARS)) delete out.photoThumb;
+  if (out.banner !== undefined && !isPhotoDataUrl(out.banner, MAX_BANNER_CHARS)) delete out.banner;
+  if (out.bannerThumb !== undefined && !isPhotoDataUrl(out.bannerThumb, MAX_BANNER_THUMB_CHARS)) delete out.bannerThumb;
+  if (out.bannerId !== undefined && (typeof out.bannerId !== "string" || out.bannerId.length > 40)) delete out.bannerId;
   return out;
 }
 
@@ -97,6 +101,9 @@ export const SaveSchema = z.looseObject({
       createdAt: num,
       titleId: z.string().max(40).optional(),
       frameId: z.string().max(40).optional(),
+      bannerId: z.string().max(40).optional(),
+      banner: z.string().refine((v) => isPhotoDataUrl(v, MAX_BANNER_CHARS)).optional(),
+      bannerThumb: z.string().refine((v) => isPhotoDataUrl(v, MAX_BANNER_THUMB_CHARS)).optional(),
     })
     .nullable(),
   xp: num.min(0),
@@ -133,13 +140,75 @@ export interface PublicProfile {
   titleId?: string;
   /** Palier du cadre d'avatar choisi (sinon : celui du rang). */
   frameId?: string;
+  /** Bannière choisie (vérifiée : débloquée), ou « photo » avec sa miniature. */
+  bannerId?: string;
+  /** Miniature 240 × 80 de la bannière envoyée. */
+  bannerThumb?: string;
   level: Level;
   playerLevel: number;
   rp: number;
   xp: number;
   weeklyXp: number;
   week: string;
+  /** Résumé affiché sur la fiche du joueur. */
+  stats?: PublicStats;
   updatedAt: number;
+}
+
+export interface PublicStats {
+  missions: number;
+  answered: number;
+  /** Pourcentage de bonnes réponses (0 à 100). */
+  accuracy: number;
+  bestCombo: number;
+  perfects: number;
+  bossesWon: number;
+  streak: number;
+  streakBest: number;
+  achievements: number;
+  peakRp: number;
+  /** Chapitres avec au moins une étoile. */
+  chapters: number;
+  stars: number;
+}
+
+/** Ce qui débloque les bannières, calculé depuis la sauvegarde. */
+export function bannerContext(save: Pick<GameData, "rp" | "peakRp" | "xp" | "bosses" | "streak" | "achievements">): BannerContext {
+  return {
+    peakRp: Math.max(save.rp, save.peakRp ?? 0),
+    level: levelFromXp(save.xp).level,
+    bossesWon: Object.values(save.bosses ?? {}).filter((b) => (b as { victories?: number })?.victories).length,
+    streakBest: Math.max(save.streak?.best ?? 0, save.streak?.count ?? 0),
+    achievements: Object.keys(save.achievements ?? {}).length,
+  };
+}
+
+/** Bannière réellement portée : celle choisie si elle est débloquée (ou la photo si elle existe). */
+export function activeBannerId(profile: { bannerId?: string; bannerThumb?: string } | null | undefined, ctx: BannerContext): string | undefined {
+  const id = profile?.bannerId;
+  if (!id) return undefined;
+  if (id === PHOTO_BANNER) return isPhotoDataUrl(profile?.bannerThumb, MAX_BANNER_THUMB_CHARS) ? id : undefined;
+  const b = bannerById(id);
+  return b && isBannerUnlocked(b, ctx) ? id : undefined;
+}
+
+export function publicStatsFrom(save: GameData): PublicStats {
+  const ctx = bannerContext(save);
+  const chapters = Object.values(save.chapters ?? {});
+  return {
+    missions: save.stats.missions ?? 0,
+    answered: save.stats.answered ?? 0,
+    accuracy: save.stats.answered ? Math.round((100 * save.stats.correct) / save.stats.answered) : 0,
+    bestCombo: save.stats.bestCombo ?? 0,
+    perfects: save.stats.perfects ?? 0,
+    bossesWon: ctx.bossesWon,
+    streak: save.streak?.count ?? 0,
+    streakBest: ctx.streakBest,
+    achievements: ctx.achievements,
+    peakRp: Math.round(ctx.peakRp),
+    chapters: chapters.filter((c) => c?.stars > 0).length,
+    stars: chapters.reduce((s, c) => s + (c?.stars ?? 0), 0),
+  };
 }
 
 /** Seule la miniature est publiée (jamais la grande photo) ; l'avatar reste un emoji. */
@@ -155,14 +224,22 @@ export function publicProfileFrom(account: { publicId: string; pseudo: string },
     ...(isPhotoDataUrl(thumb, MAX_THUMB_CHARS) ? { photoThumb: thumb } : {}),
     titleId: activeTierReward(save.profile?.titleId, peakRp).tierId,
     ...(frame ? { frameId: frame } : {}),
+    ...banner(save),
     level: save.profile?.level ?? "premiere",
     playerLevel: levelFromXp(save.xp).level,
     rp: Math.round(save.rp),
     xp: Math.round(save.xp),
     weeklyXp: Math.round(save.weekly.xp),
     week: save.weekly.week,
+    stats: publicStatsFrom(save),
     updatedAt: save.updatedAt,
   };
+}
+
+function banner(save: GameData): Pick<PublicProfile, "bannerId" | "bannerThumb"> {
+  const id = activeBannerId(save.profile, bannerContext(save));
+  if (!id) return {};
+  return id === PHOTO_BANNER ? { bannerId: id, bannerThumb: save.profile!.bannerThumb } : { bannerId: id };
 }
 
 /** XP hebdomadaire réellement valable cette semaine (0 si la sauvegarde date d'une semaine passée). */

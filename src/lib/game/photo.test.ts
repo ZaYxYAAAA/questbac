@@ -61,3 +61,18 @@ describe("validation des photos", () => {
     expect(isHeic({ type: "image/jpeg", name: "IMG_0001.jpg" })).toBe(false);
   });
 });
+
+describe("bannière", () => {
+  it("garde un rectangle 3:1 dans l'image", async () => {
+    const { bannerSourceRect } = await import("./photo");
+    const r = bannerSourceRect({ width: 1200, height: 900 }, 0.5);
+    expect(r.sw / r.sh).toBeCloseTo(3);
+    expect(r.sw).toBe(1200);
+    expect(r.sy).toBeCloseTo((900 - 400) / 2);
+    const tall = bannerSourceRect({ width: 300, height: 2000 }, 0);
+    expect(tall.sy).toBe(0);
+    const wide = bannerSourceRect({ width: 3000, height: 300 }, 1, 2);
+    expect(wide.sh).toBe(150);
+    expect(wide.sx + wide.sw).toBeLessThanOrEqual(3000);
+  });
+});

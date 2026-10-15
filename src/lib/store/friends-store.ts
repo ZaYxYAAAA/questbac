@@ -43,6 +43,13 @@ export async function addFriend(code: string): Promise<{ result: "added" | "alre
   return { result: json.result, friend: friends.find((f) => !before.has(f.id)) ?? null };
 }
 
+/** Ajoute un ami depuis sa fiche (identifiant public). */
+export async function addFriendById(id: string): Promise<"added" | "already"> {
+  const json = await call("POST", { id });
+  useFriends.setState({ friends: json.friends ?? [] });
+  return json.result;
+}
+
 export async function removeFriend(id: string) {
   const json = await call("DELETE", { id });
   useFriends.setState({ friends: json.friends ?? [] });
