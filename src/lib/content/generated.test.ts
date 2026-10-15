@@ -36,6 +36,30 @@ describe("questions générées", () => {
     }
   }, 60_000);
 
+  it("ont des formules LaTeX qui s'affichent sans erreur", async () => {
+    const katex = (await import("katex")).default;
+    const errors: string[] = [];
+    for (const [id, gens] of Object.entries(CHAPTER_GENERATORS)) {
+      const r = seededRandom(5);
+      gens.forEach((g, gi) => {
+        for (let i = 0; i < 15; i++) {
+          const q = g(r);
+          const texts = [q.prompt, q.explanation, ...(q.type === "mcq" ? q.choices : [])];
+          for (const t of texts) {
+            for (const m of t.replace(/\$\$[^$]*\$\$/g, "").matchAll(/\$([^$]+)\$/g)) {
+              try {
+                katex.renderToString(m[1], { throwOnError: true, strict: "ignore" });
+              } catch (e) {
+                errors.push(`${id}#${gi} : ${m[1]} → ${(e as Error).message.slice(0, 80)}`);
+              }
+            }
+          }
+        }
+      });
+    }
+    expect([...new Set(errors)].slice(0, 30)).toEqual([]);
+  }, 120_000);
+
   it("ne reposent pas une information (même sous une autre forme) avant d'avoir épuisé le chapitre", () => {
     const short: string[] = [];
     for (const id of Object.keys(CHAPTER_GENERATORS)) {

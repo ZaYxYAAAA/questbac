@@ -23,7 +23,7 @@ import {
   tick,
 } from "@/lib/game/match";
 import { hashString, seededRandom, shuffle } from "@/lib/game/quests";
-import { DAILY_SUBJECT_BONUS, type RankProfile, RANK_EPOCH, applyResult, currentWeek, newRankProfile, publicQuestion, rankedWeek, subjectLock, subjectOfDay } from "@/lib/game/ranked";
+import { DAILY_SUBJECT_BONUS, OFFERED_KEPT, type RankProfile, RANK_EPOCH, applyResult, chooseChapters, currentWeek, newRankProfile, publicQuestion, rankedWeek, subjectLock, subjectOfDay } from "@/lib/game/ranked";
 import { rankFromRp } from "@/lib/game/progression";
 import type { PublicProfile } from "@/lib/game/save";
 import { isCorrect } from "@/lib/game/session";
@@ -326,13 +326,11 @@ export async function cancelQueue(uid: string, ticketId: string) {
   await store.del(ticketKey(ticketId));
 }
 
-/** Deux chapitres au hasard (avec des questions) de la matière, au niveau du joueur. */
-function pickChapters(subject: SubjectId, level: Level, seed: string): [string, string] {
-  const r = seededRandom(hashString(seed));
+/** Deux chapitres au hasard (avec des questions) de la matière, en évitant ceux proposés récemment aux joueurs. */
+function pickChapters(subject: SubjectId, level: Level, recent: string[]): [string, string] {
   const pool = chaptersFor(subject, level).filter((c) => hasGenerators(c.id));
   const list = pool.length >= 2 ? pool : chaptersFor(subject, level);
-  const [a, b] = shuffle(list, r);
-  return [a.id, (b ?? a).id];
+  return chooseChapters(list.map((c) => c.id), recent);
 }
 
 async function createMatch(tickets: Ticket[]): Promise<Match> {
@@ -349,6 +347,9 @@ async function createMatch(tickets: Ticket[]): Promise<Match> {
     rp: t.rp,
   }));
   const r = seededRandom(hashString(`mk:${id}`));
+  const ranks = await Promise.all(humans.map((h) => getRank(h.id, h.pseudo)));
+  // Thèmes proposés récemment à l'un des joueurs, les plus récents en dernier.
+  const recentOffers = ranks.flatMap((p) => p.offered ?? []);
   const avgRp = humans.reduce((s, h) => s + h.rp, 0) / humans.length;
   const players = [...humans];
   while (players.length < MATCH_PLAYERS) players.push(makeBot(avgRp, r, players.map((p) => p.pseudo)));
@@ -358,7 +359,7 @@ async function createMatch(tickets: Ticket[]): Promise<Match> {
     level: tickets[0].level,
     createdAt: now,
     players,
-    chapters: pickChapters(tickets[0].subject, tickets[0].level, id),
+    chapters: pickChapters(tickets[0].subject, tickets[0].level, recentOffers),
     votes: {},
     chapterId: null,
     voteEnd: null,
@@ -375,7 +376,7 @@ async function createMatch(tickets: Ticket[]): Promise<Match> {
   await saveMatch(m);
   for (const h of humans) {
     const p = await getRank(h.id, h.pseudo);
-    await putRank(h.id, { ...p, active: id });
+    await putRank(h.id, { ...p, active: id, offered: [...(p.offered ?? []).filter((c) => !m.chapters.includes(c)), ...m.chapters].slice(-OFFERED_KEPT) });
   }
   return m;
 }

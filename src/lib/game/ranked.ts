@@ -4,6 +4,7 @@
  */
 import type { Question } from "@/lib/types";
 import { weekKey } from "./progression";
+import { shuffle } from "./quests";
 
 /**
  * Époque des rangs : l'augmenter remet tous les rangs à zéro (l'XP reste).
@@ -34,6 +35,26 @@ export interface RankProfile {
   active?: string;
   /** Empreintes des dernières informations posées (pas de répétition d'une partie à l'autre). */
   seen?: string[];
+  /** Derniers thèmes proposés au vote (du plus ancien au plus récent). */
+  offered?: string[];
+}
+
+/** Nombre de thèmes proposés récemment dont on se souvient, par joueur. */
+export const OFFERED_KEPT = 24;
+
+/**
+ * Deux thèmes à proposer au vote : tirés au hasard parmi ceux que les joueurs
+ * n'ont pas vus proposés récemment ; s'il n'en reste pas assez, les plus anciens.
+ */
+export function chooseChapters(pool: readonly string[], recent: readonly string[], rand: () => number = Math.random): [string, string] {
+  if (pool.length === 0) throw new Error("Aucun thème disponible");
+  // Ancienneté : -1 = jamais proposé, sinon position (0 = le plus ancien).
+  const age = (id: string) => recent.lastIndexOf(id);
+  const shuffled = shuffle(pool, rand);
+  const ordered = [...shuffled].sort((x, y) => age(x) - age(y));
+  const fresh = ordered.filter((id) => age(id) === -1);
+  const picks = fresh.length >= 2 ? shuffle(fresh, rand).slice(0, 2) : ordered.slice(0, 2);
+  return [picks[0], picks[1] ?? picks[0]];
 }
 
 export function newRankProfile(pseudo: string, week: string): RankProfile {

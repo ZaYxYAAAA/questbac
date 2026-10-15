@@ -26,6 +26,10 @@ import { MATHS_TERMINALE } from "./gen/maths-terminale";
 import { PHYSIQUE } from "./gen/physique";
 import { SES_ANGLAIS } from "./gen/ses-anglais";
 import { SVT } from "./gen/svt";
+import { MATHS_PREMIERE_PLUS } from "./gen/plus-maths-premiere";
+import { MATHS_SECONDE_PLUS } from "./gen/plus-maths-seconde";
+import { MATHS_TERMINALE_PLUS } from "./gen/plus-maths-terminale";
+import { PHYSIQUE_PLUS } from "./gen/plus-physique";
 import { questionsForChapter } from "./questions";
 import { withCalc } from "@/lib/game/calculator";
 
@@ -48,7 +52,7 @@ const BASE_GENERATORS: Record<string, Generator[]> = {
 };
 
 /** Banques d'informations supplémentaires, ajoutées aux chapitres existants. */
-const EXTRAS: Record<string, Generator[]>[] = [EXTRA_PHILO, EXTRA_HISTOIRE, EXTRA_LETTRES, EXTRA_SVT, EXTRA_SES_LANGUES];
+const EXTRAS: Record<string, Generator[]>[] = [EXTRA_PHILO, EXTRA_HISTOIRE, EXTRA_LETTRES, EXTRA_SVT, EXTRA_SES_LANGUES, MATHS_SECONDE_PLUS, MATHS_PREMIERE_PLUS, MATHS_TERMINALE_PLUS, PHYSIQUE_PLUS];
 
 export const CHAPTER_GENERATORS: Record<string, Generator[]> = { ...BASE_GENERATORS };
 for (const extra of EXTRAS) {
