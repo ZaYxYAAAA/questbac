@@ -64,6 +64,7 @@ export default function FichesPage() {
               <h2 className="truncate font-bold text-white">{chapter.title}</h2>
               <p className="flex flex-wrap gap-x-2 text-xs text-slate-400">
                 {fiche && <span>{fiche.essentiel.length} points clés</span>}
+                {fiche && fiche.exemples.length > 0 && <span>{fiche.exemples.length} exemple{fiche.exemples.length > 1 ? "s" : ""} corrigé{fiche.exemples.length > 1 ? "s" : ""}</span>}
                 {cards > 0 && <span>🃏 {cards} cartes</span>}
                 {chapter.lab && <span className="text-cyan-300"><FlaskConical size={11} className="mr-0.5 inline" />labo</span>}
               </p>
