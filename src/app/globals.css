@@ -226,3 +226,12 @@ body {
   /* Le chrono garde sa durée réelle : c'est une information, pas une décoration. */
   .qb-drain { animation-duration: var(--qb-dur), var(--qb-dur) !important; }
 }
+
+/* Cartes mémoire : retournement 3D (les deux faces empilées dans la même cellule de grille). */
+.qb-flip { perspective: 1400px; }
+.qb-flip-inner { display: grid; transform-style: preserve-3d; transition: transform 0.55s var(--qb-ease); }
+.qb-flip-inner.is-flipped { transform: rotateY(180deg); }
+.qb-face { grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.qb-face-back { transform: rotateY(180deg); }
+@keyframes qb-card-in { from { opacity: 0; transform: translateX(28px) rotate(2deg); } to { opacity: 1; transform: none; } }
+.qb-card-in { animation: qb-card-in 0.35s var(--qb-ease) backwards; }

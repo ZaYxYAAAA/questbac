@@ -94,6 +94,8 @@ export function QuestionCard({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.tagName === "INPUT") return;
+      // Labo ou calculatrice ouverts par-dessus : les touches leur appartiennent.
+      if (document.querySelector('[role="dialog"]')) return;
       if (status !== "answering") return;
       if (question.type === "mcq") {
         const n = parseInt(e.key, 10) - 1;

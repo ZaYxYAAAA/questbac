@@ -1,4 +1,4 @@
-import { FlaskConical, Globe, Home, type LucideIcon, Map as MapIcon, Skull, Swords, Target, Trophy, User, Users } from "lucide-react";
+import { BookOpen, FlaskConical, Globe, Home, type LucideIcon, Map as MapIcon, Skull, Swords, Target, Trophy, User, Users } from "lucide-react";
 
 export interface NavPage {
   href: string;
@@ -31,6 +31,7 @@ export const SECTIONS: NavSection[] = [
       { href: "/culture", label: "Culture G", icon: Globe },
       { href: "/boss", label: "Boss", icon: Skull },
       { href: "/labo", label: "Labo", icon: FlaskConical },
+      { href: "/fiches", label: "Fiches", icon: BookOpen },
     ],
     extra: ["/mission"],
   },

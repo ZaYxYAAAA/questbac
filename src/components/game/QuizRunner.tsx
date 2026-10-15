@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { Flame, Sparkles, Timer, X } from "lucide-react";
+import { FlaskConical, Flame, Sparkles, Timer, X } from "lucide-react";
 import Link from "next/link";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { comboMultiplier, xpForAnswer } from "@/lib/game/progression";
 import type { GivenAnswer } from "@/lib/game/session";
-import type { Question, QuizResult } from "@/lib/types";
+import type { LabId, Question, QuizResult } from "@/lib/types";
+import { LabSheet } from "./LabSheet";
 import { QuestionCard } from "./QuestionCard";
 import { BoostChip } from "@/components/game/BoostChip";
 
@@ -18,6 +19,7 @@ export function QuizRunner({
   exitHref,
   onComplete,
   secondsPerQuestion,
+  lab,
 }: {
   questions: Question[];
   title: string;
@@ -26,7 +28,10 @@ export function QuizRunner({
   onComplete: (result: QuizResult, answerXp: number) => void;
   /** Chrono par question (duels) : à zéro, la question compte comme ratée. */
   secondsPerQuestion?: number;
+  /** Labo du chapitre, à ouvrir en pleine mission. */
+  lab?: LabId;
 }) {
+  const [labOpen, setLabOpen] = useState(false);
   const [index, setIndex] = useState(0);
   const [combo, setCombo] = useState(0);
   const [maxCombo, setMaxCombo] = useState(0);
@@ -142,6 +147,15 @@ export function QuizRunner({
           Combo ×<span key={combo} className={combo > 0 ? "qb-bump" : undefined}>{combo}</span> {combo > 0 && <span className="text-xs font-medium opacity-80">(XP ×{comboMultiplier(combo).toFixed(1)})</span>}
         </div>
         <div className="flex items-center gap-2">
+        {lab && (
+          <button
+            type="button"
+            onClick={() => setLabOpen(true)}
+            className="qb-press inline-flex items-center gap-1.5 rounded-full border border-cyan-400/40 bg-cyan-500/15 px-3 py-1 text-sm font-bold text-cyan-100"
+          >
+            <FlaskConical size={15} /> Labo
+          </button>
+        )}
         <BoostChip />
         <div className="relative flex items-center gap-1.5 rounded-full bg-violet-500/15 px-3 py-1 text-sm font-bold text-violet-200">
           <Sparkles size={16} /> <span key={xp} className="qb-bump tabular-nums">{xp}</span> XP
@@ -182,6 +196,7 @@ export function QuizRunner({
       <p className="text-center text-xs text-slate-500">
         {correctCount} bonne{correctCount > 1 ? "s" : ""} réponse{correctCount > 1 ? "s" : ""}<span className="hidden sm:inline"> · Raccourcis clavier : 1-4 ou A-D, V/F, Entrée</span>
       </p>
+      {labOpen && lab && <LabSheet lab={lab} onClose={() => setLabOpen(false)} />}
     </div>
   );
 }

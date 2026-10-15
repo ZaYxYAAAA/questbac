@@ -158,6 +158,21 @@ pourront tourner telles quelles côté serveur.
   (ticket), `match:<id>` (partie), `match:settled:<id>` (points distribués une seule fois).
   Le serveur recopie le rang dans la sauvegarde (`rp`), et fait foi.
 
+## Fiches de révision
+
+- Page **/fiches** (Entraînement → Fiches) : par niveau et par matière, une fiche par chapitre
+  (/fiches/<chapitre>). Lien « Fiche » sur chaque chapitre de la carte et sur l'intro des missions.
+- **L'essentiel** (src/lib/content/fiches/) : points clés écrits pour les 141 chapitres du
+  programme (formules, définitions, dates, méthodes) et **pièges à éviter**. Format texte :
+  `@id`, puis `- point` et `! piège` (Markdown + LaTeX) ; un test vérifie que chaque chapitre a
+  sa fiche et que le LaTeX est équilibré.
+- **Cartes mémoire** recto/verso (`chapterMemos`) : produites automatiquement par les banques de
+  connaissances (`pairs`, `cards`, `claims` joignent leurs cartes à leurs générateurs) et par les
+  questions écrites à la main. « Je savais / À revoir », les cartes ratées se rejouent à la fin ;
+  finir un paquet compte pour la quête « Révise une fiche jusqu'au bout ».
+- **Labo en pleine mission** : bouton « Labo » pendant une mission d'un chapitre qui a un labo
+  (trigonométrie, second degré, suites…), ouvert dans une feuille par-dessus la question.
+
 ## Boss, boosts et rythme
 
 - **Boss : 3 essais pour toute la vie du compte** (`src/lib/game/boss-rules.ts`). L'essai est

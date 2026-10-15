@@ -8,7 +8,17 @@ import { hashString, shuffle } from "@/lib/game/quests";
 
 export type Rand = () => number;
 export type Draft = Omit<McqQuestion, "id"> | Omit<NumericQuestion, "id"> | Omit<TrueFalseQuestion, "id">;
-export type Generator = (r: Rand) => Draft;
+/** Carte mémoire (fiches de révision) : recto, verso et précision facultative. */
+export interface Memo {
+  front: string;
+  back: string;
+  note?: string;
+}
+/** Générateur de questions ; les banques de connaissances y joignent leurs cartes mémoire. */
+export type Generator = ((r: Rand) => Draft) & { memo?: Memo[] };
+
+/** Joint des cartes mémoire à un générateur. */
+const withMemo = (g: Generator, memo: Memo[]): Generator => Object.assign(g, { memo });
 
 /** Rattache une question à l'information qu'elle teste (mêmes parties = même information). */
 export const withFact = (d: Draft, ...parts: string[]): Draft => ({ ...d, fact: hashString(parts.join("|")).toString(36) });
@@ -164,10 +174,13 @@ export interface PairOptions {
 export function pairs(items: readonly Pair[], o: PairOptions): Generator[] {
   const explain = o.explain ?? ((a: string, b: string) => `${a} → ${b}.`);
   const gens: Generator[] = [
-    (r) => {
-      const [a, b] = pick(r, items);
-      return withFact(mcq(r, o.ask(a), b, items.filter(([x, y]) => x !== a && y !== b).map(([, y]) => y), explain(a, b)), a, b);
-    },
+    withMemo(
+      (r) => {
+        const [a, b] = pick(r, items);
+        return withFact(mcq(r, o.ask(a), b, items.filter(([x, y]) => x !== a && y !== b).map(([, y]) => y), explain(a, b)), a, b);
+      },
+      items.map(([a, b]) => ({ front: o.ask(a), back: b })),
+    ),
   ];
   if (o.reverse) {
     const reverse = o.reverse;
@@ -193,15 +206,23 @@ export function pairs(items: readonly Pair[], o: PairOptions): Generator[] {
 export type Card = readonly [string, string, readonly string[], string];
 
 /** Un générateur qui tire une carte de cours (ordre des choix mélangé). */
-export const cards = (items: readonly Card[]): Generator => (r) => {
-  const [q, a, w, e] = pick(r, items);
-  return withFact(mcq(r, q, a, [...w], e), q);
-};
+export const cards = (items: readonly Card[]): Generator =>
+  withMemo(
+    (r) => {
+      const [q, a, w, e] = pick(r, items);
+      return withFact(mcq(r, q, a, [...w], e), q);
+    },
+    items.map(([q, a, , e]) => ({ front: q, back: a, note: e })),
+  );
 
 /** Affirmation de cours : [énoncé, vrai ?, explication]. */
 export type Claim = readonly [string, boolean, string];
 
-export const claims = (items: readonly Claim[]): Generator => (r) => {
-  const [q, a, e] = pick(r, items);
-  return withFact(tf(q, a, e), q);
-};
+export const claims = (items: readonly Claim[]): Generator =>
+  withMemo(
+    (r) => {
+      const [q, a, e] = pick(r, items);
+      return withFact(tf(q, a, e), q);
+    },
+    items.map(([q, a, e]) => ({ front: `Vrai ou faux : ${q}`, back: a ? "Vrai" : "Faux", note: e })),
+  );

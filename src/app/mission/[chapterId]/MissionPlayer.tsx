@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { ChevronLeft, FlaskConical, Infinity as InfinityIcon, Play, Shuffle } from "lucide-react";
+import { BookOpen, ChevronLeft, FlaskConical, Infinity as InfinityIcon, Play, Shuffle } from "lucide-react";
 import { QuizRunner } from "@/components/game/QuizRunner";
 import { RewardScreen } from "@/components/game/RewardScreen";
 import { Button } from "@/components/ui/Button";
@@ -51,6 +51,7 @@ export function MissionPlayer({ chapter, autoMix = false }: { chapter: Chapter; 
       <QuizRunner
         questions={phase.questions}
         title={phase.mix ? (meta.extra ? "Quiz éclair" : "Mélange") : chapter.title}
+        lab={phase.mix ? undefined : chapter.lab}
         subtitle={phase.label}
         exitHref={exitHref}
         onComplete={(result, answerXp) => {
@@ -133,10 +134,13 @@ export function MissionPlayer({ chapter, autoMix = false }: { chapter: Chapter; 
           <InfinityIcon size={16} className="shrink-0 text-emerald-300" />
           Questions générées à chaque partie : valeurs, exemples et pièges changent, et tu ne retombes pas sur une question déjà vue.
         </p>
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Link href={`/fiches/${chapter.id}`} className="inline-flex items-center gap-1 text-sm font-semibold text-amber-300 hover:text-amber-200">
+            <BookOpen size={14} /> Revoir la fiche avant de jouer
+          </Link>
           {chapter.lab && (
             <Link href={`/labo/${chapter.lab}`} className="inline-flex items-center gap-1 text-sm text-violet-300 hover:text-violet-200">
-              <FlaskConical size={14} /> Manipuler dans le labo
+              <FlaskConical size={14} /> Labo (aussi pendant la mission)
             </Link>
           )}
         </div>

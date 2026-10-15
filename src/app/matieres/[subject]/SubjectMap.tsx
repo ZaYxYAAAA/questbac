@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import clsx from "clsx";
-import { ChevronLeft, FlaskConical, Lock, Play, Swords } from "lucide-react";
+import { BookOpen, ChevronLeft, FlaskConical, Lock, Play, Swords } from "lucide-react";
 import { Tabs } from "@/components/ui/Tabs";
 import { bossesForLevel } from "@/lib/content/bosses";
 import { LEVELS, chaptersFor, subjectMeta } from "@/lib/content/curriculum";
@@ -66,6 +66,9 @@ export function SubjectMap({ subject, initialLevel }: { subject: SubjectId; init
                   <div className="flex flex-wrap gap-2">
                     <Link href={`/mission/${c.id}`} className="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-500">
                       <Play size={14} /> Mission
+                    </Link>
+                    <Link href={`/fiches/${c.id}`} className="inline-flex items-center gap-1.5 rounded-xl bg-slate-800 px-3 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-700">
+                      <BookOpen size={14} /> Fiche
                     </Link>
                     {c.lab && (
                       <Link href={`/labo/${c.lab}`} className="inline-flex items-center gap-1.5 rounded-xl bg-slate-800 px-3 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-700">

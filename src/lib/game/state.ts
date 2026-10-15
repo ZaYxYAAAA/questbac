@@ -468,7 +468,9 @@ export type ActivityInput =
   | { kind: "fiche"; fiche: SavedFiche }
   | { kind: "forge"; mission: CustomMission }
   | { kind: "duel"; outcome: DuelOutcome }
-  | { kind: "ranked"; place: number; correct: number };
+  | { kind: "ranked"; place: number; correct: number }
+  /** Cartes mémoire d'une fiche révisées jusqu'au bout (quête du jour, pas d'XP directe). */
+  | { kind: "revision"; chapterId: string };
 
 /** Activités hors quiz : ouverture d'un labo, fiche générée, mission forgée. */
 export function applyActivity(input: GameData, activity: ActivityInput, now = new Date()) {
@@ -486,6 +488,8 @@ export function applyActivity(input: GameData, activity: ActivityInput, now = ne
   } else if (activity.kind === "forge") {
     d = { ...d, missions: [activity.mission, ...d.missions], stats: { ...d.stats, missionsForged: d.stats.missionsForged + 1 } };
     events.forge = 1;
+  } else if (activity.kind === "revision") {
+    events.fiche = 1;
   } else if (activity.kind === "ranked") {
     const xp = matchXp(activity.place, activity.correct);
     const lines: RewardLine[] = [{ label: `Partie classée : ${activity.place}${activity.place === 1 ? "re" : "e"} place, ${activity.correct}/10`, value: `+${xp} XP` }];

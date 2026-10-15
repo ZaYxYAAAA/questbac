@@ -6,7 +6,7 @@
 import type { Level, Question, SubjectId } from "@/lib/types";
 import { hashString, shuffle } from "@/lib/game/quests";
 import { CHAPTERS, chapterById } from "./curriculum";
-import type { Generator, Rand } from "./gen/kit";
+import type { Generator, Memo, Rand } from "./gen/kit";
 import { CULTURE } from "./gen/culture";
 import { ESPAGNOL } from "./gen/espagnol";
 import { EXTRA_HISTOIRE } from "./gen/extra-histoire";
@@ -139,4 +139,25 @@ export function generatorsForTopic(subject: SubjectId, level: Level, topic = "",
     generators: chosen.flatMap((c) => CHAPTER_GENERATORS[c.id] ?? []),
     extra: chosen.flatMap((c) => questionsForChapter(c.id)),
   };
+}
+
+/**
+ * Cartes mémoire d'un chapitre (fiches de révision) : tirées des banques de
+ * connaissances et des questions écrites à la main, sans doublon.
+ */
+export function chapterMemos(chapterId: string): Memo[] {
+  const out: Memo[] = [];
+  const seen = new Set<string>();
+  const add = (m: Memo) => {
+    const key = normalize(m.front);
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(m);
+  };
+  for (const g of CHAPTER_GENERATORS[chapterId] ?? []) for (const m of g.memo ?? []) add(m);
+  for (const q of questionsForChapter(chapterId)) {
+    if (q.type === "mcq") add({ front: q.prompt, back: q.choices[q.answer], note: q.explanation });
+    else if (q.type === "truefalse") add({ front: `Vrai ou faux : ${q.prompt}`, back: q.answer ? "Vrai" : "Faux", note: q.explanation });
+  }
+  return out;
 }

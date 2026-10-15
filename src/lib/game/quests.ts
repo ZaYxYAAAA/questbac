@@ -29,6 +29,7 @@ const POOL: QuestDef[] = [
   { id: "lab-1", label: "Explore un labo interactif", emoji: "🧪", event: "lab", target: 1, xp: 25 },
   { id: "lab-3", label: "Explore 3 labos interactifs", emoji: "🧪", event: "lab", target: 3, xp: 50 },
   { id: "combo-6", label: "Atteins un combo de 6", emoji: "🔥", event: "combo", target: 6, xp: 50 },
+  { id: "fiche-1", label: "Révise une fiche jusqu'au bout", emoji: "📖", event: "fiche", target: 1, xp: 40 },
 ];
 
 export const CHEST_XP = 120;
