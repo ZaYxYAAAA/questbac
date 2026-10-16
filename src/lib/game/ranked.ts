@@ -20,6 +20,8 @@ export interface MatchHistory {
   delta: number;
   /** Nombre de joueurs de la partie (3 si absent : anciennes parties). */
   size?: number;
+  /** Mode spécial joué (absent : classique). */
+  mode?: string;
 }
 
 export interface RankProfile {
@@ -120,9 +122,11 @@ export function publicQuestion(q: Question): Question {
 export const MAX_IN_A_ROW = 3;
 /** …ensuite elle se repose : 1 partie dans une autre matière, ou 15 minutes, suffisent. */
 export const REST_MS = 15 * 60_000;
-/** Matière « fraîche » (pas jouée sur les 5 dernières parties) : +10 % de points de rang gagnés. */
-export const FRESH_WINDOW = 5;
-export const FRESH_BONUS = 0.1;
+/** Jauge de variété : −10 % de points gagnés par partie identique d'affilée (−30 % au plus)… */
+export const ROUTINE_MALUS = 0.1;
+export const ROUTINE_MAX = 3;
+/** …et +15 % quand on change vraiment (différent de ses 2 dernières parties). */
+export const VARIETY_BONUS = 0.15;
 /** Bonus de points de rang gagnés dans la matière du jour. */
 export const DAILY_SUBJECT_BONUS = 0.25;
 
@@ -138,9 +142,29 @@ export function subjectRestUntil(history: readonly Pick<MatchHistory, "subject" 
   return until > now ? until : 0;
 }
 
-/** Matière pas jouée récemment (et déjà quelques parties au compteur) : bonus de fraîcheur. */
-export function isFreshSubject(history: readonly Pick<MatchHistory, "subject">[], subject: string): boolean {
-  return history.length >= MAX_IN_A_ROW && !history.slice(0, FRESH_WINDOW).some((h) => h.subject === subject);
+/** Ce qui fait qu'une partie est « la même » : matière, nombre de joueurs et mode (classique ou mode du jour). */
+export interface PlayConfig {
+  subject: string;
+  size: number;
+  mode: string;
+}
+
+export const sameConfig = (h: Pick<MatchHistory, "subject" | "size" | "mode">, c: PlayConfig) =>
+  h.subject === c.subject && (h.size ?? 3) === c.size && (h.mode ?? "classique") === c.mode;
+
+/**
+ * Bonus (ou malus) de variété sur les points gagnés pour la prochaine partie :
+ * −10 % par partie identique d'affilée juste avant (jusqu'à −30 %), +15 % si
+ * elle ne ressemble à aucune des 2 dernières, 0 sinon.
+ */
+export function varietyBonus(history: readonly Pick<MatchHistory, "subject" | "size" | "mode">[], c: PlayConfig): number {
+  let streak = 0;
+  for (const h of history) {
+    if (!sameConfig(h, c)) break;
+    streak++;
+  }
+  if (streak > 0) return -ROUTINE_MALUS * Math.min(streak, ROUTINE_MAX);
+  return history.length >= 2 && !history.slice(0, 2).some((h) => sameConfig(h, c)) ? VARIETY_BONUS : 0;
 }
 
 /** Matière du jour (heure de Paris), parmi celles du niveau : +25 % de points de rang gagnés. */

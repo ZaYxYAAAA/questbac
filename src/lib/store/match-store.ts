@@ -6,6 +6,7 @@ import type { BoardRow, MatchView, XpRow } from "@/lib/server/match";
 import type { GivenAnswer } from "@/lib/game/session";
 import type { Question } from "@/lib/types";
 import { useGame } from "./game-store";
+import type { SpecialId } from "@/lib/game/specials";
 
 export type { BoardRow, MatchView, XpRow };
 
@@ -19,15 +20,16 @@ interface RankedState {
   /** Parties à jouer ailleurs avant de rejouer chaque matière (0 = libre). */
   /** Heure de fin de repos de chaque matière (0 = jouable). */
   locks: Record<string, number>;
-  /** Matières fraîches : +10 % de points de rang gagnés. */
-  fresh: string[];
+  /** Mode spécial du jour (et celui de demain). */
+  special: SpecialId | null;
+  specialNext: SpecialId | null;
   /** Matière du jour (+25 % de points de rang gagnés). */
   daily: string | null;
   error: string | null;
   loadedAt: number;
 }
 
-export const useRanked = create<RankedState>(() => ({ rank: null, board: [], xp: [], locks: {}, fresh: [], daily: null, error: null, loadedAt: 0 }));
+export const useRanked = create<RankedState>(() => ({ rank: null, board: [], xp: [], locks: {}, special: null, specialNext: null, daily: null, error: null, loadedAt: 0 }));
 
 async function call<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
@@ -45,9 +47,9 @@ let inflight: Promise<void> | null = null;
 /** Recharge mon rang et le classement général ; aligne les points de rang de la sauvegarde. */
 export function loadRanked(): Promise<void> {
   if (inflight) return inflight;
-  inflight = call<{ rank: MyRank; board: BoardRow[]; xp: XpRow[]; locks: Record<string, number>; fresh?: string[]; daily: string }>("/api/ranked")
-    .then(({ rank, board, xp, locks, fresh, daily }) => {
-      useRanked.setState({ rank, board, xp, locks, fresh: fresh ?? [], daily, error: null, loadedAt: Date.now() });
+  inflight = call<{ rank: MyRank; board: BoardRow[]; xp: XpRow[]; locks: Record<string, number>; special?: SpecialId; specialNext?: SpecialId; daily: string }>("/api/ranked")
+    .then(({ rank, board, xp, locks, special, specialNext, daily }) => {
+      useRanked.setState({ rank, board, xp, locks, special: special ?? null, specialNext: specialNext ?? null, daily, error: null, loadedAt: Date.now() });
       useGame.getState().syncRank(rank.rp, rank.peak);
     })
     .catch((e) => useRanked.setState({ error: e instanceof Error ? e.message : "Erreur" }))
@@ -57,8 +59,8 @@ export function loadRanked(): Promise<void> {
   return inflight;
 }
 
-export const joinQueue = (subject: string, size = 3) =>
-  call<{ ticket?: string; matchId?: string }>("/api/match/queue", { method: "POST", body: JSON.stringify({ subject, size }) });
+export const joinQueue = (subject: string, size = 3, special = false) =>
+  call<{ ticket?: string; matchId?: string }>("/api/match/queue", { method: "POST", body: JSON.stringify({ subject, size, special }) });
 
 export const pollQueue = (ticket: string) => call<{ matchId?: string; elapsedMs: number }>(`/api/match/queue?ticket=${encodeURIComponent(ticket)}`);
 

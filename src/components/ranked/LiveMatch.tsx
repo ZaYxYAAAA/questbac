@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { Markdown } from "@/components/ui/Markdown";
 import { chapterById, subjectMeta } from "@/lib/content/curriculum";
 import { ordinal, placeOutcome } from "@/lib/game/match";
+import { MIX_CHAPTER, SPECIALS } from "@/lib/game/specials";
 import { levelFromXp, rankFromRp } from "@/lib/game/progression";
 import type { GivenAnswer } from "@/lib/game/session";
 import { useGame } from "@/lib/store/game-store";
@@ -29,6 +30,7 @@ type Player = MatchView["players"][number];
 export function LiveMatch({
   subject,
   size = 3,
+  special = false,
   matchId: resumeId,
   onClose,
   onReplay,
@@ -36,10 +38,12 @@ export function LiveMatch({
   subject: SubjectId;
   /** Nombre de joueurs (3, 5 ou 7). */
   size?: number;
+  /** Jouer le mode spécial du jour. */
+  special?: boolean;
   /** Reprendre une partie déjà lancée. */
   matchId?: string | null;
   onClose: () => void;
-  onReplay: (subject: SubjectId, size: number) => void;
+  onReplay: (subject: SubjectId, size: number, special: boolean) => void;
 }) {
   const [matchId, setMatchId] = useState<string | null>(resumeId ?? null);
   const [view, setView] = useState<MatchView | null>(null);
@@ -102,7 +106,7 @@ export function LiveMatch({
         if (!stop) fail(e);
       }
     };
-    joinQueue(subject, size)
+    joinQueue(subject, size, special)
       .then((r) => {
         if (stop) {
           if (r.ticket) void cancelQueue(r.ticket);
@@ -122,7 +126,7 @@ export function LiveMatch({
       clearTimeout(timer);
       if (ticket.current) void cancelQueue(ticket.current);
     };
-  }, [subject, size, resumeId]);
+  }, [subject, size, special, resumeId]);
 
   // ── Suivi de la partie : chaque seconde, et pile aux changements de phase ──
   const viewRef = useRef(view);
@@ -208,7 +212,7 @@ export function LiveMatch({
     if (!already) {
       const outcome = placeOutcome(me.place, view.size);
       play(me.place === 1 ? "win" : outcome === "loss" ? "lose" : "reward");
-      useGame.getState().recordActivity({ kind: "ranked", place: me.place, correct: me.score, size: view.size });
+      useGame.getState().recordActivity({ kind: "ranked", place: me.place, correct: Math.max(0, Math.min(view.total, me.score)), size: view.size });
       if (me.place === 1) void celebrate("big");
     }
     void loadRanked();
@@ -231,6 +235,7 @@ export function LiveMatch({
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-lg">{meta.emoji}</span>
             <p className="min-w-0 flex-1 truncate text-sm font-bold text-white">
               {meta.name} <span className="font-medium text-slate-400">· classé à {view?.size ?? size}</span>
+              {view?.special && <span className={clsx("ml-1.5 rounded-full bg-gradient-to-r px-2 py-0.5 text-[10px] font-black text-white", SPECIALS[view.special].gradient)}>{SPECIALS[view.special].emoji} {SPECIALS[view.special].name}</span>}
             </p>
             {inGame && (
               <span key={view.index} className="qb-pop rounded-full bg-white/10 px-2.5 py-1 text-xs font-black tabular-nums text-white">
@@ -267,7 +272,7 @@ export function LiveMatch({
           ) : view.phase === "reveal" ? (
             <Reveal view={view} now={serverNow} moves={moves} />
           ) : (
-            <Results view={view} onClose={onClose} onReplay={() => onReplay(view.subject as SubjectId, view.size)} />
+            <Results view={view} onClose={onClose} onReplay={() => onReplay(view.subject as SubjectId, view.size, !!view.special)} />
           )}
         </div>
       </div>
@@ -368,7 +373,8 @@ function Intro({ view, now }: { view: MatchView; now: number }) {
   useEffect(() => {
     if (view.startsAt) play(left > 0 ? "tick" : "go");
   }, [left, view.startsAt]);
-  const c = view.chapterId ? chapterById(view.chapterId) : null;
+  const c = view.chapterId === MIX_CHAPTER ? { title: "Tous les chapitres de la matière" } : view.chapterId ? chapterById(view.chapterId) : null;
+  const sp = view.special ? SPECIALS[view.special] : null;
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-6 py-6 text-center">
       <PlayersRow players={view.players} mode="vote" />
@@ -376,6 +382,12 @@ function Intro({ view, now }: { view: MatchView; now: number }) {
         <p className="text-xs font-bold uppercase tracking-wider text-amber-300">Chapitre choisi</p>
         <p className="mt-1 text-2xl font-black text-white">{c?.title ?? "…"}</p>
       </div>
+      {sp && (
+        <div className={clsx("qb-pop rounded-2xl bg-gradient-to-r px-4 py-2.5 text-white shadow-lg", sp.gradient)}>
+          <p className="text-sm font-black">{sp.emoji} Mode du jour : {sp.name}</p>
+          <p className="text-xs font-semibold text-white/90">{sp.rule}</p>
+        </div>
+      )}
       <div className="grid h-32 place-items-center">
         <p key={left} className="qb-count bg-gradient-to-b from-white to-amber-200 bg-clip-text text-8xl font-black text-transparent">{left || "Go !"}</p>
       </div>
@@ -602,7 +614,7 @@ function Results({ view, onClose, onReplay }: { view: MatchView; onClose: () => 
         <p className="qb-drop text-6xl">{MEDALS[me.place - 1] ?? (placeOutcome(me.place, view.size) === "loss" ? "💀" : "🎖️")}</p>
         <p className="qb-fade-up text-3xl font-black text-white" style={{ animationDelay: "0.15s" }}>{me.place === 1 ? "Victoire !" : `${ordinal(me.place)} place`}</p>
         <p className="text-xs font-semibold text-slate-500">sur {view.size} joueurs</p>
-        <p className="text-sm text-slate-400">{me.score}/{view.total} bonnes réponses · {(me.totalMs / 1000).toFixed(1)} s</p>
+        <p className="text-sm text-slate-400">{scoreText(view, me.score)}{view.special === "finale" || view.special === "sansfilet" ? "" : " bonnes réponses"} · {(me.totalMs / 1000).toFixed(1)} s</p>
       </div>
 
       <div className="grid grid-cols-3 items-end gap-2">
@@ -615,7 +627,7 @@ function Results({ view, onClose, onReplay }: { view: MatchView; onClose: () => 
                 <Avatar emoji={p.avatar} photo={photoOf(p)} rp={p.rp} size={place === 1 ? "lg" : "md"} name={p.pseudo} />
               </div>
               <p className={clsx("max-w-full truncate text-xs font-bold", p.isMe ? "text-violet-200" : "text-white")}>{p.isMe ? "Toi" : p.pseudo}</p>
-              <p className="text-[11px] text-slate-400">{p.score}/{view.total} · {(p.totalMs / 1000).toFixed(0)} s</p>
+              <p className="text-[11px] text-slate-400">{scoreText(view, p.score)} · {(p.totalMs / 1000).toFixed(0)} s</p>
               <div className={clsx("qb-rise flex w-full flex-col items-center justify-start rounded-t-2xl border border-b-0 border-white/10 bg-gradient-to-b pt-2", height, color)} style={{ animationDelay: `${delay}s` }}>
                 <span className="text-2xl">{MEDALS[place - 1]}</span>
                 <span className={clsx("text-xs font-black", (p.delta ?? 0) >= 0 ? "text-emerald-300" : "text-rose-300")}>{(p.delta ?? 0) >= 0 ? "+" : ""}{p.delta ?? 0}</span>
@@ -632,7 +644,7 @@ function Results({ view, onClose, onReplay }: { view: MatchView; onClose: () => 
               <span className="w-7 text-center text-sm font-black text-slate-300">{ordinal(p.place)}</span>
               <Avatar emoji={p.avatar} photo={photoOf(p)} rp={p.rp} size="sm" name={p.pseudo} />
               <Name p={p} />
-              <span className="text-xs text-slate-400">{p.score}/{view.total}</span>
+              <span className="text-xs text-slate-400">{scoreText(view, p.score)}</span>
               <span className={clsx("w-10 text-right text-sm font-black", (p.delta ?? 0) >= 0 ? "text-emerald-300" : "text-rose-300")}>{(p.delta ?? 0) >= 0 ? "+" : ""}{p.delta ?? 0}</span>
             </div>
           ))}
@@ -642,7 +654,14 @@ function Results({ view, onClose, onReplay }: { view: MatchView; onClose: () => 
       <div className="grid grid-cols-2 gap-2">
         <div className={clsx("qb-pop rounded-2xl border p-3 text-center", delta >= 0 ? "border-emerald-400/30 bg-emerald-500/10" : "border-rose-400/30 bg-rose-500/10")} style={{ animationDelay: "0.5s" }}>
           <p className={clsx("text-3xl font-black tabular-nums", delta >= 0 ? "text-emerald-300" : "text-rose-300")}>{rp >= 0 ? "+" : ""}{rp}</p>
-          <p className="text-xs text-slate-400">points de rang{view.bonus && delta > 0 ? " · ⭐ +25 %" : ""}{view.fresh && delta > 0 ? " · ✨ +10 %" : ""}</p>
+          <p className="text-xs text-slate-400">points de rang</p>
+          {delta > 0 && (view.bonus || view.special || view.variety !== 0) && (
+            <p className="mt-1 flex flex-wrap justify-center gap-1 text-[10px] font-bold">
+              {view.bonus && <span className="rounded bg-amber-400/15 px-1 text-amber-200">⭐ +25 %</span>}
+              {view.special && <span className="rounded bg-fuchsia-400/15 px-1 text-fuchsia-200">{SPECIALS[view.special].emoji} +30 %</span>}
+              {view.variety !== 0 && <span className={clsx("rounded px-1", view.variety > 0 ? "bg-emerald-400/15 text-emerald-200" : "bg-rose-400/15 text-rose-200")}>{view.variety > 0 ? "🌈" : "🔁"} {view.variety > 0 ? "+" : "−"}{Math.round(Math.abs(view.variety) * 100)} %</span>}
+            </p>
+          )}
         </div>
         <div className="qb-pop rounded-2xl border border-violet-400/30 bg-violet-500/10 p-3 text-center" style={{ animationDelay: "0.6s" }}>
           <p className="text-3xl font-black tabular-nums text-violet-200">+{xp}</p>
@@ -672,6 +691,11 @@ function Results({ view, onClose, onReplay }: { view: MatchView; onClose: () => 
 }
 
 // ─────────────────────────── Morceaux ───────────────────────────
+
+/** Score affiché : « 7/10 » en classique, « 9 pts » quand le mode change le décompte. */
+function scoreText(view: MatchView, score: number) {
+  return view.special === "finale" || view.special === "sansfilet" ? `${score} pts` : `${score}/${view.total}`;
+}
 
 /** Mon niveau après la partie : la part gagnée s'allume dans la barre. */
 function LevelBar({ gained }: { gained: number }) {
