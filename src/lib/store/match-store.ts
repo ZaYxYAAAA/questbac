@@ -54,8 +54,8 @@ export function loadRanked(): Promise<void> {
   return inflight;
 }
 
-export const joinQueue = (subject: string) =>
-  call<{ ticket?: string; matchId?: string }>("/api/match/queue", { method: "POST", body: JSON.stringify({ subject }) });
+export const joinQueue = (subject: string, size = 3) =>
+  call<{ ticket?: string; matchId?: string }>("/api/match/queue", { method: "POST", body: JSON.stringify({ subject, size }) });
 
 export const pollQueue = (ticket: string) => call<{ matchId?: string; elapsedMs: number }>(`/api/match/queue?ticket=${encodeURIComponent(ticket)}`);
 

@@ -9,6 +9,8 @@ import {
   botVotes,
   makeBot,
   markAway,
+  matchXp,
+  placeOutcome,
   phaseAt,
   planBotAnswer,
   questionMs,
@@ -119,5 +121,50 @@ describe("variété des matières en classé", () => {
   it("matière du jour stable sur la journée", () => {
     const list = ["maths", "svt", "histoire"];
     expect(subjectOfDay(list, new Date("2026-10-14T08:00:00Z"))).toBe(subjectOfDay(list, new Date("2026-10-14T20:00:00Z")));
+  });
+});
+
+describe("parties à 5 et à 7", () => {
+  it("à 3, rien ne change (mêmes points, même XP)", () => {
+    expect([1, 2, 3].map((p) => rpDelta(p, 0, 7, 10, 3))).toEqual([30, 9, -6]);
+    expect([1, 2, 3].map((p) => matchXp(p, 0, 3))).toEqual([80, 40, 15]);
+  });
+
+  it("la victoire rapporte plus, la dernière place coûte plus", () => {
+    for (const rp of [0, 2000, 9500]) {
+      expect(rpDelta(1, rp, 7, 10, 5)).toBeGreaterThan(rpDelta(1, rp, 7, 10, 3));
+      expect(rpDelta(1, rp, 7, 10, 7)).toBeGreaterThan(rpDelta(1, rp, 7, 10, 5));
+      expect(rpDelta(5, rp, 3, 10, 5)).toBeLessThan(rpDelta(3, rp, 3, 10, 3));
+      expect(rpDelta(7, rp, 3, 10, 7)).toBeLessThan(rpDelta(5, rp, 3, 10, 5));
+    }
+    expect(matchXp(1, 7, 5)).toBeGreaterThan(matchXp(1, 7, 3));
+  });
+
+  it("les points baissent place après place ; le milieu gagne un peu, la moitié basse perd", () => {
+    for (const size of [5, 7]) {
+      const d = Array.from({ length: size }, (_, i) => rpDelta(i + 1, 1000, 6, 10, size));
+      for (let i = 1; i < size; i++) expect(d[i]).toBeLessThan(d[i - 1]);
+      const mid = (size - 1) / 2;
+      expect(d[mid]).toBeGreaterThan(0);
+      expect(d[mid + 1]).toBeLessThan(0);
+      expect(placeOutcome(1, size)).toBe("win");
+      expect(placeOutcome(mid + 1, size)).toBe("middle");
+      expect(placeOutcome(size, size)).toBe("loss");
+    }
+    expect(Array.from({ length: 5 }, (_, i) => matchXp(i + 1, 0, 5)).every((x) => x >= 15)).toBe(true);
+  });
+
+  it("une partie à 5 se joue entièrement (classement de 5 joueurs)", () => {
+    const r = seededRandom(7);
+    const players = Array.from({ length: 5 }, () => makeBot(1000, r));
+    const m = {
+      id: "m5", subject: "maths", level: "premiere", createdAt: 0, players, chapters: ["a", "b"], votes: {}, chapterId: null, voteEnd: null,
+      questions: [], starts: [], ends: [], answers: {}, botPlans: {}, away: {}, finishedAt: null,
+    } as unknown as Match;
+    m.votes = botVotes(m);
+    const make = () => Array.from({ length: 10 }, (_, i) => ({ id: `q${i}`, type: "truefalse", prompt: `Question ${i}`, answer: true, explanation: "" }) as unknown as Question);
+    tick(m, 10 ** 9, make);
+    expect(m.finishedAt).not.toBeNull();
+    expect(standings(m).map((s) => s.place)).toEqual([1, 2, 3, 4, 5]);
   });
 });

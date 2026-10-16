@@ -175,7 +175,7 @@ export function PlayerSheet({ player, onClose }: { player: PlayerPreview; onClos
                   {rank.history.map((h) => (
                     <span key={h.at} className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-slate-900/70 px-2 py-1 text-xs">
                       <span>{subjectMeta(h.subject as SubjectId)?.emoji}</span>
-                      <span>{MEDALS[h.place - 1]}</span>
+                      <span>{MEDALS[h.place - 1] ?? <b className="text-slate-300">{h.place}e</b>}</span>
                       <span className={clsx("font-black", h.delta >= 0 ? "text-emerald-300" : "text-rose-300")}>{h.delta >= 0 ? "+" : ""}{h.delta}</span>
                     </span>
                   ))}

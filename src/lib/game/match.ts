@@ -1,5 +1,5 @@
 /**
- * Partie classée à 3 joueurs : vote du chapitre, 10 questions jouées en même
+ * Partie classée à 3, 5 ou 7 joueurs : vote du chapitre, 10 questions jouées en même
  * temps, classement (bonnes réponses d'abord, puis temps total) et points de rang.
  *
  * Tout est pur et piloté par l'heure : `tick` fait avancer la partie d'après
@@ -13,6 +13,12 @@ import { questionTimeMs } from "./timing";
 
 export const MATCH_QUESTIONS = 10;
 export const MATCH_PLAYERS = 3;
+/** Formats de partie : toujours un nombre impair de joueurs (une place du milieu, autant de gagnants que de perdants). */
+export const MATCH_SIZES = [3, 5, 7] as const;
+export type MatchSize = (typeof MATCH_SIZES)[number];
+export const isMatchSize = (n: unknown): n is MatchSize => MATCH_SIZES.includes(n as MatchSize);
+/** Multiplicateur des enjeux : plus il y a de joueurs, plus la victoire rapporte et plus la dernière place coûte. */
+export const stakes = (size: number) => 1 + (Math.max(3, size) - 3) * 0.2;
 /** Attente maximale en file avant de compléter avec des bots. */
 export const QUEUE_WAIT_MS = 3000;
 export const VOTE_MS = 10_000;
@@ -321,13 +327,39 @@ export function standings(m: Match): Standing[] {
   return rows.map((r, i) => ({ ...r, place: i + 1 }));
 }
 
-/** Points de rang selon la place, plus durs à gagner et plus coûteux à perdre en montant. */
-export function rpDelta(place: number, rp: number, correct: number, total: number): number {
+/**
+ * Points de rang selon la place et le nombre de joueurs, plus durs à gagner et
+ * plus coûteux à perdre en montant. La place du milieu rapporte un peu ; au-dessus
+ * on gagne, en dessous on perd. À 5 ou 7, la 1re place rapporte plus (×1,4 / ×1,8)
+ * et la dernière coûte plus, puisqu'il y a plus de perdants.
+ */
+export function rpDelta(place: number, rp: number, correct: number, total: number, size = MATCH_PLAYERS): number {
   const t = tierIndex(rp);
-  const base = place === 1 ? 30 - t * 1.5 : place === 2 ? Math.max(2, 9 - t * 1.2) : -(6 + t * 3);
+  const n = Math.max(3, size);
+  const k = clamp(place - 1, 0, n - 1);
+  const mid = (n - 1) / 2;
+  const s = stakes(n);
+  const win = (30 - t * 1.5) * s;
+  const middle = Math.max(2, 9 - t * 1.2);
+  const loss = -(6 + t * 3) * s;
+  const base = k < mid ? middle + (win - middle) * (1 - k / mid) : k === mid ? middle : (loss * (k - mid)) / mid;
   const perfect = correct === total && total > 0 ? 5 : 0;
   return Math.round(base + perfect);
 }
 
-/** XP d'entraînement gagnée par une partie classée. */
-export const matchXp = (place: number, correct: number) => correct * 12 + (place === 1 ? 80 : place === 2 ? 40 : 15);
+/** XP d'entraînement gagnée par une partie classée (jamais négative ; la victoire rapporte plus à 5 ou 7). */
+export function matchXp(place: number, correct: number, size = MATCH_PLAYERS): number {
+  const n = Math.max(3, size);
+  const k = clamp(place - 1, 0, n - 1);
+  const mid = (n - 1) / 2;
+  const top = 80 * stakes(n);
+  const bonus = k <= mid ? 40 + (top - 40) * (1 - k / mid) : 40 - 25 * ((k - mid) / mid);
+  return correct * 12 + Math.round(bonus);
+}
+
+/** Gagnant, place du milieu ou perdant. */
+export const placeOutcome = (place: number, size = MATCH_PLAYERS): "win" | "middle" | "loss" =>
+  place - 1 < (size - 1) / 2 ? "win" : place - 1 === (size - 1) / 2 ? "middle" : "loss";
+
+/** « 1re », « 2e »… */
+export const ordinal = (n: number) => `${n}${n === 1 ? "re" : "e"}`;

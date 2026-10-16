@@ -6,7 +6,7 @@ import type { CustomMission, Level, QuizResult, SavedFiche, SubjectId } from "@/
 import { type BossRecord, bossState, fightInProgress, triesLeft } from "./boss-rules";
 import { type XpBoost, activeBoost, fmtMult, grantBoost, replayFactor } from "./boost";
 import { DUEL_REWARDS, type DuelOutcome } from "./duel";
-import { matchXp } from "./match";
+import { matchXp, ordinal } from "./match";
 import { type AchievementDef, newlyUnlocked } from "./achievements";
 import { type DailyReward, type DailyState, claimDaily } from "./daily";
 import type { LeagueState } from "./league";
@@ -491,7 +491,7 @@ export type ActivityInput =
   | { kind: "fiche"; fiche: SavedFiche }
   | { kind: "forge"; mission: CustomMission }
   | { kind: "duel"; outcome: DuelOutcome }
-  | { kind: "ranked"; place: number; correct: number }
+  | { kind: "ranked"; place: number; correct: number; size?: number }
   /** Cartes mémoire d'une fiche révisées jusqu'au bout (quête du jour, pas d'XP directe). */
   | { kind: "revision"; chapterId: string };
 
@@ -514,8 +514,9 @@ export function applyActivity(input: GameData, activity: ActivityInput, now = ne
   } else if (activity.kind === "revision") {
     events.fiche = 1;
   } else if (activity.kind === "ranked") {
-    const xp = matchXp(activity.place, activity.correct);
-    const lines: RewardLine[] = [{ label: `Partie classée : ${activity.place}${activity.place === 1 ? "re" : "e"} place, ${activity.correct}/10`, value: `+${xp} XP` }];
+    const size = activity.size ?? 3;
+    const xp = matchXp(activity.place, activity.correct, size);
+    const lines: RewardLine[] = [{ label: `Partie classée à ${size} : ${ordinal(activity.place)} place, ${activity.correct}/10`, value: `+${xp} XP` }];
     return finalize(before, d, { xp, rp: 0, lines, events }, now);
   } else {
     const reward = DUEL_REWARDS[activity.outcome];

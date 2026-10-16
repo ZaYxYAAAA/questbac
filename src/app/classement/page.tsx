@@ -13,6 +13,7 @@ import { LiveMatch } from "@/components/ranked/LiveMatch";
 import { Button } from "@/components/ui/Button";
 import { Tabs } from "@/components/ui/Tabs";
 import { subjectMeta, subjectsForLevel } from "@/lib/content/curriculum";
+import { MATCH_SIZES, type MatchSize, matchXp, ordinal, rpDelta } from "@/lib/game/match";
 import { RANK_TIERS, rankFromRp } from "@/lib/game/progression";
 import { useCloud } from "@/lib/store/cloud-sync";
 import { useGame } from "@/lib/store/game-store";
@@ -21,7 +22,15 @@ import type { SubjectId } from "@/lib/types";
 
 type Board = "rangs" | "xp";
 type Scope = "tous" | "amis";
-type Playing = { subject: SubjectId; matchId?: string | null; key: number };
+type Playing = { subject: SubjectId; size: number; matchId?: string | null; key: number };
+
+/** Formats de partie : nom, et ce que ça change. */
+const FORMATS: Record<MatchSize, { name: string; emoji: string }> = {
+  3: { name: "Duel à 3", emoji: "⚔️" },
+  5: { name: "Mêlée à 5", emoji: "🔥" },
+  7: { name: "Arène à 7", emoji: "👑" },
+};
+const SIZE_KEY = "qb-ranked-size";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 /** Noms courts pour les tuiles étroites. */
@@ -36,6 +45,23 @@ export default function RankedPage() {
   const [tab, setTab] = useState<Board>("rangs");
   const [scope, setScope] = useState<Scope>("tous");
   const [open, setOpen] = useState<PlayerPreview | null>(null);
+  const [size, setSize] = useState<MatchSize>(3);
+  useEffect(() => {
+    try {
+      const saved = Number(localStorage.getItem(SIZE_KEY));
+      if (MATCH_SIZES.includes(saved as MatchSize)) setSize(saved as MatchSize);
+    } catch {
+      // Stockage indisponible : format par défaut.
+    }
+  }, []);
+  const pickSize = (n: MatchSize) => {
+    setSize(n);
+    try {
+      localStorage.setItem(SIZE_KEY, String(n));
+    } catch {
+      // Pas grave : le choix vaut pour cette visite.
+    }
+  };
 
   useEffect(() => {
     const asked = new URLSearchParams(window.location.search).get("vue");
@@ -51,12 +77,13 @@ export default function RankedPage() {
       <LiveMatch
         key={playing.key}
         subject={playing.subject}
+        size={playing.size}
         matchId={playing.matchId}
         onClose={() => {
           setPlaying(null);
           void loadRanked();
         }}
-        onReplay={(subject) => setPlaying({ subject, key: Date.now() })}
+        onReplay={(subject, n) => setPlaying({ subject, size: n, key: Date.now() })}
       />
     );
   }
@@ -75,7 +102,7 @@ export default function RankedPage() {
   }
 
   const level = profile?.level ?? "seconde";
-  const play = (subject: SubjectId) => setPlaying({ subject, key: Date.now() });
+  const play = (subject: SubjectId) => setPlaying({ subject, size, key: Date.now() });
 
   return (
     <div className="space-y-5">
@@ -87,7 +114,7 @@ export default function RankedPage() {
           {rank.active && (
             <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-amber-400/40 bg-amber-500/10 p-3">
               <p className="flex-1 text-sm text-amber-100">⚔️ Tu as une partie en cours.</p>
-              <Button variant="gold" onClick={() => setPlaying({ subject: subjectsForLevel(level)[0].id, matchId: rank.active, key: Date.now() })}>
+              <Button variant="gold" onClick={() => setPlaying({ subject: subjectsForLevel(level)[0].id, size, matchId: rank.active, key: Date.now() })}>
                 <Play size={16} /> Reprendre
               </Button>
             </div>
@@ -99,8 +126,9 @@ export default function RankedPage() {
       <section className="space-y-3">
         <div>
           <h2 className="flex items-center gap-2 text-lg font-black text-white"><Swords size={18} className="text-amber-300" /> Lancer une partie</h2>
-          <p className="text-sm text-slate-400">3 joueurs · 10 questions en même temps · les bonnes réponses d&apos;abord, la vitesse départage.</p>
+          <p className="text-sm text-slate-400">{size} joueurs · 10 questions en même temps · les bonnes réponses d&apos;abord, la vitesse départage.</p>
         </div>
+        <SizePicker size={size} onPick={pickSize} rp={rank?.rp ?? 0} />
         {daily && (
           <p className="flex items-center gap-2 rounded-2xl border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-sm text-amber-100">
             <span className="text-lg">⭐</span>
@@ -238,6 +266,46 @@ function MyRankCard({ rank, onOpen }: { rank: MyRank; onOpen: () => void }) {
   );
 }
 
+/** Choix du format : 3, 5 ou 7 joueurs, avec ce que rapportent la 1re et la dernière place à mon rang. */
+function SizePicker({ size, onPick, rp }: { size: MatchSize; onPick: (n: MatchSize) => void; rp: number }) {
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Nombre de joueurs">
+        {MATCH_SIZES.map((n) => {
+          const f = FORMATS[n];
+          const on = size === n;
+          return (
+            <button
+              key={n}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              onClick={() => onPick(n)}
+              className={clsx(
+                "qb-press relative overflow-hidden rounded-2xl border-2 px-2 py-2.5 text-center transition",
+                on ? "border-amber-300 bg-amber-400/15 shadow-[0_0_24px_-8px] shadow-amber-400" : "border-white/10 bg-slate-900/70 hover:border-white/25",
+              )}
+            >
+              <span className="block text-xl leading-none">{f.emoji}</span>
+              <span className={clsx("mt-1 block text-sm font-black", on ? "text-white" : "text-slate-300")}>{f.name}</span>
+              <span className="mt-1 flex justify-center gap-0.5" aria-hidden>
+                {Array.from({ length: n }, (_, i) => (
+                  <span key={i} className={clsx("h-1.5 w-1.5 rounded-full", on ? (i < (n - 1) / 2 ? "bg-emerald-400" : i === (n - 1) / 2 ? "bg-slate-300" : "bg-rose-400") : "bg-slate-600")} />
+                ))}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-xl bg-slate-900/70 px-3 py-2 text-xs text-slate-300">
+        <span>🥇 1re : <b className="text-emerald-300">+{rpDelta(1, rp, 7, 10, size)}</b> pts · <b className="text-violet-200">{matchXp(1, 7, size)} XP</b></span>
+        <span>{size > 3 ? "💀" : "🥉"} {ordinal(size)} : <b className="text-rose-300">{rpDelta(size, rp, 3, 10, size)}</b> pts</span>
+        {size > 3 && <span className="w-full text-center text-[11px] text-slate-500">Les {(size - 1) / 2} premiers gagnent des points, les {(size - 1) / 2} derniers en perdent.</span>}
+      </p>
+    </div>
+  );
+}
+
 function Stat({ label, value, tone }: { label: string; value: string; tone?: "up" | "down" }) {
   return (
     <div className="rounded-2xl bg-slate-950/50 px-2 py-2">
@@ -253,7 +321,8 @@ function History({ rank }: { rank: MyRank }) {
       {rank.history.slice(0, 8).map((h) => (
         <div key={h.at} className="flex shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-slate-900/70 px-2.5 py-1.5 text-xs">
           <span>{subjectMeta(h.subject as SubjectId)?.emoji}</span>
-          <span>{MEDALS[h.place - 1]}</span>
+          <span>{MEDALS[h.place - 1] ?? <b className="text-slate-300">{ordinal(h.place)}</b>}</span>
+          {(h.size ?? 3) > 3 && <span className="rounded bg-white/10 px-1 text-[10px] font-bold text-slate-300">à {h.size}</span>}
           <span className="text-slate-300">{h.correct}/10</span>
           <span className={clsx("font-black", h.delta >= 0 ? "text-emerald-300" : "text-rose-300")}>{h.delta >= 0 ? "+" : ""}{h.delta}</span>
         </div>
@@ -421,7 +490,8 @@ function Ladder({ rp }: { rp: number }) {
       {open && (
         <div className="space-y-3 rounded-2xl border border-white/10 bg-slate-900/70 p-3">
           <ul className="space-y-1 text-sm text-slate-300">
-            <li>🥇 1re place : <b className="text-emerald-300">+20 à +30</b> pts · 🥈 2e : <b className="text-emerald-300">+2 à +9</b> · 🥉 3e : <b className="text-rose-300">−6 à −27</b></li>
+            <li>À 3 : 🥇 1re place <b className="text-emerald-300">+20 à +30</b> pts · 🥈 2e <b className="text-emerald-300">+2 à +9</b> · 🥉 3e <b className="text-rose-300">−6 à −27</b></li>
+            <li>À 5 et à 7 : la place du milieu rapporte un peu, au-dessus on gagne, en dessous on perd. La victoire rapporte <b className="text-emerald-300">×1,4</b> (à 5) ou <b className="text-emerald-300">×1,8</b> (à 7), la dernière place coûte autant de plus.</li>
             <li>Plus ton rang est haut, moins tu gagnes et plus tu perds. 10/10 : <b className="text-white">+5</b> bonus.</li>
             <li>Les flèches ▲▼ du classement montrent les points gagnés ou perdus depuis lundi.</li>
           </ul>

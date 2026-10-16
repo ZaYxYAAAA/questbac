@@ -1,5 +1,6 @@
 import { SUBJECTS } from "@/lib/content/curriculum";
 import { currentSession, jsonError, readJson, storageDown } from "@/lib/server/accounts";
+import { MATCH_PLAYERS, isMatchSize } from "@/lib/game/match";
 import { cancelQueue, joinQueue, pollQueue } from "@/lib/server/match";
 import type { SubjectId } from "@/lib/types";
 
@@ -7,16 +8,19 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const NO_STORE = { "Cache-Control": "no-store" };
 
-/** POST /api/match/queue { subject } — chercher une partie classée dans une matière. */
+/** POST /api/match/queue { subject, size? } — chercher une partie classée (3, 5 ou 7 joueurs) dans une matière. */
 export async function POST(req: Request) {
   const session = await currentSession();
   if (!session) return jsonError("Connecte-toi pour jouer en classé.", 401);
   const read = await readJson(req, 1_000);
   if (!read.ok) return read.response;
-  const subject = (read.body as { subject?: unknown } | null)?.subject;
+  const body = read.body as { subject?: unknown; size?: unknown } | null;
+  const subject = body?.subject;
   if (typeof subject !== "string" || !SUBJECTS.some((s) => s.id === subject)) return jsonError("Matière inconnue.", 400);
+  const size = body?.size ?? MATCH_PLAYERS;
+  if (!isMatchSize(size)) return jsonError("Format de partie inconnu.", 400);
   try {
-    return Response.json(await joinQueue(session.uid, session.pseudo, subject as SubjectId), { headers: NO_STORE });
+    return Response.json(await joinQueue(session.uid, session.pseudo, subject as SubjectId, size), { headers: NO_STORE });
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("Tu as joué")) return jsonError(error.message, 409);
     return storageDown(error);

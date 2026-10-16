@@ -10,6 +10,7 @@ import { celebrate, useCountUp } from "@/components/game/RewardScreen";
 import { Button } from "@/components/ui/Button";
 import { Markdown } from "@/components/ui/Markdown";
 import { chapterById, subjectMeta } from "@/lib/content/curriculum";
+import { ordinal, placeOutcome } from "@/lib/game/match";
 import { rankFromRp } from "@/lib/game/progression";
 import type { GivenAnswer } from "@/lib/game/session";
 import { useGame } from "@/lib/store/game-store";
@@ -21,20 +22,23 @@ type Player = MatchView["players"][number];
 
 /**
  * Partie classée en direct, plein écran : recherche (3 s puis bots), vote du
- * chapitre, 10 questions en même temps pour les 3 joueurs, résultats.
+ * chapitre, 10 questions en même temps pour les 3, 5 ou 7 joueurs, résultats.
  * Le serveur mène la partie ; l'écran l'interroge chaque seconde.
  */
 export function LiveMatch({
   subject,
+  size = 3,
   matchId: resumeId,
   onClose,
   onReplay,
 }: {
   subject: SubjectId;
+  /** Nombre de joueurs (3, 5 ou 7). */
+  size?: number;
   /** Reprendre une partie déjà lancée. */
   matchId?: string | null;
   onClose: () => void;
-  onReplay: (subject: SubjectId) => void;
+  onReplay: (subject: SubjectId, size: number) => void;
 }) {
   const [matchId, setMatchId] = useState<string | null>(resumeId ?? null);
   const [view, setView] = useState<MatchView | null>(null);
@@ -96,7 +100,7 @@ export function LiveMatch({
         if (!stop) fail(e);
       }
     };
-    joinQueue(subject)
+    joinQueue(subject, size)
       .then((r) => {
         if (stop) {
           if (r.ticket) void cancelQueue(r.ticket);
@@ -114,7 +118,7 @@ export function LiveMatch({
       clearTimeout(timer);
       if (ticket.current) void cancelQueue(ticket.current);
     };
-  }, [subject, resumeId]);
+  }, [subject, size, resumeId]);
 
   // ── Suivi de la partie : chaque seconde, et pile aux changements de phase ──
   const viewRef = useRef(view);
@@ -198,7 +202,7 @@ export function LiveMatch({
       // Stockage indisponible : l'XP sera quand même comptée une fois pour cet écran.
     }
     if (!already) {
-      useGame.getState().recordActivity({ kind: "ranked", place: me.place, correct: me.score });
+      useGame.getState().recordActivity({ kind: "ranked", place: me.place, correct: me.score, size: view.size });
       if (me.place === 1) void celebrate("big");
     }
     void loadRanked();
@@ -220,7 +224,7 @@ export function LiveMatch({
           <div className="flex items-center gap-2">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-lg">{meta.emoji}</span>
             <p className="min-w-0 flex-1 truncate text-sm font-bold text-white">
-              {meta.name} <span className="font-medium text-slate-400">· classé</span>
+              {meta.name} <span className="font-medium text-slate-400">· classé à {view?.size ?? size}</span>
             </p>
             {inGame && (
               <span key={view.index} className="qb-pop rounded-full bg-white/10 px-2.5 py-1 text-xs font-black tabular-nums text-white">
@@ -236,7 +240,7 @@ export function LiveMatch({
 
         <div key={screenKey} className="qb-fade-up flex flex-1 flex-col gap-4">
           {!view ? (
-            <Searching found={!!matchId} startedAt={searchStart} now={now} />
+            <Searching found={!!matchId} startedAt={searchStart} now={now} size={size} />
           ) : view.phase === "vote" ? (
             <Vote
               view={view}
@@ -257,7 +261,7 @@ export function LiveMatch({
           ) : view.phase === "reveal" ? (
             <Reveal view={view} now={serverNow} moves={moves} />
           ) : (
-            <Results view={view} onClose={onClose} onReplay={() => onReplay(view.subject as SubjectId)} />
+            <Results view={view} onClose={onClose} onReplay={() => onReplay(view.subject as SubjectId, view.size)} />
           )}
         </div>
       </div>
@@ -267,7 +271,7 @@ export function LiveMatch({
 
 // ─────────────────────────── Écrans ───────────────────────────
 
-function Searching({ found, startedAt, now }: { found: boolean; startedAt: number; now: number }) {
+function Searching({ found, startedAt, now, size }: { found: boolean; startedAt: number; now: number; size: number }) {
   const profile = useGame((s) => s.profile);
   const rp = useGame((s) => s.rp);
   const secs = Math.floor((now - startedAt) / 1000);
@@ -278,12 +282,13 @@ function Searching({ found, startedAt, now }: { found: boolean; startedAt: numbe
         {found && <span className="qb-pop absolute inset-4 rounded-full bg-emerald-400/15 ring-2 ring-emerald-400/50" />}
         {profile && <Avatar emoji={profile.avatar} photo={profile.photoThumb} rp={rp} size="xl" />}
       </div>
-      <div className="flex items-center gap-3">
-        {[0, 1].map((i) => (
+      <div className={clsx("flex flex-wrap items-center justify-center", size > 5 ? "gap-2" : "gap-3")}>
+        {Array.from({ length: size - 1 }, (_, i) => (
           <span
             key={`${i}-${found}`}
             className={clsx(
-              "grid h-12 w-12 place-items-center rounded-full border-2 text-xl font-black",
+              "grid place-items-center rounded-full border-2 font-black",
+              size > 5 ? "h-10 w-10 text-base" : "h-12 w-12 text-xl",
               found ? "qb-drop border-emerald-400 bg-emerald-400/15 text-emerald-300" : "border-dashed border-white/20 text-slate-500",
             )}
             style={found ? { animationDelay: `${i * 0.12}s` } : undefined}
@@ -298,7 +303,8 @@ function Searching({ found, startedAt, now }: { found: boolean; startedAt: numbe
           {found ? "Préparation de la partie" : secs < 3 ? `${secs + 1} s` : "Des joueurs de ton niveau complètent la partie"}
         </p>
       </div>
-      <p className="max-w-xs text-xs text-slate-500">3 joueurs, 10 questions en même temps. Les bonnes réponses comptent d&apos;abord, la vitesse départage.</p>
+      <p className="max-w-xs text-xs text-slate-500">{size} joueurs, 10 questions en même temps. Les bonnes réponses comptent d&apos;abord, la vitesse départage.</p>
+      {size > 3 && <p className="max-w-xs rounded-xl bg-amber-400/10 px-3 py-2 text-xs font-semibold text-amber-200">🔥 Partie à {size} : la victoire rapporte plus, mais les dernières places coûtent plus cher.</p>}
     </div>
   );
 }
@@ -573,8 +579,9 @@ function Results({ view, onClose, onReplay }: { view: MatchView; onClose: () => 
   return (
     <div className="space-y-5">
       <div className="space-y-1 pt-1 text-center">
-        <p className="qb-drop text-6xl">{MEDALS[me.place - 1]}</p>
-        <p className="qb-fade-up text-3xl font-black text-white" style={{ animationDelay: "0.15s" }}>{me.place === 1 ? "Victoire !" : me.place === 2 ? "2e place" : "3e place"}</p>
+        <p className="qb-drop text-6xl">{MEDALS[me.place - 1] ?? (placeOutcome(me.place, view.size) === "loss" ? "💀" : "🎖️")}</p>
+        <p className="qb-fade-up text-3xl font-black text-white" style={{ animationDelay: "0.15s" }}>{me.place === 1 ? "Victoire !" : `${ordinal(me.place)} place`}</p>
+        <p className="text-xs font-semibold text-slate-500">sur {view.size} joueurs</p>
         <p className="text-sm text-slate-400">{me.score}/{view.total} bonnes réponses · {(me.totalMs / 1000).toFixed(1)} s</p>
       </div>
 
@@ -597,6 +604,20 @@ function Results({ view, onClose, onReplay }: { view: MatchView; onClose: () => 
           );
         })}
       </div>
+
+      {view.size > 3 && (
+        <div className="qb-stagger space-y-1.5">
+          {[...view.players].filter((p) => p.place > 3).sort((a, b) => a.place - b.place).map((p) => (
+            <div key={p.id} className={clsx("flex items-center gap-3 rounded-2xl border px-3 py-2", p.isMe ? "border-violet-400/40 bg-violet-500/10" : "border-white/10 bg-slate-900/70")}>
+              <span className="w-7 text-center text-sm font-black text-slate-300">{ordinal(p.place)}</span>
+              <Avatar emoji={p.avatar} photo={p.photoThumb} rp={p.rp} size="sm" name={p.pseudo} />
+              <Name p={p} />
+              <span className="text-xs text-slate-400">{p.score}/{view.total}</span>
+              <span className={clsx("w-10 text-right text-sm font-black", (p.delta ?? 0) >= 0 ? "text-emerald-300" : "text-rose-300")}>{(p.delta ?? 0) >= 0 ? "+" : ""}{p.delta ?? 0}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-2">
         <div className={clsx("qb-pop rounded-2xl border p-3 text-center", delta >= 0 ? "border-emerald-400/30 bg-emerald-500/10" : "border-rose-400/30 bg-rose-500/10")} style={{ animationDelay: "0.5s" }}>
@@ -643,17 +664,19 @@ function Name({ p }: { p: Player }) {
   );
 }
 
-/** Les 3 joueurs en haut de l'écran : score, et « a répondu » / « a voté ». */
+/** Les joueurs en haut de l'écran : score, et « a répondu » / « a voté ». À 5 ou 7, en version compacte. */
 function PlayersRow({ players, mode }: { players: Player[]; mode: "vote" | "question" }) {
+  const compact = players.length > 3;
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div className={clsx("grid", compact ? "gap-1.5" : "gap-2", players.length === 5 ? "grid-cols-5" : players.length > 5 ? "grid-cols-4" : "grid-cols-3")}>
       {players.map((p) => {
         const done = mode === "vote" ? p.voted : p.answered;
         return (
           <div
             key={p.id}
             className={clsx(
-              "relative flex flex-col items-center gap-1 rounded-2xl border px-1 py-2 transition-colors duration-300",
+              "relative flex flex-col items-center gap-1 rounded-2xl border px-1 transition-colors duration-300",
+              compact ? "py-1.5" : "py-2",
               p.isMe ? "border-violet-400/40 bg-violet-500/10" : done ? "border-emerald-400/30 bg-emerald-500/5" : "border-white/10 bg-slate-900/70",
             )}
           >
@@ -661,12 +684,12 @@ function PlayersRow({ players, mode }: { players: Player[]; mode: "vote" | "ques
               <Avatar emoji={p.avatar} photo={p.photoThumb} rp={p.rp} size="sm" name={p.pseudo} />
               {done && <span className="qb-pop absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-emerald-500 text-[10px] font-black text-slate-950">✓</span>}
             </div>
-            <p className="max-w-full truncate text-xs font-bold text-white">{p.isMe ? "Toi" : p.pseudo}</p>
+            <p className={clsx("max-w-full truncate font-bold text-white", compact ? "text-[10px]" : "text-xs")}>{p.isMe ? "Toi" : p.pseudo}</p>
             {mode === "question" ? (
               <p className="text-xs font-black text-amber-300">
                 <span key={p.score} className="qb-bump tabular-nums">{p.score}</span> pt{p.score > 1 ? "s" : ""}
               </p>
-            ) : (
+            ) : compact ? null : (
               <p className="truncate text-[10px] text-slate-500">{p.label}</p>
             )}
             {mode === "question" && !done && !p.isMe && <span className="absolute bottom-1 right-2 animate-pulse text-[10px] text-slate-500">…</span>}

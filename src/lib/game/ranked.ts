@@ -18,6 +18,8 @@ export interface MatchHistory {
   place: number;
   correct: number;
   delta: number;
+  /** Nombre de joueurs de la partie (3 si absent : anciennes parties). */
+  size?: number;
 }
 
 export interface RankProfile {
