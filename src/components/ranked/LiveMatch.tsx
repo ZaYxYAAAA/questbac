@@ -645,8 +645,12 @@ function Results({ view, onClose, onReplay }: { view: MatchView; onClose: () => 
           <p className="text-xs text-slate-400">points de rang</p>
           {delta > 0 && (view.bonus || view.variety !== 0) && (
             <p className="mt-1 flex flex-wrap justify-center gap-1 text-[10px] font-bold">
-              {view.bonus && <span className="rounded bg-amber-400/15 px-1 text-amber-200">⭐ +25 %</span>}
-              {view.variety !== 0 && <span className={clsx("rounded px-1", view.variety > 0 ? "bg-emerald-400/15 text-emerald-200" : "bg-rose-400/15 text-rose-200")}>{view.variety > 0 ? "🌈" : "🔁"} {view.variety > 0 ? "+" : "−"}{Math.round(Math.abs(view.variety) * 100)} %</span>}
+              {view.bonus && <span className="rounded bg-amber-400/15 px-1.5 py-0.5 text-amber-200">Matière du jour +25 %</span>}
+              {view.variety !== 0 && (
+                <span className={clsx("rounded px-1.5 py-0.5", view.variety > 0 ? "bg-emerald-400/15 text-emerald-200" : "bg-rose-400/15 text-rose-200")}>
+                  Variété {view.variety > 0 ? "+" : "−"}{Math.round(Math.abs(view.variety) * 100)} %
+                </span>
+              )}
             </p>
           )}
         </div>

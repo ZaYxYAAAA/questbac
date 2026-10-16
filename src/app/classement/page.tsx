@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { ChevronDown, Lock, Play, Swords } from "lucide-react";
+import { ChevronDown, Lock, Moon, Play, Star, Swords, TrendingDown, TrendingUp, Trophy } from "lucide-react";
 import { Avatar } from "@/components/game/Avatar";
 import { PlayerSheet, type PlayerPreview } from "@/components/game/PlayerSheet";
 import { PlayerTitle } from "@/components/game/PlayerTitle";
@@ -32,12 +32,23 @@ function weekly<T extends { place: number; isMe: boolean }>(rows: T[], key: (r: 
 }
 type Playing = { subject: SubjectId; size: number; matchId?: string | null; key: number };
 
-/** Formats de partie : nom, et ce que ça change. */
-const FORMATS: Record<MatchSize, { name: string; emoji: string }> = {
-  3: { name: "Duel à 3", emoji: "⚔️" },
-  5: { name: "Mêlée à 5", emoji: "🔥" },
-  7: { name: "Arène à 7", emoji: "👑" },
-};
+/** Petite pastille sobre (bonus, malus, repos) sur les tuiles de matière. */
+function Chip({ tone, icon: Icon, children }: { tone: "gold" | "up" | "down" | "rest"; icon: typeof Star; children: ReactNode }) {
+  return (
+    <span
+      className={clsx(
+        "inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold leading-none tabular-nums",
+        tone === "gold" && "bg-black/30 text-amber-200",
+        tone === "up" && "bg-black/30 text-emerald-200",
+        tone === "down" && "bg-black/40 text-rose-200",
+        tone === "rest" && "bg-black/30 text-white/90",
+      )}
+    >
+      <Icon size={10} strokeWidth={2.5} />
+      {children}
+    </span>
+  );
+}
 const SIZE_KEY = "qb-ranked-size";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
@@ -146,11 +157,12 @@ export default function RankedPage() {
         </div>
         <SizePicker size={size} onPick={pickSize} rp={rank?.rp ?? 0} />
         {daily && (
-          <p className="flex items-center gap-2 rounded-2xl border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-sm text-amber-100">
-            <span className="text-lg">⭐</span>
-            <span>
-              Matière du jour : <b className="text-white">{subjectMeta(daily as SubjectId).name}</b> · +25 % de points de rang gagnés
+          <p className="flex items-center gap-2.5 rounded-2xl border border-amber-400/30 bg-amber-400/[0.07] px-3 py-2 text-sm text-slate-300">
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-amber-400/15 text-amber-300"><Star size={14} fill="currentColor" /></span>
+            <span className="min-w-0 flex-1">
+              Matière du jour : <b className="text-white">{subjectMeta(daily as SubjectId).name}</b>
             </span>
+            <span className="shrink-0 text-xs font-bold text-amber-300">+25 %</span>
           </p>
         )}
         <div className="qb-stagger grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -176,15 +188,12 @@ export default function RankedPage() {
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-black leading-tight text-white [hyphens:auto]" lang="fr">{SHORT[s.id] ?? s.name}</span>
                   {lock > 0 ? (
-                    <span className="block text-[10px] font-semibold leading-tight text-white/90">😴 au repos · {restMin} min</span>
+                    <span className="mt-1 flex"><Chip tone="rest" icon={Moon}>Repos · {restMin} min</Chip></span>
                   ) : isDaily || variety !== 0 ? (
-                    <span className="mt-0.5 flex flex-wrap gap-1 text-[10px] font-black leading-tight">
-                      {isDaily && <span className="rounded bg-black/25 px-1 text-amber-100">⭐ +25 %</span>}
-                      {variety !== 0 && (
-                        <span className={clsx("rounded px-1", variety > 0 ? "bg-emerald-950/50 text-emerald-200" : "bg-rose-950/60 text-rose-200")}>
-                          {variety > 0 ? `🌈 +${Math.round(variety * 100)} %` : `🔁 −${Math.round(-variety * 100)} %`}
-                        </span>
-                      )}
+                    <span className="mt-1 flex flex-wrap gap-1">
+                      {isDaily && <Chip tone="gold" icon={Star}>+25 %</Chip>}
+                      {variety > 0 && <Chip tone="up" icon={TrendingUp}>+{Math.round(variety * 100)} %</Chip>}
+                      {variety < 0 && <Chip tone="down" icon={TrendingDown}>−{Math.round(-variety * 100)} %</Chip>}
                     </span>
                   ) : null}
                 </span>
@@ -193,15 +202,26 @@ export default function RankedPage() {
             );
           })}
         </div>
-        <p className="text-xs text-slate-500">
-          🌈 <b className="text-slate-300">Varie pour gagner plus</b> : rejouer exactement la même chose (même matière et même nombre de joueurs) fait perdre 10 % des points gagnés par partie d&apos;affilée (jusqu&apos;à −30 %) ; changer vraiment rapporte <b className="text-emerald-300">+15 %</b>. Après 3 parties d&apos;affilée dans une matière, elle se repose 15 min (ou 1 partie ailleurs).
-        </p>
+        <div className="space-y-1.5 rounded-2xl border border-white/5 bg-slate-900/50 px-3 py-2.5 text-xs text-slate-400">
+          <p className="flex items-start gap-2">
+            <TrendingUp size={14} className="mt-px shrink-0 text-emerald-400" />
+            <span><b className="text-slate-200">+15 %</b> si la partie est différente de tes 2 dernières.</span>
+          </p>
+          <p className="flex items-start gap-2">
+            <TrendingDown size={14} className="mt-px shrink-0 text-rose-400" />
+            <span><b className="text-slate-200">−10 %</b> par partie identique d&apos;affilée (même matière, même format), jusqu&apos;à −30 %.</span>
+          </p>
+          <p className="flex items-start gap-2">
+            <Moon size={14} className="mt-px shrink-0 text-slate-500" />
+            <span>Après 3 parties d&apos;affilée dans une matière, elle se repose 15 min.</span>
+          </p>
+        </div>
         {rank && rank.history.length > 0 && <History rank={rank} />}
       </section>
 
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-black text-white">🏆 Classements</h2>
+          <h2 className="flex items-center gap-2 text-lg font-black text-white"><Trophy size={18} className="text-amber-300" /> Classements</h2>
           <div className="flex gap-1 rounded-full bg-slate-900/80 p-1 text-xs font-bold">
             {(["tous", "amis"] as const).map((s) => (
               <button key={s} type="button" onClick={() => setScope(s)} className={clsx("rounded-full px-3 py-1 transition", scope === s ? "bg-white text-slate-950" : "text-slate-400")}>
@@ -215,14 +235,14 @@ export default function RankedPage() {
           onChange={setTab}
           className="w-full [&>button]:flex-1"
           options={[
-            { value: "rangs", label: "🏅 Rangs" },
-            { value: "xp", label: "⭐ XP totale" },
+            { value: "rangs", label: "Rangs" },
+            { value: "xp", label: "XP totale" },
           ]}
         />
         <div className="flex gap-1 rounded-full bg-slate-900/80 p-1 text-xs font-bold">
           {(["saison", "semaine"] as const).map((x) => (
             <button key={x} type="button" onClick={() => setPeriod(x)} className={clsx("flex-1 rounded-full px-3 py-1.5 transition", period === x ? "bg-gradient-to-r from-amber-300 to-orange-400 text-slate-950" : "text-slate-400")}>
-              {x === "saison" ? "🏛️ Général" : "📅 Cette semaine"}
+              {x === "saison" ? "Général" : "Cette semaine"}
             </button>
           ))}
         </div>
@@ -334,7 +354,6 @@ function SizePicker({ size, onPick, rp }: { size: MatchSize; onPick: (n: MatchSi
     <div className="space-y-2">
       <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Nombre de joueurs">
         {MATCH_SIZES.map((n) => {
-          const f = FORMATS[n];
           const on = size === n;
           return (
             <button
@@ -342,14 +361,15 @@ function SizePicker({ size, onPick, rp }: { size: MatchSize; onPick: (n: MatchSi
               type="button"
               role="radio"
               aria-checked={on}
+              aria-label={`${n} joueurs`}
               onClick={() => onPick(n)}
               className={clsx(
                 "qb-press relative overflow-hidden rounded-2xl border-2 px-2 py-2.5 text-center transition",
                 on ? "border-amber-300 bg-amber-400/15 shadow-[0_0_24px_-8px] shadow-amber-400" : "border-white/10 bg-slate-900/70 hover:border-white/25",
               )}
             >
-              <span className="block text-xl leading-none">{f.emoji}</span>
-              <span className={clsx("mt-1 block text-sm font-black", on ? "text-white" : "text-slate-300")}>{f.name}</span>
+              <span className={clsx("block text-2xl font-black leading-none tabular-nums", on ? "text-white" : "text-slate-300")}>{n}</span>
+              <span className={clsx("mt-0.5 block text-xs font-semibold", on ? "text-amber-200" : "text-slate-500")}>joueurs</span>
               <span className="mt-1 flex justify-center gap-0.5" aria-hidden>
                 {Array.from({ length: n }, (_, i) => (
                   <span key={i} className={clsx("h-1.5 w-1.5 rounded-full", on ? (i < (n - 1) / 2 ? "bg-emerald-400" : i === (n - 1) / 2 ? "bg-slate-300" : "bg-rose-400") : "bg-slate-600")} />
@@ -359,11 +379,17 @@ function SizePicker({ size, onPick, rp }: { size: MatchSize; onPick: (n: MatchSi
           );
         })}
       </div>
-      <p className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-xl bg-slate-900/70 px-3 py-2 text-xs text-slate-300">
-        <span>🥇 1re : <b className="text-emerald-300">+{rpDelta(1, rp, 7, 10, size)}</b> pts · <b className="text-violet-200">{matchXp(1, 7, size)} XP</b></span>
-        <span>{size > 3 ? "💀" : "🥉"} {ordinal(size)} : <b className="text-rose-300">{rpDelta(size, rp, 3, 10, size)}</b> pts</span>
-        {size > 3 && <span className="w-full text-center text-[11px] text-slate-500">Les {(size - 1) / 2} premiers gagnent des points, les {(size - 1) / 2} derniers en perdent.</span>}
-      </p>
+      <div className="grid grid-cols-2 divide-x divide-white/5 rounded-xl bg-slate-900/70 py-2 text-center">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">1re place</p>
+          <p className="text-sm font-black text-emerald-300">+{rpDelta(1, rp, 7, 10, size)} pts <span className="font-bold text-violet-200">· {matchXp(1, 7, size)} XP</span></p>
+        </div>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{ordinal(size)} place</p>
+          <p className="text-sm font-black text-rose-300">{rpDelta(size, rp, 3, 10, size)} pts</p>
+        </div>
+      </div>
+      {size > 3 && <p className="text-center text-[11px] text-slate-500">Les {(size - 1) / 2} premiers gagnent des points, les {(size - 1) / 2} derniers en perdent.</p>}
     </div>
   );
 }
@@ -596,7 +622,7 @@ function RankRoad({ rp, peak }: { rp: number; peak: number }) {
   return (
     <section className="qb-fade-up rounded-3xl border border-white/10 bg-slate-900/70 py-3">
       <div className="flex items-center justify-between px-4">
-        <h2 className="text-sm font-black uppercase tracking-wider text-slate-300">🛤️ La route des rangs</h2>
+        <h2 className="text-sm font-black uppercase tracking-wider text-slate-300">La route des rangs</h2>
         <span className="text-[11px] text-slate-500">record : <b className="text-slate-300">{rankFromRp(peak).label}</b></span>
       </div>
       <div ref={strip} className="relative mt-2 flex snap-x gap-1 overflow-x-auto px-4 pb-1 pt-2 [scrollbar-width:none]">
@@ -640,7 +666,7 @@ function Ladder() {
       {open && (
         <div className="space-y-3 rounded-2xl border border-white/10 bg-slate-900/70 p-3">
           <ul className="space-y-1 text-sm text-slate-300">
-            <li>À 3 : 🥇 1re place <b className="text-emerald-300">+20 à +30</b> pts · 🥈 2e <b className="text-emerald-300">+2 à +9</b> · 🥉 3e <b className="text-rose-300">−6 à −27</b></li>
+            <li>À 3 : 1re place <b className="text-emerald-300">+20 à +30</b> pts · 2e <b className="text-emerald-300">+2 à +9</b> · 3e <b className="text-rose-300">−6 à −27</b></li>
             <li>À 5 et à 7 : la place du milieu rapporte un peu, au-dessus on gagne, en dessous on perd. La victoire rapporte <b className="text-emerald-300">×1,4</b> (à 5) ou <b className="text-emerald-300">×1,8</b> (à 7), la dernière place coûte autant de plus.</li>
             <li>Plus ton rang est haut, moins tu gagnes et plus tu perds. 10/10 : <b className="text-white">+5</b> bonus.</li>
             <li>Les flèches ▲▼ du classement montrent les points gagnés ou perdus depuis lundi.</li>
