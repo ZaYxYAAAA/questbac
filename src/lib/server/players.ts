@@ -1,6 +1,6 @@
 import "server-only";
 import { PHOTO_BANNER } from "@/lib/game/banners";
-import { MAX_BANNER_CHARS, isPhotoDataUrl } from "@/lib/game/photo";
+import { MAX_BANNER_CHARS, MAX_PHOTO_CHARS, isPhotoDataUrl } from "@/lib/game/photo";
 import { rankFromRp } from "@/lib/game/progression";
 import { type MatchHistory, RANK_EPOCH, type RankProfile, currentWeek, rankedWeek } from "@/lib/game/ranked";
 import type { PublicProfile } from "@/lib/game/save";
@@ -32,7 +32,8 @@ export async function accountForPublicId(publicId: string): Promise<string | nul
 }
 
 export interface PlayerCard {
-  player: PublicProfile & { banner?: string };
+  /** `photo` : photo en 256 × 256 (la miniature serait floue en grand). */
+  player: PublicProfile & { banner?: string; photo?: string };
   rank: { rp: number; peak: number; label: string; games: number; wins: number; weekDelta: number; history: MatchHistory[] } | null;
   isMe: boolean;
   friend: boolean;
@@ -62,12 +63,14 @@ export async function playerCard(viewer: string, publicId: string): Promise<Play
     updatedAt: 0,
   };
   let banner: string | undefined;
-  if (base.bannerId === PHOTO_BANNER) {
-    const full = (await store.get<{ save: GameData }>(`save:${uid}`))?.save.profile?.banner;
-    if (isPhotoDataUrl(full, MAX_BANNER_CHARS)) banner = full;
+  let photo: string | undefined;
+  if (base.bannerId === PHOTO_BANNER || base.photoThumb) {
+    const saved = (await store.get<{ save: GameData }>(`save:${uid}`))?.save.profile;
+    if (base.bannerId === PHOTO_BANNER && isPhotoDataUrl(saved?.banner, MAX_BANNER_CHARS)) banner = saved.banner;
+    if (base.photoThumb && isPhotoDataUrl(saved?.photo, MAX_PHOTO_CHARS)) photo = saved.photo;
   }
   return {
-    player: { ...base, id: publicId, ...(r ? { rp: r.rp } : {}), ...(banner ? { banner } : {}) },
+    player: { ...base, id: publicId, ...(r ? { rp: r.rp } : {}), ...(banner ? { banner } : {}), ...(photo ? { photo } : {}) },
     rank: r
       ? { rp: r.rp, peak: Math.max(r.peak, r.rp), label: rankFromRp(r.rp).label, games: r.games, wins: r.wins, weekDelta: r.weekDelta, history: r.history.slice(0, 8) }
       : null,

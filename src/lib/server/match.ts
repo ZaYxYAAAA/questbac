@@ -24,7 +24,7 @@ import {
   tick,
 } from "@/lib/game/match";
 import { hashString, seededRandom, shuffle } from "@/lib/game/quests";
-import { DAILY_SUBJECT_BONUS, OFFERED_KEPT, type RankProfile, RANK_EPOCH, applyResult, chooseChapters, currentWeek, newRankProfile, publicQuestion, rankedWeek, subjectLock, subjectOfDay } from "@/lib/game/ranked";
+import { DAILY_SUBJECT_BONUS, FRESH_BONUS, OFFERED_KEPT, type RankProfile, RANK_EPOCH, applyResult, chooseChapters, currentWeek, isFreshSubject, newRankProfile, publicQuestion, rankedWeek, subjectOfDay, subjectRestUntil } from "@/lib/game/ranked";
 import { rankFromRp } from "@/lib/game/progression";
 import type { PublicProfile } from "@/lib/game/save";
 import { isCorrect } from "@/lib/game/session";
@@ -311,9 +311,10 @@ export async function joinQueue(uid: string, pseudo: string, subject: SubjectId,
     if (m && phaseAt(m, Date.now()).phase !== "done") return { matchId: m.id };
   }
   const save = await getSave(uid);
-  const lock = subjectLock(rank.history, subject);
-  if (lock > 0) {
-    throw new Error(`Tu as joué 3 de tes 10 dernières parties en ${subjectMeta(subject).name} : joue encore ${lock} partie${lock > 1 ? "s" : ""} dans d'autres matières pour la débloquer.`);
+  const until = subjectRestUntil(rank.history, subject);
+  if (until > 0) {
+    const min = Math.max(1, Math.ceil((until - Date.now()) / 60_000));
+    throw new Error(`Tu as joué tes 3 dernières parties en ${subjectMeta(subject).name} : fais une partie dans une autre matière, ou reviens dans ${min} min.`);
   }
   const ticket: Ticket = { id: newId(), uid, pseudo, subject, level: save?.save.profile?.level ?? "seconde", rp: rank.rp, at: Date.now(), size };
   return withLock(queueLock(subject, ticket.level, size), async () => {
@@ -409,6 +410,7 @@ async function createMatch(tickets: Ticket[], size: number = MATCH_PLAYERS): Pro
     away: {},
     finishedAt: null,
     bonus: tickets[0].subject === dailySubject(tickets[0].level),
+    fresh: humans.filter((_, i) => isFreshSubject(ranks[i].history, tickets[0].subject)).map((h) => h.id),
   };
   m.votes = botVotes(m);
   await saveMatch(m);
@@ -446,9 +448,12 @@ export async function advance(m: Match, now = Date.now()): Promise<Match> {
 /** Matière du jour pour un niveau. */
 export const dailySubject = (level: Level, now = new Date()) => subjectOfDay(subjectsForLevel(level).map((s) => s.id), now) as SubjectId;
 
-/** Parties à jouer ailleurs avant de pouvoir rejouer chaque matière (0 = libre). */
+/** Pour chaque matière : heure de fin de repos (0 = jouable) et bonus de fraîcheur. */
 export function subjectLocks(rank: RankProfile, level: Level): Record<string, number> {
-  return Object.fromEntries(subjectsForLevel(level).map((s) => [s.id, subjectLock(rank.history, s.id)]));
+  return Object.fromEntries(subjectsForLevel(level).map((s) => [s.id, subjectRestUntil(rank.history, s.id)]));
+}
+export function freshSubjects(rank: RankProfile, level: Level): string[] {
+  return subjectsForLevel(level).filter((s) => isFreshSubject(rank.history, s.id)).map((s) => s.id);
 }
 
 export function deltas(m: Match): Record<string, number> {
@@ -457,8 +462,9 @@ export function deltas(m: Match): Record<string, number> {
     s.map((row) => {
       const p = m.players.find((x) => x.id === row.playerId)!;
       const d = rpDelta(row.place, p.rp, row.correct, m.questions.length, m.players.length);
-      // Matière du jour : +25 % sur les points gagnés (les pertes restent normales).
-      return [p.id, m.bonus && d > 0 ? Math.round(d * (1 + DAILY_SUBJECT_BONUS)) : d];
+      // Matière du jour (+25 %) et matière fraîche (+10 %) : sur les points gagnés seulement.
+      const boost = (m.bonus ? DAILY_SUBJECT_BONUS : 0) + (m.fresh?.includes(p.id) ? FRESH_BONUS : 0);
+      return [p.id, boost && d > 0 ? Math.round(d * (1 + boost)) : d];
     }),
   );
 }
@@ -558,6 +564,7 @@ export function viewFor(m: Match, uid: string, now = Date.now()) {
     mine,
     away: q ? !!m.away[uid]?.includes(index) : false,
     bonus: !!m.bonus,
+    fresh: !!m.fresh?.includes(uid),
   };
 }
 

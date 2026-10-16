@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Question } from "@/lib/types";
-import { subjectLock, subjectOfDay } from "./ranked";
+import { REST_MS, isFreshSubject, subjectOfDay, subjectRestUntil } from "./ranked";
 import {
   INTRO_MS,
   type Match,
@@ -110,13 +110,20 @@ describe("partie classée", () => {
 
 
 describe("variété des matières en classé", () => {
-  const h = (...subjects: string[]) => subjects.map((subject) => ({ subject }));
-  it("3 parties sur 10 au plus dans la même matière", () => {
-    expect(subjectLock(h("histoire", "histoire"), "histoire")).toBe(0);
-    expect(subjectLock(h("histoire", "histoire", "histoire"), "histoire")).toBe(7);
-    expect(subjectLock(h("maths", "histoire", "svt", "histoire", "histoire"), "histoire")).toBe(5);
-    expect(subjectLock(h("maths", "maths", "maths", "maths", "maths", "maths", "histoire", "histoire", "histoire"), "histoire")).toBe(1);
-    expect(subjectLock(h("maths", "maths", "maths", "maths", "maths", "maths", "maths", "histoire", "histoire", "histoire"), "histoire")).toBe(0);
+  const now = 1_000_000_000;
+  const h = (...subjects: string[]) => subjects.map((subject, i) => ({ subject, at: now - 60_000 * (i + 1) }));
+  it("3 parties d'affilée au plus ; une partie ailleurs ou 15 min libèrent la matière", () => {
+    expect(subjectRestUntil(h("histoire", "histoire"), "histoire", now)).toBe(0);
+    expect(subjectRestUntil(h("histoire", "histoire", "histoire"), "histoire", now)).toBe(now - 60_000 + REST_MS);
+    expect(subjectRestUntil(h("maths", "histoire", "histoire", "histoire"), "histoire", now)).toBe(0);
+    expect(subjectRestUntil(h("histoire", "histoire", "svt", "histoire"), "histoire", now)).toBe(0);
+    expect(subjectRestUntil(h("histoire", "histoire", "histoire"), "histoire", now + REST_MS)).toBe(0);
+    expect(subjectRestUntil(h("histoire", "histoire", "histoire"), "maths", now)).toBe(0);
+  });
+  it("bonus de fraîcheur pour une matière pas jouée récemment", () => {
+    expect(isFreshSubject(h("maths", "svt"), "histoire")).toBe(false);
+    expect(isFreshSubject(h("maths", "svt", "ses"), "histoire")).toBe(true);
+    expect(isFreshSubject(h("maths", "svt", "ses", "histoire"), "histoire")).toBe(false);
   });
   it("matière du jour stable sur la journée", () => {
     const list = ["maths", "svt", "histoire"];

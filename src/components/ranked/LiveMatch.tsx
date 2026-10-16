@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { Markdown } from "@/components/ui/Markdown";
 import { chapterById, subjectMeta } from "@/lib/content/curriculum";
 import { ordinal, placeOutcome } from "@/lib/game/match";
-import { rankFromRp } from "@/lib/game/progression";
+import { levelFromXp, rankFromRp } from "@/lib/game/progression";
 import type { GivenAnswer } from "@/lib/game/session";
 import { useGame } from "@/lib/store/game-store";
 import { type MatchView, cancelQueue, fetchMatch, joinQueue, loadRanked, pollQueue, reportAway, sendAnswer, voteChapter } from "@/lib/store/match-store";
@@ -280,7 +280,7 @@ function Searching({ found, startedAt, now, size }: { found: boolean; startedAt:
       <div className="relative grid h-40 w-40 place-items-center">
         {!found && [0, 1, 2].map((i) => <span key={i} className="qb-radar absolute inset-8 rounded-full border-2 border-amber-300/50" style={{ animationDelay: `${i * 0.73}s` }} />)}
         {found && <span className="qb-pop absolute inset-4 rounded-full bg-emerald-400/15 ring-2 ring-emerald-400/50" />}
-        {profile && <Avatar emoji={profile.avatar} photo={profile.photoThumb} rp={rp} size="xl" />}
+        {profile && <Avatar emoji={profile.avatar} photo={profile.photo ?? profile.photoThumb} rp={rp} size="xl" />}
       </div>
       <div className={clsx("flex flex-wrap items-center justify-center", size > 5 ? "gap-2" : "gap-3")}>
         {Array.from({ length: size - 1 }, (_, i) => (
@@ -535,7 +535,7 @@ function Reveal({ view, now, moves }: { view: MatchView; now: number; moves: Rec
                 <span className="font-black text-white">{p.place}</span>
                 {move !== 0 && <span className={clsx("qb-pop text-[10px] font-black", move > 0 ? "text-emerald-400" : "text-rose-400")}>{move > 0 ? "▲" : "▼"}</span>}
               </span>
-              <Avatar emoji={p.avatar} photo={p.photoThumb} rp={p.rp} size="sm" name={p.pseudo} />
+              <Avatar emoji={p.avatar} photo={photoOf(p)} rp={p.rp} size="sm" name={p.pseudo} />
               <Name p={p} />
               <span className={clsx("qb-pop shrink-0 rounded-lg px-2 py-1 text-xs font-bold", p.last?.correct ? "bg-emerald-500/15 text-emerald-300" : "bg-rose-500/10 text-rose-300")}>
                 {p.last?.ms == null ? "⏱ —" : `${p.last.correct ? "✓" : "✗"} ${(p.last.ms / 1000).toFixed(1)} s`}
@@ -592,7 +592,7 @@ function Results({ view, onClose, onReplay }: { view: MatchView; onClose: () => 
           return (
             <div key={place} className="flex flex-col items-center gap-1.5 text-center">
               <div className="qb-drop" style={{ animationDelay: `${delay + 0.35}s` }}>
-                <Avatar emoji={p.avatar} photo={p.photoThumb} rp={p.rp} size={place === 1 ? "lg" : "md"} name={p.pseudo} />
+                <Avatar emoji={p.avatar} photo={photoOf(p)} rp={p.rp} size={place === 1 ? "lg" : "md"} name={p.pseudo} />
               </div>
               <p className={clsx("max-w-full truncate text-xs font-bold", p.isMe ? "text-violet-200" : "text-white")}>{p.isMe ? "Toi" : p.pseudo}</p>
               <p className="text-[11px] text-slate-400">{p.score}/{view.total} · {(p.totalMs / 1000).toFixed(0)} s</p>
@@ -610,7 +610,7 @@ function Results({ view, onClose, onReplay }: { view: MatchView; onClose: () => 
           {[...view.players].filter((p) => p.place > 3).sort((a, b) => a.place - b.place).map((p) => (
             <div key={p.id} className={clsx("flex items-center gap-3 rounded-2xl border px-3 py-2", p.isMe ? "border-violet-400/40 bg-violet-500/10" : "border-white/10 bg-slate-900/70")}>
               <span className="w-7 text-center text-sm font-black text-slate-300">{ordinal(p.place)}</span>
-              <Avatar emoji={p.avatar} photo={p.photoThumb} rp={p.rp} size="sm" name={p.pseudo} />
+              <Avatar emoji={p.avatar} photo={photoOf(p)} rp={p.rp} size="sm" name={p.pseudo} />
               <Name p={p} />
               <span className="text-xs text-slate-400">{p.score}/{view.total}</span>
               <span className={clsx("w-10 text-right text-sm font-black", (p.delta ?? 0) >= 0 ? "text-emerald-300" : "text-rose-300")}>{(p.delta ?? 0) >= 0 ? "+" : ""}{p.delta ?? 0}</span>
@@ -622,7 +622,7 @@ function Results({ view, onClose, onReplay }: { view: MatchView; onClose: () => 
       <div className="grid grid-cols-2 gap-2">
         <div className={clsx("qb-pop rounded-2xl border p-3 text-center", delta >= 0 ? "border-emerald-400/30 bg-emerald-500/10" : "border-rose-400/30 bg-rose-500/10")} style={{ animationDelay: "0.5s" }}>
           <p className={clsx("text-3xl font-black tabular-nums", delta >= 0 ? "text-emerald-300" : "text-rose-300")}>{rp >= 0 ? "+" : ""}{rp}</p>
-          <p className="text-xs text-slate-400">points de rang{view.bonus && delta > 0 ? " · ⭐ +25 %" : ""}</p>
+          <p className="text-xs text-slate-400">points de rang{view.bonus && delta > 0 ? " · ⭐ +25 %" : ""}{view.fresh && delta > 0 ? " · ✨ +10 %" : ""}</p>
         </div>
         <div className="qb-pop rounded-2xl border border-violet-400/30 bg-violet-500/10 p-3 text-center" style={{ animationDelay: "0.6s" }}>
           <p className="text-3xl font-black tabular-nums text-violet-200">+{xp}</p>
@@ -641,6 +641,8 @@ function Results({ view, onClose, onReplay }: { view: MatchView; onClose: () => 
         </div>
       </div>
 
+      <LevelBar gained={me.xp ?? 0} />
+
       <div className="flex gap-2">
         <Button variant="secondary" className="flex-1" onClick={onClose}>Retour</Button>
         <Button variant="gold" className="flex-1 py-3" onClick={onReplay}><RotateCcw size={16} /> Rejouer</Button>
@@ -650,6 +652,35 @@ function Results({ view, onClose, onReplay }: { view: MatchView; onClose: () => 
 }
 
 // ─────────────────────────── Morceaux ───────────────────────────
+
+/** Mon niveau après la partie : la part gagnée s'allume dans la barre. */
+function LevelBar({ gained }: { gained: number }) {
+  const xp = useGame((s) => s.xp);
+  const lvl = levelFromXp(xp);
+  const before = Math.max(0, lvl.current - gained) / lvl.needed;
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setShow(true), 900);
+    return () => clearTimeout(id);
+  }, []);
+  return (
+    <div className="qb-fade-up flex items-center gap-3 rounded-2xl border border-violet-400/20 bg-slate-900/80 p-3" style={{ animationDelay: "0.8s" }}>
+      <span className="qb-hex grid h-10 w-9 shrink-0 place-items-center bg-gradient-to-br from-violet-400 to-fuchsia-600 text-sm font-black text-white">{lvl.level}</span>
+      <div className="min-w-0 flex-1">
+        <p className="flex justify-between text-xs"><span className="font-bold text-white">Niveau {lvl.level}</span><span className="tabular-nums text-slate-400">{lvl.current}/{lvl.needed} XP</span></p>
+        <div className="relative mt-1 h-2.5 overflow-hidden rounded-full bg-slate-800">
+          <div className="absolute inset-y-0 left-0 rounded-full bg-violet-700" style={{ width: `${Math.round(before * 100)}%` }} />
+          <div className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-violet-400 to-fuchsia-400 transition-[width] duration-1000 [transition-timing-function:var(--qb-ease)]" style={{ width: `${Math.round((show ? lvl.progress : before) * 100)}%` }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Ma propre photo en pleine qualité (les autres joueurs : leur miniature). Elle ne change pas pendant une partie. */
+function photoOf(p: Player) {
+  return p.isMe ? useGame.getState().profile?.photo ?? p.photoThumb : p.photoThumb;
+}
 
 function Name({ p }: { p: Player }) {
   return (
@@ -681,7 +712,7 @@ function PlayersRow({ players, mode }: { players: Player[]; mode: "vote" | "ques
             )}
           >
             <div className="relative">
-              <Avatar emoji={p.avatar} photo={p.photoThumb} rp={p.rp} size="sm" name={p.pseudo} />
+              <Avatar emoji={p.avatar} photo={photoOf(p)} rp={p.rp} size="sm" name={p.pseudo} />
               {done && <span className="qb-pop absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-emerald-500 text-[10px] font-black text-slate-950">✓</span>}
             </div>
             <p className={clsx("max-w-full truncate font-bold text-white", compact ? "text-[10px]" : "text-xs")}>{p.isMe ? "Toi" : p.pseudo}</p>

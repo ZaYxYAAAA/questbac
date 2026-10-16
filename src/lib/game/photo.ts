@@ -5,14 +5,14 @@
 
 /** Photo du profil : carré 256 × 256 en JPEG. */
 export const PHOTO_SIZE = 256;
-/** Miniature publique (classement) : carré 64 × 64. */
-export const THUMB_SIZE = 64;
+/** Miniature publique (classement, parties) : carré 112 × 112, net jusqu'aux grands avatars sur écran Retina. */
+export const THUMB_SIZE = 112;
 export const PHOTO_QUALITY = 0.8;
-export const THUMB_QUALITY = 0.75;
+export const THUMB_QUALITY = 0.78;
 
 /** Tailles maximales acceptées (en caractères de data URL), avec une bonne marge. */
 export const MAX_PHOTO_CHARS = 150_000;
-export const MAX_THUMB_CHARS = 16_000;
+export const MAX_THUMB_CHARS = 24_000;
 
 /** Côté maximal de l'image de travail dans l'éditeur (limite la mémoire sur mobile). */
 export const WORK_MAX_SIDE = 1600;

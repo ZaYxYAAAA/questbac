@@ -156,6 +156,10 @@ export function RankEmblem({
             <stop offset="0.35" stopColor={light} />
             <stop offset="1" stopColor={main} />
           </radialGradient>
+          <linearGradient id={id("gloss")} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#ffffff" stopOpacity="0.45" />
+            <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+          </linearGradient>
           <clipPath id={id("clip")}>
             <path d={shield} />
           </clipPath>
@@ -224,7 +228,8 @@ export function RankEmblem({
           </g>
         )}
 
-        {/* Écu */}
+        {/* Écu : contour sombre (lisible sur tous les fonds), puis le métal */}
+        <path d={shield} fill="none" stroke="#050816" strokeWidth={i >= 3 ? 9 : 8} strokeLinejoin="round" opacity="0.85" />
         <path d={shield} fill={url("body")} stroke={i >= 7 ? url("rainbow") : url("rim")} strokeWidth={i >= 3 ? 4 : 3} strokeLinejoin="round" />
         {/* Biseau intérieur (Argent +) */}
         {i >= 1 && (
@@ -271,6 +276,11 @@ export function RankEmblem({
               <circle cx="60" cy="62" r="5" fill="#fff" opacity="0.9" />
             </>
           )}
+        </g>
+
+        {/* Brillance fixe en haut de l'écu */}
+        <g clipPath={url("clip")}>
+          <ellipse cx="48" cy="22" rx="40" ry="20" fill={url("gloss")} />
         </g>
 
         {/* Reflet qui balaie l'écu (Or +) */}

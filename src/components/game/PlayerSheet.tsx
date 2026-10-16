@@ -73,7 +73,7 @@ export function PlayerSheet({ player, onClose }: { player: PlayerPreview; onClos
     };
   }, [onClose]);
 
-  const p: Partial<PublicProfile & { banner: string }> & PlayerPreview = { ...player, ...(card?.player ?? {}) };
+  const p: Partial<PublicProfile & { banner: string; photo: string }> & PlayerPreview = { ...player, ...(card?.player ?? {}) };
   const rp = card?.rank?.rp ?? p.rp;
   const info = rankFromRp(rp);
   const peak = rankFromRp(Math.max(card?.rank?.peak ?? 0, p.stats?.peakRp ?? 0, rp));
@@ -112,7 +112,7 @@ export function PlayerSheet({ player, onClose }: { player: PlayerPreview; onClos
 
           <div className="relative px-4 pb-5">
             <div className="-mt-12 flex items-end gap-3">
-              <Avatar emoji={p.avatar} photo={p.photoThumb} name={p.pseudo} size="xl" rp={rp} frame={p.frameId} emblem={false} className="ring-4 ring-slate-950" />
+              <Avatar emoji={p.avatar} photo={p.photo ?? p.photoThumb} name={p.pseudo} size="xl" rp={rp} frame={p.frameId} emblem={false} className="ring-4 ring-slate-950" />
               <div className="min-w-0 flex-1 pb-1">
                 <p className="truncate text-2xl font-black text-white drop-shadow">{p.pseudo}</p>
                 <PlayerTitle titleId={p.titleId ?? info.tier.id} className="text-[11px]" />

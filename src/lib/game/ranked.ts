@@ -116,21 +116,31 @@ export function publicQuestion(q: Question): Question {
 
 // ─────────────────────────── Variété des matières ───────────────────────────
 
-/** Sur les 10 dernières parties, 3 au plus dans la même matière. */
-export const DIVERSITY_WINDOW = 10;
-export const MAX_SAME_SUBJECT = 3;
+/** 3 parties d'affilée au plus dans la même matière… */
+export const MAX_IN_A_ROW = 3;
+/** …ensuite elle se repose : 1 partie dans une autre matière, ou 15 minutes, suffisent. */
+export const REST_MS = 15 * 60_000;
+/** Matière « fraîche » (pas jouée sur les 5 dernières parties) : +10 % de points de rang gagnés. */
+export const FRESH_WINDOW = 5;
+export const FRESH_BONUS = 0.1;
 /** Bonus de points de rang gagnés dans la matière du jour. */
 export const DAILY_SUBJECT_BONUS = 0.25;
 
 /**
- * Parties à jouer dans d'autres matières avant de pouvoir rejouer celle-ci
- * (0 : jouable tout de suite). `history` va de la plus récente à la plus ancienne.
+ * Heure (ms) jusqu'à laquelle la matière se repose, 0 si elle est jouable.
+ * Elle se repose après 3 parties d'affilée dedans ; une partie ailleurs la libère
+ * aussitôt. `history` va de la plus récente à la plus ancienne.
  */
-export function subjectLock(history: readonly Pick<MatchHistory, "subject">[], subject: string): number {
-  const recent = history.slice(0, DIVERSITY_WINDOW - 1);
-  const hits = recent.flatMap((h, i) => (h.subject === subject ? [i] : []));
-  if (hits.length < MAX_SAME_SUBJECT) return 0;
-  return DIVERSITY_WINDOW - 1 - hits[MAX_SAME_SUBJECT - 1];
+export function subjectRestUntil(history: readonly Pick<MatchHistory, "subject" | "at">[], subject: string, now = Date.now()): number {
+  const last = history.slice(0, MAX_IN_A_ROW);
+  if (last.length < MAX_IN_A_ROW || last.some((h) => h.subject !== subject)) return 0;
+  const until = (last[0].at ?? 0) + REST_MS;
+  return until > now ? until : 0;
+}
+
+/** Matière pas jouée récemment (et déjà quelques parties au compteur) : bonus de fraîcheur. */
+export function isFreshSubject(history: readonly Pick<MatchHistory, "subject">[], subject: string): boolean {
+  return history.length >= MAX_IN_A_ROW && !history.slice(0, FRESH_WINDOW).some((h) => h.subject === subject);
 }
 
 /** Matière du jour (heure de Paris), parmi celles du niveau : +25 % de points de rang gagnés. */

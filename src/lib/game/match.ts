@@ -82,6 +82,8 @@ export interface Match {
   finishedAt: number | null;
   /** Partie dans la matière du jour : +25 % de points de rang gagnés. */
   bonus?: boolean;
+  /** Joueurs pour qui la matière est « fraîche » : +10 % de points de rang gagnés. */
+  fresh?: string[];
 }
 
 // ─────────────────────────── Bots ───────────────────────────

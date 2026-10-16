@@ -16,10 +16,32 @@ import { RankBadge } from "@/components/game/RankBadge";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { levelFromXp } from "@/lib/game/progression";
 import { playerFrame } from "@/lib/game/ranks";
+import { upgradeThumb } from "@/lib/game/thumb-client";
 import { useCloud, useCloudSync } from "@/lib/store/cloud-sync";
 import { useGame, useHydrated } from "@/lib/store/game-store";
 import { usePlayersSync } from "@/lib/store/players-store";
 import { initPush } from "@/lib/push-client";
+
+/** Niveau dans un anneau qui se remplit avec l'XP du niveau. */
+function LevelRing({ level, progress, className }: { level: number; progress: number; className?: string }) {
+  const r = 15;
+  const c = 2 * Math.PI * r;
+  return (
+    <Link href="/profil" title={`Niveau ${level} · ${Math.round(progress * 100)} %`} className={clsx("relative grid h-9 w-9 place-items-center", className)}>
+      <svg viewBox="0 0 36 36" className="absolute inset-0 -rotate-90">
+        <defs>
+          <linearGradient id="qb-lvl" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#a78bfa" />
+            <stop offset="1" stopColor="#e879f9" />
+          </linearGradient>
+        </defs>
+        <circle cx="18" cy="18" r={r} fill="#1e1b4b" stroke="#312e81" strokeWidth="3" />
+        <circle cx="18" cy="18" r={r} fill="none" stroke="url(#qb-lvl)" strokeWidth="3" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - progress)} className="transition-[stroke-dashoffset] duration-700" />
+      </svg>
+      <span className="relative text-[11px] font-black text-white">{level}</span>
+    </Link>
+  );
+}
 
 function Hud() {
   const { profile, xp, rp, peakRp, streak } = useGame();
@@ -38,7 +60,7 @@ function Hud() {
           <ProgressBar value={level.progress} height="h-1.5" />
         </div>
       </div>
-      <span className="grid h-8 min-w-8 place-items-center rounded-full bg-violet-600 px-2 text-xs font-black text-white sm:hidden">{level.level}</span>
+      <LevelRing level={level.level} progress={level.progress} className="sm:hidden" />
       <span title="Série de jours" className={clsx("flex items-center gap-1 rounded-full px-2 py-1 text-sm font-bold", streak.count > 0 ? "bg-orange-500/15 text-orange-300" : "bg-slate-800 text-slate-500")}>
         🔥 {streak.count}
       </span>
@@ -64,6 +86,18 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (hydrated) refresh();
   }, [hydrated, refresh, pathname]);
+
+  // Miniature de photo trop petite (anciens comptes) : refaite à partir de la photo.
+  const photo = profile?.photo;
+  const thumb = profile?.photoThumb;
+  useEffect(() => {
+    if (!hydrated || !photo) return;
+    let live = true;
+    void upgradeThumb(photo, thumb).then((t) => live && t && useGame.getState().updateProfile({ photoThumb: t }));
+    return () => {
+      live = false;
+    };
+  }, [hydrated, photo, thumb]);
 
   // Remise à zéro des rangs (nouvelle époque) : une seule fois par appareil.
   const applyRankEpoch = useGame((s) => s.applyRankEpoch);

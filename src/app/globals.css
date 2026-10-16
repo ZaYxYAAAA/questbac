@@ -124,6 +124,8 @@ body {
 .qb-silhouette { filter: brightness(0) opacity(0.55); }
 
 @keyframes qb-spin { to { transform: rotate(360deg); } }
+@keyframes qb-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.qb-bob { animation: qb-bob 2.6s ease-in-out infinite; }
 .qb-frame-spin { animation: qb-spin 8s linear infinite; }
 .qb-rays { animation: qb-spin 18s linear infinite; }
 
