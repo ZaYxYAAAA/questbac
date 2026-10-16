@@ -22,6 +22,7 @@ import { ACHIEVEMENTS } from "@/lib/game/achievements";
 import { BANNERS, PHOTO_BANNER, RARITY_STYLE, isBannerUnlocked, unlockLabel } from "@/lib/game/banners";
 import { RANK_TIERS, levelFromXp, rankFromRp } from "@/lib/game/progression";
 import { activeBannerId, bannerContext } from "@/lib/game/save";
+import { setSoundEnabled, soundEnabled } from "@/lib/sound";
 import { TIER_REWARDS, activeTierReward, playerFrame, unlockedTiers } from "@/lib/game/ranks";
 import { BOSSES } from "@/lib/content/bosses";
 import { bossState } from "@/lib/game/boss-rules";
@@ -220,6 +221,7 @@ export default function ProfilePage() {
               </button>
             ))}
           </div>
+          <SoundToggle />
           <Button variant="danger" onClick={() => confirm("Remettre à zéro ta progression (XP, étoiles, succès, fiches…) ? Ton profil est conservé. Cette action est irréversible.") && game.resetAll()}>
             Réinitialiser ma progression
           </Button>
@@ -228,6 +230,33 @@ export default function ProfilePage() {
         </>
       )}
     </div>
+  );
+}
+
+/** Effets sonores (activés par défaut). */
+function SoundToggle() {
+  const [on, setOn] = useState(true);
+  useEffect(() => setOn(soundEnabled()), []);
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={() => {
+        setSoundEnabled(!on);
+        setOn(!on);
+      }}
+      className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-slate-800/60 p-3 text-left"
+    >
+      <span className="text-2xl">{on ? "🔊" : "🔇"}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-bold text-white">Effets sonores</span>
+        <span className="block text-xs text-slate-400">Bonnes réponses, combos, chrono, victoires. Sur iPhone, le mode silencieux les coupe.</span>
+      </span>
+      <span className={clsx("relative h-7 w-12 shrink-0 rounded-full transition-colors", on ? "bg-emerald-500" : "bg-slate-600")}>
+        <span className={clsx("absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-[left]", on ? "left-[22px]" : "left-0.5")} />
+      </span>
+    </button>
   );
 }
 

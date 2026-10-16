@@ -9,6 +9,7 @@ import { ProgressBar } from "@/components/ui/ProgressBar";
 import { levelFromXp } from "@/lib/game/progression";
 import type { RewardSummary } from "@/lib/game/state";
 import { useGame } from "@/lib/store/game-store";
+import { play } from "@/lib/sound";
 
 export async function celebrate(intensity: "small" | "big" = "small") {
   const confetti = (await import("canvas-confetti")).default;
@@ -69,6 +70,7 @@ export function RewardScreen({
   const levelUp = summary.levelAfter > summary.levelBefore;
 
   useEffect(() => {
+    play(levelUp ? "levelup" : "reward");
     if (levelUp || summary.rankUp || (summary.stars ?? 0) >= 2) celebrate(levelUp ? "big" : "small");
   }, [levelUp, summary.rankUp, summary.stars]);
 

@@ -17,6 +17,7 @@ import { useGame } from "@/lib/store/game-store";
 import { type MatchView, cancelQueue, fetchMatch, joinQueue, loadRanked, pollQueue, reportAway, sendAnswer, voteChapter } from "@/lib/store/match-store";
 import { useToasts } from "@/lib/store/toast-store";
 import type { Question, SubjectId } from "@/lib/types";
+import { play } from "@/lib/sound";
 
 type Player = MatchView["players"][number];
 
@@ -94,6 +95,7 @@ export function LiveMatch({
         if (stop) return;
         if (r.matchId) {
           ticket.current = null;
+          play("found");
           setMatchId(r.matchId);
         } else timer = setTimeout(poll, 500);
       } catch (e) {
@@ -106,8 +108,10 @@ export function LiveMatch({
           if (r.ticket) void cancelQueue(r.ticket);
           return;
         }
-        if (r.matchId) setMatchId(r.matchId);
-        else if (r.ticket) {
+        if (r.matchId) {
+          if (!resumeId) play("found");
+          setMatchId(r.matchId);
+        } else if (r.ticket) {
           ticket.current = r.ticket;
           timer = setTimeout(poll, 500);
         }
@@ -202,6 +206,8 @@ export function LiveMatch({
       // Stockage indisponible : l'XP sera quand même comptée une fois pour cet écran.
     }
     if (!already) {
+      const outcome = placeOutcome(me.place, view.size);
+      play(me.place === 1 ? "win" : outcome === "loss" ? "lose" : "reward");
       useGame.getState().recordActivity({ kind: "ranked", place: me.place, correct: me.score, size: view.size });
       if (me.place === 1) void celebrate("big");
     }
@@ -335,7 +341,10 @@ function Vote({ view, now, onVote }: { view: MatchView; now: number; onVote: (ch
               key={id}
               type="button"
               disabled={!!view.myVote}
-              onClick={() => onVote(id)}
+              onClick={() => {
+                play("select");
+                onVote(id);
+              }}
               className={clsx(
                 "qb-press relative overflow-hidden rounded-2xl border-2 p-4 text-left",
                 mine ? "qb-glow-pulse border-amber-400 bg-amber-400/15" : view.myVote ? "scale-[0.98] border-white/5 bg-slate-900/60 opacity-50" : "border-white/10 bg-slate-900/80 hover:-translate-y-0.5 hover:border-amber-300",
@@ -355,6 +364,10 @@ function Vote({ view, now, onVote }: { view: MatchView; now: number; onVote: (ch
 
 function Intro({ view, now }: { view: MatchView; now: number }) {
   const left = view.startsAt ? Math.max(0, Math.ceil((view.startsAt - now) / 1000)) : 0;
+  // Compte à rebours : un tic par seconde, puis « go ».
+  useEffect(() => {
+    if (view.startsAt) play(left > 0 ? "tick" : "go");
+  }, [left, view.startsAt]);
   const c = view.chapterId ? chapterById(view.chapterId) : null;
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-6 py-6 text-center">
@@ -381,6 +394,12 @@ function Ask({ view, now, onAnswered }: { view: MatchView; now: number; onAnswer
   const q = view.mine ? view.question! : confirmed?.question ?? view.question!;
   const left = view.endsAt ? Math.max(0, view.endsAt - now) : 0;
   const locked = !!mine || sending !== null || view.away || left === 0;
+  const secsLeft = Math.ceil(left / 1000);
+  // Les 3 dernières secondes, si je n'ai pas encore répondu : petit tic.
+  useEffect(() => {
+    if (!mine && sending === null && secsLeft > 0 && secsLeft <= 3) play("tick");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- un tic par seconde affichée
+  }, [secsLeft]);
 
   const submit = async (given: GivenAnswer) => {
     if (locked) return;
@@ -392,6 +411,7 @@ function Ask({ view, now, onAnswered }: { view: MatchView; now: number; onAnswer
       try {
         const r = await sendAnswer(view.id, view.index, given);
         if (r.status === "ok" && r.question && r.correct !== undefined) {
+          play(r.correct ? "correct" : "wrong", 1);
           setConfirmed({ answer: { given, correct: r.correct, ms: r.view.mine?.ms ?? Math.max(0, sentAt - (view.startsAt ?? sentAt)) }, question: r.question });
         }
         onAnswered(r.view, sentAt);

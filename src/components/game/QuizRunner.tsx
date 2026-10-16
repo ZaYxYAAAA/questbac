@@ -11,6 +11,7 @@ import type { LabId, Question, QuizResult } from "@/lib/types";
 import { LabSheet } from "./LabSheet";
 import { QuestionCard } from "./QuestionCard";
 import { BoostChip } from "@/components/game/BoostChip";
+import { play } from "@/lib/sound";
 
 export function QuizRunner({
   questions,
@@ -42,6 +43,7 @@ export function QuizRunner({
   const questionStart = useRef(Date.now());
   /** Dernière question déjà répondue (ou expirée) : évite un double enregistrement. */
   const answeredIndex = useRef(-1);
+  const lastTick = useRef(0);
   const [timedOut, setTimedOut] = useState(false);
   /** Nombre de réponses données : force le rendu des pastilles de progression. */
   const [, setAnswered] = useState(0);
@@ -55,11 +57,19 @@ export function QuizRunner({
     setTimedOut(false);
     setRemaining(secondsPerQuestion);
     const limit = secondsPerQuestion * 1000;
+    lastTick.current = 0;
     const id = setInterval(() => {
       if (answeredIndex.current === index) return clearInterval(id);
       const left = limit - (Date.now() - questionStart.current);
       setRemaining(Math.max(0, left / 1000));
+      // Les 3 dernières secondes : petit tic.
+      const secs = Math.ceil(left / 1000);
+      if (secs > 0 && secs <= 3 && lastTick.current !== secs && answeredIndex.current !== index) {
+        lastTick.current = secs;
+        play("tick");
+      }
       if (left <= 0) {
+        play("wrong");
         clearInterval(id);
         answeredIndex.current = index;
         answers.current.push({ questionId: questions[index].id, correct: false, timeMs: limit, given: "" });
@@ -76,6 +86,7 @@ export function QuizRunner({
     answeredIndex.current = index;
     answers.current.push({ questionId: q.id, correct, timeMs: Date.now() - questionStart.current, given });
     setAnswered((n) => n + 1);
+    play(correct ? "correct" : "wrong", combo + 1);
     if (correct) {
       const gained = xpForAnswer(q.difficulty ?? 1, combo);
       setXp((x) => x + gained);

@@ -17,6 +17,7 @@ import { ProgressBar } from "@/components/ui/ProgressBar";
 import { levelFromXp } from "@/lib/game/progression";
 import { playerFrame } from "@/lib/game/ranks";
 import { upgradeThumb } from "@/lib/game/thumb-client";
+import { initSound } from "@/lib/sound";
 import { useCloud, useCloudSync } from "@/lib/store/cloud-sync";
 import { useGame, useHydrated } from "@/lib/store/game-store";
 import { usePlayersSync } from "@/lib/store/players-store";
@@ -86,6 +87,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (hydrated) refresh();
   }, [hydrated, refresh, pathname]);
+
+  // Effets sonores : l'audio se débloque au premier contact.
+  useEffect(() => initSound(), []);
 
   // Miniature de photo trop petite (anciens comptes) : refaite à partir de la photo.
   const photo = profile?.photo;

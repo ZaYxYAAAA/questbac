@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 import clsx from "clsx";
+import { play } from "@/lib/sound";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "gold";
 
@@ -15,8 +16,18 @@ const VARIANTS: Record<Variant, string> = {
 const base =
   "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50";
 
-export function Button({ variant = "primary", className, ...props }: ComponentProps<"button"> & { variant?: Variant }) {
-  return <button type="button" className={clsx(base, VARIANTS[variant], className)} {...props} />;
+export function Button({ variant = "primary", className, onClick, ...props }: ComponentProps<"button"> & { variant?: Variant }) {
+  return (
+    <button
+      type="button"
+      className={clsx(base, VARIANTS[variant], className)}
+      onClick={(e) => {
+        play("tap");
+        onClick?.(e);
+      }}
+      {...props}
+    />
+  );
 }
 
 export function LinkButton({

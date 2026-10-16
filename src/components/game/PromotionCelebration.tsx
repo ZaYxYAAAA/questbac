@@ -6,6 +6,7 @@ import { RankEmblem } from "@/components/game/RankEmblem";
 import { Button } from "@/components/ui/Button";
 import { rewardFor } from "@/lib/game/ranks";
 import { useCelebration } from "@/lib/store/celebration-store";
+import { play } from "@/lib/sound";
 
 const AUTO_CLOSE_MS = 6500;
 
@@ -18,6 +19,7 @@ export function PromotionCelebration() {
   useEffect(() => {
     if (!promotion) return;
     button.current?.focus({ preventScroll: true });
+    play("promotion");
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (!reduced) void celebrate(promotion.newTier ? "big" : "small");
     const timer = setTimeout(close, AUTO_CLOSE_MS);

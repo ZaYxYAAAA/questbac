@@ -17,6 +17,7 @@ import { type DuelView, claimDuel, fetchDuel, playDuel } from "@/lib/store/duels
 import { useGame } from "@/lib/store/game-store";
 import { announce, useToasts } from "@/lib/store/toast-store";
 import type { Question } from "@/lib/types";
+import { play } from "@/lib/sound";
 
 const fmtTime = (ms: number) => `${(ms / 1000).toFixed(1).replace(".", ",")} s`;
 
@@ -94,6 +95,7 @@ export default function DuelPage() {
       const { outcome, duel: next } = await claimDuel(duel.id);
       setDuel(next);
       announce(recordActivity({ kind: "duel", outcome }));
+      play(outcome === "win" ? "win" : outcome === "loss" ? "lose" : "reward");
       if (outcome === "win") celebrate("big");
     } catch (e) {
       useToasts.getState().push({ emoji: "⚠️", title: e instanceof Error ? e.message : "Erreur", tone: "rose" });

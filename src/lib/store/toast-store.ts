@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import type { RewardSummary } from "@/lib/game/state";
+import { play } from "@/lib/sound";
 
 export interface Toast {
   id: number;
@@ -23,6 +24,8 @@ export const useToasts = create<ToastStore>((set, get) => ({
   toasts: [],
   push: (t) => {
     const id = ++counter;
+    // Un seul « pop » pour une rafale de notifications.
+    if (get().toasts.length === 0) play("pop");
     set({ toasts: [...get().toasts, { ...t, id }].slice(-4) });
     setTimeout(() => get().dismiss(id), 4500);
   },

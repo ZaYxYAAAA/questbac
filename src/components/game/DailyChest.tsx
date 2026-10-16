@@ -10,6 +10,7 @@ import { formatCountdown } from "@/lib/game/league";
 import { dayKey } from "@/lib/game/progression";
 import { useGame } from "@/lib/store/game-store";
 import { announce } from "@/lib/store/toast-store";
+import { play } from "@/lib/sound";
 
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -41,6 +42,7 @@ export function DailyChest() {
       setOpening(false);
       if (!result) return;
       setWon(result.reward);
+      play("coin");
       announce(result.summary);
       if (!reducedMotion()) void celebrate(result.reward.day === 7 ? "big" : "small");
     }, reducedMotion() ? 0 : 600);
