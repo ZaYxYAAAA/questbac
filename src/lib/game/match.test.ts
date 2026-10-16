@@ -121,14 +121,14 @@ describe("variété des matières en classé", () => {
     expect(subjectRestUntil(h("histoire", "histoire", "histoire"), "maths", now)).toBe(0);
   });
   it("jauge de variété : −10 % par partie identique d'affilée (max −30 %), +15 % pour un vrai changement", () => {
-    const c = { subject: "maths", size: 3, mode: "classique" };
-    const g = (...x: [string, number?, string?][]) => x.map(([subject, size, mode]) => ({ subject, ...(size ? { size } : {}), ...(mode ? { mode } : {}) }));
+    const c = { subject: "maths", size: 3 };
+    const g = (...x: [string, number?][]) => x.map(([subject, size]) => ({ subject, ...(size ? { size } : {}) }));
     expect(varietyBonus(g(["maths"]), c)).toBeCloseTo(-0.1);
     expect(varietyBonus(g(["maths"], ["maths"], ["maths"], ["maths"], ["maths"]), c)).toBeCloseTo(-0.3);
     expect(varietyBonus(g(["maths", 5]), c)).toBe(0);
     expect(varietyBonus(g(["svt"], ["maths"]), c)).toBe(0);
     expect(varietyBonus(g(["svt"], ["ses"], ["maths"]), c)).toBeCloseTo(0.15);
-    expect(varietyBonus(g(["maths", 3, "eclair"], ["maths", 5]), c)).toBeCloseTo(0.15);
+    expect(varietyBonus(g(["maths", 7], ["maths", 5]), c)).toBeCloseTo(0.15);
     expect(varietyBonus([], c)).toBe(0);
   });
   it("matière du jour stable sur la journée", () => {

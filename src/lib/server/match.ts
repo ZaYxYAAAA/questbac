@@ -16,7 +16,7 @@ import {
   markAway,
   matchXp,
   phaseAt,
-  limitMs,
+  questionMs,
   resultOf,
   rpDelta,
   standings,
@@ -25,7 +25,6 @@ import {
 } from "@/lib/game/match";
 import { hashString, seededRandom, shuffle } from "@/lib/game/quests";
 import { DAILY_SUBJECT_BONUS, OFFERED_KEPT, type RankProfile, RANK_EPOCH, applyResult, chooseChapters, currentWeek, newRankProfile, publicQuestion, rankedWeek, subjectOfDay, subjectRestUntil, varietyBonus } from "@/lib/game/ranked";
-import { MIX_CHAPTER, SPECIAL_BONUS, type SpecialId } from "@/lib/game/specials";
 import { rankFromRp } from "@/lib/game/progression";
 import type { PublicProfile } from "@/lib/game/save";
 import { isCorrect } from "@/lib/game/session";
@@ -55,8 +54,6 @@ interface Ticket {
   at: number;
   /** Nombre de joueurs voulu (3, 5 ou 7). */
   size?: MatchSize;
-  /** Mode spécial du jour (absent : classique). */
-  special?: SpecialId;
   matchId?: string;
 }
 
@@ -238,9 +235,9 @@ async function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
 }
 
 /** Une file par matière, par niveau (les chapitres en dépendent) et par format de partie. */
-const sizeTag = (n: number, sp?: SpecialId) => (n === MATCH_PLAYERS ? "" : `:${n}`) + (sp ? `:${sp}` : "");
-const queueKey = (s: SubjectId, l: Level, n: number = MATCH_PLAYERS, sp?: SpecialId) => `mmq:${s}:${l}${sizeTag(n, sp)}`;
-const queueLock = (s: SubjectId, l: Level, n: number = MATCH_PLAYERS, sp?: SpecialId) => `mml:${s}:${l}${sizeTag(n, sp)}`;
+const sizeTag = (n: number) => (n === MATCH_PLAYERS ? "" : `:${n}`);
+const queueKey = (s: SubjectId, l: Level, n: number = MATCH_PLAYERS) => `mmq:${s}:${l}${sizeTag(n)}`;
+const queueLock = (s: SubjectId, l: Level, n: number = MATCH_PLAYERS) => `mml:${s}:${l}${sizeTag(n)}`;
 const sizeOf = (t: Pick<Ticket, "size">) => t.size ?? MATCH_PLAYERS;
 const ticketKey = (id: string) => `mmt:${id}`;
 const matchKey = (id: string) => `match:${id}`;
@@ -300,13 +297,13 @@ export async function getMatch(id: string): Promise<Match | null> {
 }
 const saveMatch = (m: Match) => getStore().set(matchKey(m.id), m);
 
-async function freshQueue(subject: SubjectId, level: Level, size: number, now: number, special?: SpecialId): Promise<Ticket[]> {
-  const q = (await getStore().get<Ticket[]>(queueKey(subject, level, size, special))) ?? [];
+async function freshQueue(subject: SubjectId, level: Level, size: number, now: number): Promise<Ticket[]> {
+  const q = (await getStore().get<Ticket[]>(queueKey(subject, level, size))) ?? [];
   return q.filter((t) => !t.matchId && now - t.at < TICKET_TTL_MS);
 }
 
 /** Entrer en file : une partie se forme dès qu'il y a assez de joueurs ; sinon on attend (3 s max, puis bots). */
-export async function joinQueue(uid: string, pseudo: string, subject: SubjectId, size: MatchSize = MATCH_PLAYERS, special?: SpecialId): Promise<{ ticket?: string; matchId?: string }> {
+export async function joinQueue(uid: string, pseudo: string, subject: SubjectId, size: MatchSize = MATCH_PLAYERS): Promise<{ ticket?: string; matchId?: string }> {
   await resetRanksIfNeeded();
   const rank = await getRank(uid, pseudo);
   if (rank.active) {
@@ -319,18 +316,18 @@ export async function joinQueue(uid: string, pseudo: string, subject: SubjectId,
     const min = Math.max(1, Math.ceil((until - Date.now()) / 60_000));
     throw new Error(`Tu as joué tes 3 dernières parties en ${subjectMeta(subject).name} : fais une partie dans une autre matière, ou reviens dans ${min} min.`);
   }
-  const ticket: Ticket = { id: newId(), uid, pseudo, subject, level: save?.save.profile?.level ?? "seconde", rp: rank.rp, at: Date.now(), size, ...(special ? { special } : {}) };
-  return withLock(queueLock(subject, ticket.level, size, special), async () => {
+  const ticket: Ticket = { id: newId(), uid, pseudo, subject, level: save?.save.profile?.level ?? "seconde", rp: rank.rp, at: Date.now(), size };
+  return withLock(queueLock(subject, ticket.level, size), async () => {
     const store = getStore();
-    const queue = (await freshQueue(subject, ticket.level, size, ticket.at, special)).filter((t) => t.uid !== uid);
+    const queue = (await freshQueue(subject, ticket.level, size, ticket.at)).filter((t) => t.uid !== uid);
     if (queue.length >= size - 1) {
       const mates = queue.slice(0, size - 1);
-      const m = await createMatch([ticket, ...mates], size, special);
-      await store.set(queueKey(subject, ticket.level, size, special), queue.filter((t) => !mates.includes(t)));
+      const m = await createMatch([ticket, ...mates], size);
+      await store.set(queueKey(subject, ticket.level, size), queue.filter((t) => !mates.includes(t)));
       for (const t of mates) await store.set(ticketKey(t.id), { ...t, matchId: m.id });
       return { matchId: m.id };
     }
-    await store.set(queueKey(subject, ticket.level, size, special), [...queue, ticket]);
+    await store.set(queueKey(subject, ticket.level, size), [...queue, ticket]);
     await store.set(ticketKey(ticket.id), ticket);
     return { ticket: ticket.id };
   });
@@ -345,13 +342,13 @@ export async function pollQueue(uid: string, ticketId: string): Promise<{ matchI
   const elapsedMs = Date.now() - t.at;
   if (elapsedMs < QUEUE_WAIT_MS) return { elapsedMs };
   const size = sizeOf(t);
-  return withLock(queueLock(t.subject, t.level, size, t.special), async () => {
+  return withLock(queueLock(t.subject, t.level, size), async () => {
     const again = await store.get<Ticket>(ticketKey(ticketId));
     if (again?.matchId) return { matchId: again.matchId, elapsedMs };
-    const queue = (await freshQueue(t.subject, t.level, size, Date.now(), t.special)).filter((x) => x.id !== t.id && x.uid !== uid);
+    const queue = (await freshQueue(t.subject, t.level, size, Date.now())).filter((x) => x.id !== t.id && x.uid !== uid);
     const mates = queue.slice(0, size - 1);
-    const m = await createMatch([t, ...mates], size, t.special);
-    await store.set(queueKey(t.subject, t.level, size, t.special), queue.filter((x) => !mates.includes(x)));
+    const m = await createMatch([t, ...mates], size);
+    await store.set(queueKey(t.subject, t.level, size), queue.filter((x) => !mates.includes(x)));
     for (const x of [t, ...mates]) await store.set(ticketKey(x.id), { ...x, matchId: m.id });
     return { matchId: m.id, elapsedMs };
   });
@@ -361,9 +358,9 @@ export async function cancelQueue(uid: string, ticketId: string) {
   const store = getStore();
   const t = await store.get<Ticket>(ticketKey(ticketId));
   if (!t || t.uid !== uid || t.matchId) return;
-  await withLock(queueLock(t.subject, t.level, sizeOf(t), t.special), async () => {
-    const queue = (await store.get<Ticket[]>(queueKey(t.subject, t.level, sizeOf(t), t.special))) ?? [];
-    await store.set(queueKey(t.subject, t.level, sizeOf(t), t.special), queue.filter((x) => x.id !== t.id));
+  await withLock(queueLock(t.subject, t.level, sizeOf(t)), async () => {
+    const queue = (await store.get<Ticket[]>(queueKey(t.subject, t.level, sizeOf(t)))) ?? [];
+    await store.set(queueKey(t.subject, t.level, sizeOf(t)), queue.filter((x) => x.id !== t.id));
   });
   await store.del(ticketKey(ticketId));
 }
@@ -375,7 +372,7 @@ function pickChapters(subject: SubjectId, level: Level, recent: string[]): [stri
   return chooseChapters(list.map((c) => c.id), recent);
 }
 
-async function createMatch(tickets: Ticket[], size: number = MATCH_PLAYERS, special?: SpecialId): Promise<Match> {
+async function createMatch(tickets: Ticket[], size: number = MATCH_PLAYERS): Promise<Match> {
   const store = getStore();
   const id = newId();
   const now = Date.now();
@@ -401,7 +398,7 @@ async function createMatch(tickets: Ticket[], size: number = MATCH_PLAYERS, spec
     level: tickets[0].level,
     createdAt: now,
     players,
-    chapters: special === "melange" ? [MIX_CHAPTER, MIX_CHAPTER] : pickChapters(tickets[0].subject, tickets[0].level, recentOffers),
+    chapters: pickChapters(tickets[0].subject, tickets[0].level, recentOffers),
     votes: {},
     chapterId: null,
     voteEnd: null,
@@ -413,8 +410,7 @@ async function createMatch(tickets: Ticket[], size: number = MATCH_PLAYERS, spec
     away: {},
     finishedAt: null,
     bonus: tickets[0].subject === dailySubject(tickets[0].level),
-    ...(special ? { special } : {}),
-    variety: Object.fromEntries(humans.map((h, i) => [h.id, varietyBonus(ranks[i].history, { subject: tickets[0].subject, size, mode: special ?? "classique" })])),
+    variety: Object.fromEntries(humans.map((h, i) => [h.id, varietyBonus(ranks[i].history, { subject: tickets[0].subject, size })])),
   };
   m.votes = botVotes(m);
   await saveMatch(m);
@@ -427,29 +423,14 @@ async function createMatch(tickets: Ticket[], size: number = MATCH_PLAYERS, spec
 
 // ─────────────────────────── Déroulé ───────────────────────────
 
-/** Questions de la partie selon le mode : Mélange (un chapitre différent par question), Expert (les plus difficiles). */
-function makeQuestions(m: Match, chapterId: string, r: () => number, seen: string[]) {
-  if (chapterId === MIX_CHAPTER) {
-    const pool = shuffle(chaptersFor(m.subject, m.level).filter((c) => hasGenerators(c.id)), r);
-    const out = [];
-    for (let i = 0; out.length < 10 && i < 40 && pool.length; i++) out.push(...chapterQuestions(pool[i % pool.length].id, 1, r, seen));
-    return out.slice(0, 10);
-  }
-  if (m.special === "expert") {
-    const all = chapterQuestions(chapterId, 30, r, seen);
-    const hard = all.filter((q) => (q.difficulty ?? 1) >= 2);
-    return [...hard, ...all.filter((q) => !hard.includes(q))].slice(0, 10);
-  }
-  return chapterQuestions(chapterId, 10, r, seen);
-}
-
 /** Fait avancer la partie, l'enregistre si elle a changé, et distribue les points à la fin (une seule fois). */
 export async function advance(m: Match, now = Date.now()): Promise<Match> {
   let seen: string[] = [];
   if (!m.chapterId) {
     for (const p of m.players.filter((x) => !x.bot)) seen = seen.concat((await getRank(p.id, p.pseudo)).seen ?? []);
   }
-  const make = (chapterId: string, seed: string) => makeQuestions(m, chapterId, seededRandom(hashString(`q:${seed}`)), seen).map((q, i) => ({ ...q, id: `mq-${i}` }));
+  const make = (chapterId: string, seed: string) =>
+    chapterQuestions(chapterId, 10, seededRandom(hashString(`q:${seed}`)), seen).map((q, i) => ({ ...q, id: `mq-${i}` }));
   if (tick(structuredClone(m), now, make)) {
     // Changement de phase : sous verrou, sur la version la plus récente (avec toutes les actions).
     await withLock(`mlk:${m.id}`, async () => {
@@ -479,8 +460,8 @@ export function deltas(m: Match): Record<string, number> {
     s.map((row) => {
       const p = m.players.find((x) => x.id === row.playerId)!;
       const d = rpDelta(row.place, p.rp, row.correct, m.questions.length, m.players.length);
-      // Matière du jour (+25 %), mode du jour (+30 %), jauge de variété (−30 % à +15 %) : sur les points gagnés seulement.
-      const boost = (m.bonus ? DAILY_SUBJECT_BONUS : 0) + (m.special ? SPECIAL_BONUS : 0) + (m.variety?.[p.id] ?? 0);
+      // Matière du jour (+25 %) et jauge de variété (−30 % à +15 %) : sur les points gagnés seulement.
+      const boost = (m.bonus ? DAILY_SUBJECT_BONUS : 0) + (m.variety?.[p.id] ?? 0);
       return [p.id, boost && d > 0 ? Math.max(1, Math.round(d * (1 + boost))) : d];
     }),
   );
@@ -496,7 +477,7 @@ async function settle(m: Match) {
     const p = m.players.find((x) => x.id === row.playerId)!;
     if (p.bot) continue;
     const prof = await getRank(p.id, p.pseudo);
-    const next = applyResult(prof, { at: Date.now(), subject: m.subject, place: row.place, correct: row.correct, delta: d[p.id], ...(m.players.length !== MATCH_PLAYERS ? { size: m.players.length } : {}), ...(m.special ? { mode: m.special } : {}) }, week);
+    const next = applyResult(prof, { at: Date.now(), subject: m.subject, place: row.place, correct: row.correct, delta: d[p.id], ...(m.players.length !== MATCH_PLAYERS ? { size: m.players.length } : {}) }, week);
     const facts = m.questions.map(factKey);
     await putRank(p.id, { ...next, seen: [...(prof.seen ?? []).filter((k) => !facts.includes(k)), ...facts].slice(-SEEN_KEPT) });
   }
@@ -550,7 +531,7 @@ export function viewFor(m: Match, uid: string, now = Date.now()) {
       label: rankFromRp(p.rp).label,
       rp: p.rp,
       isMe: p.id === uid,
-      score: row.points,
+      score: row.correct,
       totalMs: row.totalMs,
       place: row.place,
       answered: current,
@@ -575,13 +556,12 @@ export function viewFor(m: Match, uid: string, now = Date.now()) {
     voteEndsAt: m.createdAt + VOTE_MS,
     myVote: m.votes[uid]?.chapter ?? null,
     startsAt: index >= 0 ? m.starts[index] ?? null : null,
-    endsAt: q && index >= 0 && m.starts[index] !== undefined ? m.starts[index] + limitMs(m, index) : null,
+    endsAt: q && index >= 0 && m.starts[index] !== undefined ? m.starts[index] + questionMs(q) : null,
     nextAt: phase === "reveal" ? m.starts[index + 1] ?? m.finishedAt : phase === "intro" ? m.starts[0] : null,
     question: q ? (phase === "question" && !mine ? publicQuestion(q) : q) : null,
     mine,
     away: q ? !!m.away[uid]?.includes(index) : false,
     bonus: !!m.bonus,
-    special: m.special ?? null,
     variety: m.variety?.[uid] ?? 0,
   };
 }

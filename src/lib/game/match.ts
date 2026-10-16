@@ -9,7 +9,6 @@
 import type { Level, Question, SubjectId } from "@/lib/types";
 import { RANK_TIERS, rankFromRp } from "./progression";
 import { hashString, seededRandom } from "./quests";
-import { MIX_CHAPTER, type SpecialId } from "./specials";
 import { questionTimeMs } from "./timing";
 
 export const MATCH_QUESTIONS = 10;
@@ -83,8 +82,6 @@ export interface Match {
   finishedAt: number | null;
   /** Partie dans la matière du jour : +25 % de points de rang gagnés. */
   bonus?: boolean;
-  /** Mode spécial du jour (règles modifiées, +30 % de points gagnés). */
-  special?: SpecialId;
   /** Jauge de variété de chaque joueur humain : bonus (ou malus) sur les points gagnés. */
   variety?: Record<string, number>;
 }
@@ -139,7 +136,8 @@ const visibleLength = (s: string) => s.replace(/\$[^$]*\$/g, "xxxxxx").replace(/
  * lecture selon la longueur, réflexion variable, réponses fausses parfois
  * précipitées ou hésitantes, distractions, et parfois pas de réponse à temps.
  */
-export function planBotAnswer(bot: MatchPlayer, q: Question, r: () => number, momentum = 0, limit = questionMs(q)): BotPlan {
+export function planBotAnswer(bot: MatchPlayer, q: Question, r: () => number, momentum = 0): BotPlan {
+  const limit = questionMs(q);
   const skill = bot.skill ?? 0.6;
   const speed = bot.speed ?? 0.5;
   const difficulty = q.difficulty ?? 1;
@@ -164,13 +162,13 @@ export function planBotAnswer(bot: MatchPlayer, q: Question, r: () => number, mo
 }
 
 /** Plans des bots pour toute la partie (avec une petite dynamique de série, comme un humain en confiance ou déstabilisé). */
-export function planBots(m: Pick<Match, "id" | "players" | "questions" | "special">): Record<string, BotPlan[]> {
+export function planBots(m: Pick<Match, "id" | "players" | "questions">): Record<string, BotPlan[]> {
   const r = seededRandom(hashString(`bots:${m.id}`));
   const out: Record<string, BotPlan[]> = {};
   for (const p of m.players.filter((x) => x.bot)) {
     let momentum = 0;
-    out[p.id] = m.questions.map((q, i) => {
-      const plan = planBotAnswer(p, q, r, momentum, limitMs(m, i));
+    out[p.id] = m.questions.map((q) => {
+      const plan = planBotAnswer(p, q, r, momentum);
       momentum = clamp(momentum + (plan.correct ? 0.02 : -0.03), -0.08, 0.06);
       return plan;
     });
@@ -180,8 +178,6 @@ export function planBots(m: Pick<Match, "id" | "players" | "questions" | "specia
 
 /** Votes des bots : un choix au hasard, au bout de 1,5 à 6,5 secondes. */
 export function botVotes(m: Pick<Match, "id" | "players" | "chapters" | "createdAt">): Record<string, Vote> {
-  // Mode Mélange : pas de vote, tout le monde « a voté » dès le début.
-  if (m.chapters[0] === MIX_CHAPTER) return Object.fromEntries(m.players.map((p) => [p.id, { chapter: MIX_CHAPTER, at: m.createdAt }]));
   const r = seededRandom(hashString(`votes:${m.id}`));
   return Object.fromEntries(
     m.players.filter((p) => p.bot).map((p) => [p.id, { chapter: m.chapters[r() < 0.5 ? 0 : 1], at: m.createdAt + 1500 + Math.round(r() * 5000) }]),
@@ -189,18 +185,6 @@ export function botVotes(m: Pick<Match, "id" | "players" | "chapters" | "created
 }
 
 // ─────────────────────────── Déroulé ───────────────────────────
-
-/** Temps de la question i dans cette partie (mode Éclair : moitié moins, 6 s au moins). */
-export function limitMs(m: Pick<Match, "questions" | "special">, i: number): number {
-  const base = questionMs(m.questions[i]);
-  return m.special === "eclair" ? Math.max(6000, Math.round(base / 2000) * 1000) : base;
-}
-
-/** Points d'une question : 1 si juste ; finale : ×2 sur les 3 dernières ; sans filet : −1 si fausse. */
-export function pointsFor(m: Pick<Match, "questions" | "special">, i: number, r: { correct: boolean; ms: number | null }): number {
-  if (r.correct) return m.special === "finale" && i >= m.questions.length - 3 ? 2 : 1;
-  return m.special === "sansfilet" && r.ms !== null ? -1 : 0;
-}
 
 export type MakeQuestions = (chapterId: string, seed: string, level: Level) => Question[];
 
@@ -263,7 +247,7 @@ export function tick(m: Match, now: number, make: MakeQuestions): boolean {
     }
     const start = m.starts[i];
     if (now < start) break;
-    const limit = limitMs(m, i);
+    const limit = questionMs(m.questions[i]);
     const times = m.players.map((p) => doneAt(m, p, i));
     let end: number | null = null;
     if (times.every((t) => t !== null) && Math.max(...(times as number[])) <= now) end = Math.min(start + limit, Math.max(...(times as number[])));
@@ -292,11 +276,11 @@ export function submitAnswer(m: Match, playerId: string, index: number, given: s
   const { phase, index: current } = phaseAt(m, now);
   if (phase !== "question" || current !== index) return now < (m.starts[index] ?? Infinity) ? "wrong-question" : "late";
   const start = m.starts[index];
-  if (now > start + limitMs(m, index) + ANSWER_GRACE_MS) return "late";
+  if (now > start + questionMs(m.questions[index]) + ANSWER_GRACE_MS) return "late";
   if (m.away[playerId]?.includes(index)) return "away";
   const list = (m.answers[playerId] ??= []);
   if (list[index]) return "already";
-  list[index] = { correct, ms: Math.min(limitMs(m, index), now - start), given };
+  list[index] = { correct, ms: Math.min(questionMs(m.questions[index]), now - start), given };
   return "ok";
 }
 
@@ -315,8 +299,6 @@ export interface Standing {
   playerId: string;
   place: number;
   correct: number;
-  /** Score de la partie : les bonnes réponses, avec les règles du mode spécial (malus, finale double). */
-  points: number;
   totalMs: number;
 }
 
@@ -335,17 +317,15 @@ export function standings(m: Match): Standing[] {
   const done = m.ends.length;
   const rows = m.players.map((p) => {
     let correct = 0;
-    let points = 0;
     let totalMs = 0;
     for (let i = 0; i < done; i++) {
       const r = resultOf(m, p, i);
       if (r.correct) correct++;
-      points += pointsFor(m, i, r);
-      totalMs += r.ms ?? limitMs(m, i);
+      totalMs += r.ms ?? questionMs(m.questions[i]);
     }
-    return { playerId: p.id, correct, points, totalMs };
+    return { playerId: p.id, correct, totalMs };
   });
-  rows.sort((a, b) => b.points - a.points || a.totalMs - b.totalMs);
+  rows.sort((a, b) => b.correct - a.correct || a.totalMs - b.totalMs);
   return rows.map((r, i) => ({ ...r, place: i + 1 }));
 }
 

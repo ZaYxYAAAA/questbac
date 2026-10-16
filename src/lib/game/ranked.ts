@@ -20,8 +20,6 @@ export interface MatchHistory {
   delta: number;
   /** Nombre de joueurs de la partie (3 si absent : anciennes parties). */
   size?: number;
-  /** Mode spécial joué (absent : classique). */
-  mode?: string;
 }
 
 export interface RankProfile {
@@ -142,22 +140,20 @@ export function subjectRestUntil(history: readonly Pick<MatchHistory, "subject" 
   return until > now ? until : 0;
 }
 
-/** Ce qui fait qu'une partie est « la même » : matière, nombre de joueurs et mode (classique ou mode du jour). */
+/** Ce qui fait qu'une partie est « la même » : même matière et même nombre de joueurs. */
 export interface PlayConfig {
   subject: string;
   size: number;
-  mode: string;
 }
 
-export const sameConfig = (h: Pick<MatchHistory, "subject" | "size" | "mode">, c: PlayConfig) =>
-  h.subject === c.subject && (h.size ?? 3) === c.size && (h.mode ?? "classique") === c.mode;
+export const sameConfig = (h: Pick<MatchHistory, "subject" | "size">, c: PlayConfig) => h.subject === c.subject && (h.size ?? 3) === c.size;
 
 /**
  * Bonus (ou malus) de variété sur les points gagnés pour la prochaine partie :
  * −10 % par partie identique d'affilée juste avant (jusqu'à −30 %), +15 % si
  * elle ne ressemble à aucune des 2 dernières, 0 sinon.
  */
-export function varietyBonus(history: readonly Pick<MatchHistory, "subject" | "size" | "mode">[], c: PlayConfig): number {
+export function varietyBonus(history: readonly Pick<MatchHistory, "subject" | "size">[], c: PlayConfig): number {
   let streak = 0;
   for (const h of history) {
     if (!sameConfig(h, c)) break;

@@ -15,7 +15,6 @@ import { Tabs } from "@/components/ui/Tabs";
 import { subjectMeta, subjectsForLevel } from "@/lib/content/curriculum";
 import { MATCH_SIZES, type MatchSize, matchXp, ordinal, rpDelta } from "@/lib/game/match";
 import { varietyBonus } from "@/lib/game/ranked";
-import { SPECIALS, type SpecialId } from "@/lib/game/specials";
 import { RANK_TIERS, rankFromRp } from "@/lib/game/progression";
 import { RANK_STEPS, stepIndex } from "@/lib/game/ranks";
 import { useCloud } from "@/lib/store/cloud-sync";
@@ -31,7 +30,7 @@ type Period = "saison" | "semaine";
 function weekly<T extends { place: number; isMe: boolean }>(rows: T[], key: (r: T) => number): T[] {
   return [...rows].sort((a, b) => key(b) - key(a) || a.place - b.place).map((r, i) => ({ ...r, place: i + 1 }));
 }
-type Playing = { subject: SubjectId; size: number; special?: boolean; matchId?: string | null; key: number };
+type Playing = { subject: SubjectId; size: number; matchId?: string | null; key: number };
 
 /** Formats de partie : nom, et ce que ça change. */
 const FORMATS: Record<MatchSize, { name: string; emoji: string }> = {
@@ -49,9 +48,7 @@ const fmt = (n: number) => n.toLocaleString("fr-FR");
 export default function RankedPage() {
   const { user, checked } = useCloud();
   const profile = useGame((s) => s.profile);
-  const { rank, board, xp, error, locks, special, specialNext, daily } = useRanked();
-  const [daySpecial, setDaySpecial] = useState(false);
-  const mode = daySpecial && special ? special : "classique";
+  const { rank, board, xp, error, locks, daily } = useRanked();
   // Les repos se terminent tout seuls : l'écran se rafraîchit chaque minute.
   const [clock, setClock] = useState(() => Date.now());
   useEffect(() => {
@@ -96,13 +93,12 @@ export default function RankedPage() {
         key={playing.key}
         subject={playing.subject}
         size={playing.size}
-        special={playing.special}
         matchId={playing.matchId}
         onClose={() => {
           setPlaying(null);
           void loadRanked();
         }}
-        onReplay={(subject, n, sp) => setPlaying({ subject, size: n, special: sp, key: Date.now() })}
+        onReplay={(subject, n) => setPlaying({ subject, size: n, key: Date.now() })}
       />
     );
   }
@@ -121,7 +117,7 @@ export default function RankedPage() {
   }
 
   const level = profile?.level ?? "seconde";
-  const play = (subject: SubjectId) => setPlaying({ subject, size, special: mode !== "classique", key: Date.now() });
+  const play = (subject: SubjectId) => setPlaying({ subject, size, key: Date.now() });
 
   return (
     <div className="space-y-5">
@@ -149,7 +145,6 @@ export default function RankedPage() {
           <p className="text-sm text-slate-400">{size} joueurs · 10 questions en même temps · les bonnes réponses d&apos;abord, la vitesse départage.</p>
         </div>
         <SizePicker size={size} onPick={pickSize} rp={rank?.rp ?? 0} />
-        {special && <ModePicker special={special} next={specialNext} on={daySpecial} onChange={setDaySpecial} />}
         {daily && (
           <p className="flex items-center gap-2 rounded-2xl border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-sm text-amber-100">
             <span className="text-lg">⭐</span>
@@ -163,7 +158,7 @@ export default function RankedPage() {
             const restMin = Math.max(0, Math.ceil(((locks[s.id] ?? 0) - clock) / 60_000));
             const lock = restMin;
             const isDaily = daily === s.id;
-            const variety = rank ? varietyBonus(rank.history, { subject: s.id, size, mode }) : 0;
+            const variety = rank ? varietyBonus(rank.history, { subject: s.id, size }) : 0;
             return (
               <button
                 key={s.id}
@@ -199,7 +194,7 @@ export default function RankedPage() {
           })}
         </div>
         <p className="text-xs text-slate-500">
-          🌈 <b className="text-slate-300">Varie pour gagner plus</b> : rejouer exactement la même chose (matière, format et mode) fait perdre 10 % des points gagnés par partie d&apos;affilée (jusqu&apos;à −30 %) ; changer vraiment rapporte <b className="text-emerald-300">+15 %</b>. Après 3 parties d&apos;affilée dans une matière, elle se repose 15 min (ou 1 partie ailleurs).
+          🌈 <b className="text-slate-300">Varie pour gagner plus</b> : rejouer exactement la même chose (même matière et même nombre de joueurs) fait perdre 10 % des points gagnés par partie d&apos;affilée (jusqu&apos;à −30 %) ; changer vraiment rapporte <b className="text-emerald-300">+15 %</b>. Après 3 parties d&apos;affilée dans une matière, elle se repose 15 min (ou 1 partie ailleurs).
         </p>
         {rank && rank.history.length > 0 && <History rank={rank} />}
       </section>
@@ -330,50 +325,6 @@ function MyRankCard({ rank, onOpen }: { rank: MyRank; onOpen: () => void }) {
         <Stat label={rank.wins > 1 ? "victoires" : "victoire"} value={String(rank.wins)} />
       </div>
     </section>
-  );
-}
-
-/** Classique ou mode spécial du jour (+30 %). */
-function ModePicker({ special, next, on, onChange }: { special: SpecialId; next: SpecialId | null; on: boolean; onChange: (on: boolean) => void }) {
-  const sp = SPECIALS[special];
-  return (
-    <div className="grid grid-cols-[auto_1fr] gap-2" role="radiogroup" aria-label="Mode de jeu">
-      <button
-        type="button"
-        role="radio"
-        aria-checked={!on}
-        onClick={() => onChange(false)}
-        className={clsx("qb-press rounded-2xl border-2 px-3 py-2 text-center", !on ? "border-white bg-white/10" : "border-white/10 bg-slate-900/70")}
-      >
-        <span className="block text-lg leading-none">📘</span>
-        <span className="mt-1 block text-xs font-black text-white">Classique</span>
-      </button>
-      <button
-        type="button"
-        role="radio"
-        aria-checked={on}
-        onClick={() => onChange(!on)}
-        className={clsx(
-          "qb-press relative overflow-hidden rounded-2xl border-2 p-2.5 text-left transition",
-          on ? "border-white shadow-[0_0_28px_-6px] shadow-fuchsia-500" : "border-transparent opacity-90",
-        )}
-      >
-        <span className={clsx("absolute inset-0 bg-gradient-to-r", sp.gradient)} />
-        <span className="qbb-fx qbb-shine" />
-        <span className="relative flex items-center gap-2.5">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-black/25 text-2xl">{sp.emoji}</span>
-          <span className="min-w-0 flex-1">
-            <span className="flex items-center gap-1.5 text-sm font-black text-white">
-              Mode du jour : {sp.name}
-              <span className="whitespace-nowrap rounded-full bg-black/30 px-1.5 text-[10px]">+30 %</span>
-            </span>
-            <span className="block text-[11px] font-semibold leading-tight text-white/90">{sp.rule}</span>
-            {next && <span className="block text-[10px] text-white/70">Demain : {SPECIALS[next].emoji} {SPECIALS[next].name}</span>}
-          </span>
-          {on && <span className="qb-pop text-lg">✓</span>}
-        </span>
-      </button>
-    </div>
   );
 }
 

@@ -1,7 +1,6 @@
 import { currentSession, getSave, jsonError, storageDown } from "@/lib/server/accounts";
 import { dailySubject, getMatch, getRank, rankBoard, resetRanksIfNeeded, subjectLocks, xpBoard } from "@/lib/server/match";
 import { phaseAt } from "@/lib/game/match";
-import { specialOfDay, specialOfTomorrow } from "@/lib/game/specials";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +16,7 @@ export async function GET() {
     const { seen: _seen, ...rank } = me;
     const level = (await getSave(session.uid))?.save.profile?.level ?? "seconde";
     return Response.json(
-      { rank: { ...rank, active: active && phaseAt(active, Date.now()).phase !== "done" ? active.id : null }, board: await rankBoard(session.uid), xp: await xpBoard(session.uid), locks: subjectLocks(me, level), special: specialOfDay(), specialNext: specialOfTomorrow(), daily: dailySubject(level) },
+      { rank: { ...rank, active: active && phaseAt(active, Date.now()).phase !== "done" ? active.id : null }, board: await rankBoard(session.uid), xp: await xpBoard(session.uid), locks: subjectLocks(me, level), daily: dailySubject(level) },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
