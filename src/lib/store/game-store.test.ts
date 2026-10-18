@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { serverSaveWins, toGameData } from "@/lib/game/save";
 import { createInitialData } from "@/lib/game/state";
 import { dayKey } from "@/lib/game/progression";
@@ -81,9 +81,16 @@ describe("ligue et coffre quotidien dans le store", () => {
   });
 
   it("le coffre du jour ne s'ouvre qu'une fois", () => {
-    useGame.setState({ ...createInitialData(), profile });
-    expect(useGame.getState().claimDaily()?.reward.day).toBe(1);
-    expect(useGame.getState().claimDaily()).toBeNull();
-    expect(useGame.getState().xp).toBe(30);
+    // Un mercredi : le dimanche, l'XP est doublée et le total changerait.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-14T12:00:00"));
+    try {
+      useGame.setState({ ...createInitialData(), profile });
+      expect(useGame.getState().claimDaily()?.reward.day).toBe(1);
+      expect(useGame.getState().claimDaily()).toBeNull();
+      expect(useGame.getState().xp).toBe(30);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
