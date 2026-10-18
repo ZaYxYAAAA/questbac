@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "katex/dist/katex.min.css";
 import "./globals.css";
 import { AppShell } from "@/components/layout/AppShell";
+import { Splash } from "@/components/layout/Splash";
 
 export const metadata: Metadata = {
   title: { default: "QuestBac — Révise en jouant", template: "%s · QuestBac" },
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="fr">
       <body className="font-sans antialiased">
+        <Splash />
         <AppShell>{children}</AppShell>
       </body>
     </html>

@@ -131,7 +131,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Barre latérale (ordinateur) */}
       <aside className="qb-no-print sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-white/5 bg-slate-950/60 p-4 backdrop-blur lg:flex">
         <Link href="/" className="mb-8 flex items-center gap-2 px-2">
-          <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 text-xl shadow-lg shadow-violet-900/50">⚔️</span>
+          {/* eslint-disable-next-line @next/next/no-img-element -- icône de l'appli */}
+          <img src="/icon-192.png?v=2" alt="" width={40} height={40} className="h-10 w-10 rounded-xl shadow-lg shadow-violet-900/50" />
           <span className="text-xl font-black tracking-tight text-white">Quest<span className="text-violet-400">Bac</span></span>
         </Link>
         <nav className="flex flex-col gap-1">
@@ -175,7 +176,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="qb-no-print sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-white/5 bg-slate-950/70 px-4 backdrop-blur lg:justify-end">
           <Link href="/" className="flex items-center gap-2 lg:hidden">
-            <span className="text-xl">⚔️</span>
+            {/* eslint-disable-next-line @next/next/no-img-element -- icône de l'appli */}
+            <img src="/icon-192.png?v=2" alt="" width={30} height={30} className="h-[30px] w-[30px] rounded-lg" />
             <span className="text-lg font-black text-white">Quest<span className="text-violet-400">Bac</span></span>
           </Link>
           {hydrated && <Hud />}

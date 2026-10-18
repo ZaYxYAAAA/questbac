@@ -124,6 +124,16 @@ body {
 .qb-silhouette { filter: brightness(0) opacity(0.55); }
 
 @keyframes qb-spin { to { transform: rotate(360deg); } }
+/* ───── Écran de chargement ───── */
+@keyframes qb-splash-logo { 0% { transform: scale(0.6) rotate(-8deg); opacity: 0; } 60% { transform: scale(1.06) rotate(2deg); opacity: 1; } 100% { transform: scale(1) rotate(0); } }
+.qb-splash-logo { animation: qb-splash-logo 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes qb-splash-ring { 0%, 100% { opacity: 0.4; transform: scale(0.92); } 50% { opacity: 0.9; transform: scale(1.05); } }
+.qb-splash-ring { animation: qb-splash-ring 1.8s ease-in-out infinite; }
+@keyframes qb-splash-text { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.qb-splash-text { animation: qb-splash-text 0.5s 0.25s ease-out both; }
+@keyframes qb-splash-bar { from { left: -35%; } to { left: 100%; } }
+.qb-splash-bar { animation: qb-splash-bar 1.1s ease-in-out infinite; }
+
 @keyframes qb-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
 .qb-bob { animation: qb-bob 2.6s ease-in-out infinite; }
 .qb-frame-spin { animation: qb-spin 8s linear infinite; }
