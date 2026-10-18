@@ -200,8 +200,8 @@ body {
 
 /* ───── Fiche imprimable (A4) ───── */
 .qb-paper { width: 100%; max-width: 210mm; border-radius: 6px; overflow: hidden; }
-.qb-paper-body { padding: 12mm 13mm 9mm; }
-@media (max-width: 640px) { .qb-paper-body { padding: 18px 16px 14px; } }
+.qb-paper-body { padding: 12mm 13mm 9mm; --qb-mx: 7mm; }
+@media (max-width: 640px) { .qb-paper-body { padding: 18px 16px 14px; --qb-mx: 8px; } }
 /* Le Markdown est pensé pour le thème sombre : sur papier, on repasse en encre foncée. */
 .qb-paper .qb-md strong { color: #0f172a; }
 .qb-paper .qb-md a { color: #5b21b6; }
@@ -220,7 +220,7 @@ body {
   .qb-no-print { display: none !important; }
   main { padding: 0 !important; max-width: none !important; }
   .qb-paper { max-width: none; border-radius: 0; box-shadow: none !important; }
-  .qb-paper-body { padding: 0 2mm; }
+  .qb-paper-body { padding: 2mm 3mm 0 5mm; --qb-mx: 1.5mm; }
   /* Pages ordinaires imprimées depuis l'appli : texte foncé. Les fiches gardent leurs couleurs. */
   :not(.qb-paper) > .qb-md, :not(.qb-paper) > .qb-md * { color: #000; }
 }
