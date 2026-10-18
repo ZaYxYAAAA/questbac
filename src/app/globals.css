@@ -198,11 +198,31 @@ body {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
 
+/* ───── Fiche imprimable (A4) ───── */
+.qb-paper { width: 100%; max-width: 210mm; border-radius: 6px; overflow: hidden; }
+.qb-paper-body { padding: 12mm 13mm 9mm; }
+@media (max-width: 640px) { .qb-paper-body { padding: 18px 16px 14px; } }
+/* Le Markdown est pensé pour le thème sombre : sur papier, on repasse en encre foncée. */
+.qb-paper .qb-md strong { color: #0f172a; }
+.qb-paper .qb-md a { color: #5b21b6; }
+.qb-paper .qb-md code { background: #f1f5f9; }
+.qb-paper .qb-md blockquote { background: #f5f3ff; color: #334155; }
+.qb-paper .qb-md th, .qb-paper .qb-md td { border-color: #e2e8f0; }
+.qb-paper .qb-md th { background: #f5f3ff; color: #0f172a; }
+.qb-avoid-break { break-inside: avoid; page-break-inside: avoid; }
+
+@page { size: A4; margin: 10mm; }
 @media print {
-  body { background: #fff !important; color: #000 !important; }
+  html, body { background: #fff !important; background-image: none !important; color: #000 !important; min-height: 0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .qb-paper footer { margin-top: 8px; padding-top: 6px; break-before: avoid; page-break-before: avoid; }
+  .qb-paper section { margin-top: 14px; }
+  .qb-paper header { padding-bottom: 10px; }
   .qb-no-print { display: none !important; }
-  .qb-md, .qb-md * { color: #000 !important; }
-  .qb-md blockquote { background: #f3f0ff !important; }
+  main { padding: 0 !important; max-width: none !important; }
+  .qb-paper { max-width: none; border-radius: 0; box-shadow: none !important; }
+  .qb-paper-body { padding: 0 2mm; }
+  /* Pages ordinaires imprimées depuis l'appli : texte foncé. Les fiches gardent leurs couleurs. */
+  :not(.qb-paper) > .qb-md, :not(.qb-paper) > .qb-md * { color: #000; }
 }
 
 @keyframes qb-slide-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }

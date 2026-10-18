@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import clsx from "clsx";
-import { BookOpenCheck, ChevronDown, ChevronLeft, Eye, EyeOff, FlaskConical, Lightbulb, Play, TriangleAlert } from "lucide-react";
+import { BookOpenCheck, ChevronDown, ChevronLeft, Eye, EyeOff, FlaskConical, Lightbulb, Play, Printer, TriangleAlert } from "lucide-react";
 import { FlashDeck } from "@/components/game/FlashDeck";
 import { LabSheet } from "@/components/game/LabSheet";
 import { Markdown } from "@/components/ui/Markdown";
@@ -82,6 +82,11 @@ export function FicheView({ chapter }: { chapter: Chapter }) {
             <Link href={`/mission/${chapter.id}`} className="qb-press inline-flex items-center gap-1.5 rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-900">
               <Play size={15} fill="currentColor" /> S&apos;entraîner
             </Link>
+            {fiche && (
+              <Link href={`/fiches/${chapter.id}/imprimer`} className="qb-press inline-flex items-center gap-1.5 rounded-xl bg-black/30 px-4 py-2 text-sm font-bold text-white ring-1 ring-white/25">
+                <Printer size={15} /> Version à imprimer
+              </Link>
+            )}
             {chapter.lab && (
               <button type="button" onClick={() => setLab(true)} className="qb-press inline-flex items-center gap-1.5 rounded-xl bg-black/30 px-4 py-2 text-sm font-bold text-white ring-1 ring-white/25">
                 <FlaskConical size={15} /> Ouvrir le labo
