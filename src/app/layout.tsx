@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     "Application de révision gamifiée pour la Seconde, la Première et la Terminale : missions, boss, classements, mode classé, duels et labos de maths interactifs.",
   applicationName: "QuestBac",
   appleWebApp: { capable: true, title: "QuestBac", statusBarStyle: "black-translucent" },
-  icons: { icon: "/icon-192.png?v=2" },
+  icons: { icon: [{ url: "/favicon-48.png?v=3", sizes: "48x48" }, { url: "/icon-192.png?v=3", sizes: "192x192" }] },
 };
 
 export const viewport: Viewport = {

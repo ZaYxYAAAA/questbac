@@ -12,10 +12,10 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#050816",
     lang: "fr",
     icons: [
-      // ?v=2 : nouvelle icône (le téléphone garde l'ancienne en cache sinon).
-      { src: "/icon-192.png?v=2", sizes: "192x192", type: "image/png" },
-      { src: "/icon-512.png?v=2", sizes: "512x512", type: "image/png" },
-      { src: "/icon-maskable.png?v=2", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      // ?v=3 : nouvelle icône (le téléphone garde l'ancienne en cache sinon).
+      { src: "/icon-192.png?v=3", sizes: "192x192", type: "image/png" },
+      { src: "/icon-512.png?v=3", sizes: "512x512", type: "image/png" },
+      { src: "/icon-maskable.png?v=3", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
   };
 }

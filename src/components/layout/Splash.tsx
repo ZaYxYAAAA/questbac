@@ -51,7 +51,7 @@ export function Splash() {
       <div className="relative">
         <span className="qb-splash-ring absolute -inset-6 rounded-[44px] bg-violet-500/30 blur-2xl" />
         {/* eslint-disable-next-line @next/next/no-img-element -- icône locale, affichée avant le chargement de l'appli */}
-        <img src="/icon-512.png?v=2" alt="" width={120} height={120} className="qb-splash-logo relative h-[120px] w-[120px] rounded-[30px] shadow-2xl shadow-violet-950" />
+        <img src="/icon-512.png?v=3" alt="" width={120} height={120} className="qb-splash-logo relative h-[120px] w-[120px] rounded-[30px] shadow-2xl shadow-violet-600/40" />
       </div>
       <div className="qb-splash-text relative text-center">
         <p className="text-3xl font-black tracking-tight text-white">
