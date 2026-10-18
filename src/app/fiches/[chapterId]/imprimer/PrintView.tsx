@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
-import { ChevronLeft, Palette, Printer } from "lucide-react";
+import { Check, ChevronLeft, Palette, Printer } from "lucide-react";
 import { FichePaper, type PaperOptions, quizFrom } from "@/components/game/FichePaper";
 import { subjectMeta } from "@/lib/content/curriculum";
 import { ficheFor, ficheTexts } from "@/lib/content/fiches";
@@ -63,18 +63,7 @@ export function PrintView({ chapter }: { chapter: Chapter }) {
         <Link href={`/fiches/${chapter.id}`} className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-white">
           <ChevronLeft size={16} /> Fiche
         </Link>
-        <div className="ml-auto flex flex-wrap items-center gap-1.5">
-          {TOGGLES.map(({ key, label }) => (
-            <button
-              key={key}
-              type="button"
-              aria-pressed={options[key]}
-              onClick={() => setOptions((o) => ({ ...o, [key]: !o[key] }))}
-              className={clsx("rounded-full px-3 py-1.5 text-xs font-bold transition", options[key] ? "bg-white text-slate-900" : "bg-white/10 text-slate-400")}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="ml-auto">
           <button type="button" onClick={() => window.print()} className="qb-press inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-500">
             <Printer size={16} /> Imprimer / PDF
           </button>
@@ -82,7 +71,32 @@ export function PrintView({ chapter }: { chapter: Chapter }) {
       </div>
 
       <section className="qb-no-print mx-auto max-w-[210mm] space-y-3 rounded-2xl border border-white/10 bg-slate-900/70 p-4" aria-label="Personnaliser la fiche">
-        <p className="flex items-center gap-2 text-sm font-black text-white"><Palette size={16} className="text-violet-300" /> Personnaliser la fiche</p>
+        <div>
+          <p className="flex items-center gap-2 text-sm font-black text-white"><Palette size={16} className="text-violet-300" /> Personnaliser la fiche</p>
+          <p className="mt-0.5 text-xs text-slate-400">Choisis ce qui apparaît et le style : l&apos;aperçu en dessous change en direct.</p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <span className="w-20 text-xs font-bold uppercase tracking-wider text-slate-500">Contenu</span>
+          <div className="flex flex-wrap gap-2">
+            {TOGGLES.map(({ key, label }) => {
+              const on = options[key];
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  role="checkbox"
+                  aria-checked={on}
+                  onClick={() => setOptions((o) => ({ ...o, [key]: !o[key] }))}
+                  className={clsx("flex items-center gap-1.5 rounded-full py-1 pl-1.5 pr-2.5 text-xs font-semibold transition", on ? "bg-white text-slate-900" : "bg-white/5 text-slate-400 hover:bg-white/10")}
+                >
+                  <span className={clsx("grid h-4 w-4 place-items-center rounded", on ? "bg-violet-600 text-white" : "ring-1 ring-slate-500")}>{on && <Check size={12} strokeWidth={3} />}</span>
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <span className="w-20 text-xs font-bold uppercase tracking-wider text-slate-500">Couleurs</span>
@@ -152,7 +166,7 @@ export function PrintView({ chapter }: { chapter: Chapter }) {
           </div>
         </div>
         <p className="text-xs text-slate-500">
-          Ton style est gardé pour toutes tes fiches. Sans corrections, les exemples deviennent des exercices avec des lignes ; pour un PDF, choisis « Enregistrer en PDF » comme imprimante.
+          Ton style est gardé pour toutes tes fiches. Sans corrections, les exemples deviennent des exercices avec des lignes à remplir. Pour un PDF, choisis « Enregistrer en PDF » comme imprimante.
         </p>
       </section>
 
