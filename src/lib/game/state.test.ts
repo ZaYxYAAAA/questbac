@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { acknowledgeLeague, applyActivity, applyDailyClaim, applySession, createInitialData, refreshPeriods } from "./state";
 import { bossState, keepBossProgress, triesLeft } from "./boss-rules";
 import { startBossFight, tierUnlocked } from "./state";
+import { dayKey } from "./progression";
+import { dailyQuests } from "./quests";
 
 const now = new Date(2026, 9, 12, 10);
 const perfect = { correct: 5, total: 5, maxCombo: 5, durationMs: 30_000, answers: [] };
@@ -69,9 +71,39 @@ describe("applySession", () => {
     expect(startBossFight(d, "sphinx-fonctions", later)).toBeNull();
   });
 
+  it("boss : un combat long (explications lues) compte un seul essai, et sa victoire", () => {
+    let d = createInitialData(now);
+    for (let i = 0; i < 3; i++) d = startBossFight(d, "sphinx-fonctions", now)!;
+    const later = new Date(now.getTime() + 45 * 60_000);
+    const win = applySession(d, { kind: "boss", bossId: "sphinx-fonctions", subject: "maths", result: perfect, won: true, xpReward: 250, rpReward: 0, bossHpLeft: 0 }, later);
+    expect(win.data.bosses["sphinx-fonctions"]).toMatchObject({ victories: 1, tries: 3 });
+    expect(win.summary.xpGained).toBeGreaterThan(0);
+    // 1er essai long et perdu : toujours 1 essai compté, pas 2.
+    const first = startBossFight(createInitialData(now), "derivatus", now)!;
+    const lost = applySession(first, { kind: "boss", bossId: "derivatus", subject: "maths", result: perfect, won: false, xpReward: 350, rpReward: 0, bossHpLeft: 0.4 }, later);
+    expect(lost.data.bosses.derivatus.tries).toBe(1);
+    expect(triesLeft(lost.data.bosses.derivatus, later.getTime())).toBe(2);
+  });
+
+  it("un boost plus faible gagné pendant un boost ×2 n'est pas annoncé comme activé", () => {
+    const boost = { mult: 2, until: now.getTime() + 10 * 60_000, source: "boss" as const };
+    const d0 = { ...createInitialData(now), boost, daily: { lastClaim: "2026-10-11", count: 6 } };
+    const claimed = applyDailyClaim(d0, now)!;
+    expect(claimed.reward.day).toBe(7);
+    expect(claimed.data.boost).toEqual(boost);
+    expect(claimed.summary.lines.some((l) => l.label.includes("activé"))).toBe(false);
+    expect(claimed.summary.lines).toContainEqual({ label: "Boost XP ×1,5 sans effet : un boost ×2 est déjà actif", value: "" });
+    // Sans boost en cours, il est bien activé.
+    const fresh = applyDailyClaim({ ...d0, boost: null }, now)!;
+    expect(fresh.summary.lines).toContainEqual({ label: "🚀 Boost XP ×1,5 activé", value: "1 h" });
+  });
+
   it("le serveur ne rend jamais d'essais de boss", () => {
     const merged = keepBossProgress({ derivatus: { victories: 0, attempts: 5, tries: 2 } }, { derivatus: { victories: 0, attempts: 1, tries: 0 } });
     expect(merged.derivatus).toMatchObject({ tries: 2, attempts: 5 });
+    // Le meilleur temps d'un boss vaincu n'est pas effacé par une version qui n'en a pas.
+    const timed = keepBossProgress({ derivatus: { victories: 1, attempts: 2, tries: 2, bestTimeMs: 41_000 } }, { derivatus: { victories: 0, attempts: 1, tries: 1, bestTimeMs: null } });
+    expect(timed.derivatus).toMatchObject({ victories: 1, bestTimeMs: 41_000 });
   });
 
   it("une mission rejouée le même jour rapporte de moins en moins", () => {
@@ -87,6 +119,30 @@ describe("applySession", () => {
     expect(gains[2]).toMatch(/^−/);
     const tomorrow = new Date(now.getTime() + 86_400_000);
     expect(applySession(d, play, tomorrow).summary.lines.some((l) => l.label.startsWith("Mission déjà jouée"))).toBe(false);
+  });
+
+  it("n'affiche plus une série interrompue, qui repart à 1", () => {
+    const d0 = { ...createInitialData(now), streak: { count: 12, lastDay: "2026-10-12", best: 12 } };
+    // Le lendemain : la série tient encore (il reste la journée pour réviser).
+    expect(refreshPeriods(d0, new Date(2026, 9, 13, 10)).streak.count).toBe(12);
+    // Deux jours plus tard : elle est cassée, le meilleur score reste.
+    const broken = refreshPeriods(d0, new Date(2026, 9, 14, 10));
+    expect(broken.streak).toEqual({ count: 0, lastDay: "2026-10-12", best: 12 });
+    expect(refreshPeriods(broken, new Date(2026, 9, 14, 10))).toBe(broken);
+    const back = applyActivity(broken, { kind: "lab", labId: "trigo" }, new Date(2026, 9, 14, 11)).data;
+    expect(back.streak).toEqual({ count: 1, lastDay: "2026-10-14", best: 12 });
+  });
+
+  it("la quête « Explore 3 labos » demande 3 labos différents", () => {
+    // Un jour où la quête lab-3 est tirée.
+    const day = Array.from({ length: 60 }, (_, i) => new Date(2026, 9, 1 + i, 10)).find((d) => dailyQuests(dayKey(d)).some((q) => q.id === "lab-3"))!;
+    let d = createInitialData(day);
+    for (let i = 0; i < 3; i++) d = applyActivity(d, { kind: "lab", labId: "trigo" }, day).data;
+    expect(d.quests.progress["lab-3"]).toBe(1);
+    expect(d.quests.done).not.toContain("lab-3");
+    d = applyActivity(d, { kind: "lab", labId: "suites" }, day).data;
+    d = applyActivity(d, { kind: "lab", labId: "pendule" }, day).data;
+    expect(d.quests.done).toContain("lab-3");
   });
 
   it("réinitialise les quêtes quand le jour change", () => {

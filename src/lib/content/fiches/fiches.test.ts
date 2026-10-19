@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CHAPTERS, subjectMeta } from "@/lib/content/curriculum";
 import { chapterMemos } from "@/lib/content/generated";
 import { ficheFor, ficheIds, ficheTexts, parseFiches } from "./index";
+import { DEFAULT_LOOK, parseLook } from "./look";
 import { notationsIn } from "./notations";
 
 describe("fiches de révision", () => {
@@ -39,6 +40,21 @@ describe("fiches de révision", () => {
     const fluides = notationsIn(ficheTexts(ficheFor("pc-1-fluides")!)).map((n) => n.symbol);
     expect(fluides).not.toContain("P_A(B)");
     expect(notationsIn(ficheTexts(ficheFor("maths-2-probas-cond")!)).map((n) => n.symbol)).toContain("P_A(B)");
+  });
+  it("le lexique donne le sens propre à la matière", () => {
+    const meanings = (id: string) => notationsIn(ficheTexts(ficheFor(id)!));
+    // En optique, f' est la distance focale, pas une dérivée.
+    const lentilles = meanings("pc-1-lentilles").filter((n) => n.symbol === "f'");
+    expect(lentilles).toHaveLength(1);
+    expect(lentilles[0].meaning).toContain("focale");
+    expect(meanings("maths-1-derivation").find((n) => n.symbol === "f'")?.meaning).toContain("dérivée");
+    // La flèche d'une équation de réaction n'est pas « tend vers ».
+    expect(meanings("pc-1-redox").map((n) => n.symbol)).not.toContain(String.raw`\to`);
+    expect(meanings("svt-2-metabolisme").some((n) => n.meaning.includes("réaction"))).toBe(true);
+    expect(meanings("maths-t-limites").map((n) => n.symbol)).toContain(String.raw`\to`);
+    // v = d/t n'est pas une dérivée ; d[R]/dt en est une.
+    expect(meanings("maths-2-automatismes").map((n) => n.symbol)).not.toContain(String.raw`\dfrac{dx}{dt}`);
+    expect(meanings("pc-t-cinetique").map((n) => n.symbol)).toContain(String.raw`\dfrac{dx}{dt}`);
   });
   it("les banques de connaissances donnent des cartes mémoire", () => {
     expect(chapterMemos("cg-capitales").length).toBeGreaterThan(80);
@@ -84,5 +100,18 @@ describe("formules des fiches", () => {
       }
     }
     expect(errors).toEqual([]);
+  });
+});
+
+describe("apparence des fiches imprimables", () => {
+  it("relit un choix valide et ignore les valeurs inconnues", () => {
+    expect(parseLook({ theme: "foret", font: "stylo", paper: "seyes" })).toEqual({ theme: "foret", font: "stylo", paper: "seyes" });
+    expect(parseLook({ theme: "arc-en-ciel", font: 3 })).toEqual(DEFAULT_LOOK);
+    expect(parseLook(null)).toEqual(DEFAULT_LOOK);
+  });
+
+  it("refuse les clés héritées du prototype (localStorage corrompu)", () => {
+    expect(parseLook({ theme: "constructor", font: "toString", paper: "__proto__" })).toEqual(DEFAULT_LOOK);
+    expect(parseLook({ theme: "hasOwnProperty", font: "valueOf", paper: "isPrototypeOf" })).toEqual(DEFAULT_LOOK);
   });
 });

@@ -2,7 +2,7 @@
  * Maths, Terminale (spécialité) : questions supplémentaires couvrant toutes les
  * notions du programme, en plus de `maths-terminale.ts`.
  */
-import { type Generator, cards, claims, frac, fracTex, int, mcq, nonZero, numeric, oneOf, par, pick, poly, shift, tex, tf } from "./kit";
+import { type Generator, type Rand, cards, claims, frac, fracTex, int, mcq, nonZero, numeric, oneOf, par, pick, poly, shift, term, tex, tf } from "./kit";
 
 /** Équation de plan $ax + by + cz + d = 0$ bien écrite (termes nuls omis). */
 const plane3 = (a: number, b: number, c: number, d: number) => {
@@ -25,13 +25,14 @@ const recurrence: Generator[] = [
   (r) => {
     const a = pick(r, [0.5, 0.2, 0.25, 0.8]), l = int(r, -5, 9);
     const b = Math.round(l * (1 - a) * 100) / 100;
-    return numeric(`$u_{n+1} = ${tex(a)}u_n ${b < 0 ? "-" : "+"} ${tex(Math.abs(b))}$. Si $(u_n)$ converge, quelle est sa limite ?`, l,
-      `La limite $\\ell$ vérifie $\\ell = ${tex(a)}\\ell + ${par(b)}$ (point fixe), soit $${tex(1 - a)}\\ell = ${tex(b)}$ et $\\ell = ${l}$.`);
+    return numeric(`$u_{n+1} = ${tex(a)}u_n${b === 0 ? "" : ` ${b < 0 ? "-" : "+"} ${tex(Math.abs(b))}`}$. Si $(u_n)$ converge, quelle est sa limite ?`, l,
+      `La limite $\\ell$ vérifie $\\ell = ${tex(a)}\\ell${term(b)}$ (point fixe), soit $${tex(1 - a)}\\ell = ${tex(b)}$ et $\\ell = ${l}$.`);
   },
   (r) => {
     const [n, d] = pick(r, [[1, 2], [1, 5], [-1, 2], [1, 4], [2, 3]] as const);
-    const q = fracTex(n, d), qp = n < 0 ? `\\left(${q}\\right)` : q;
-    return mcq(r, `$\\displaystyle\\lim_{n \\to +\\infty} \\left(1 + ${qp} + ${qp}^2 + \\dots + ${qp}^n\\right) = \\;?$`, frac(d, d - n), [frac(d, d + n), "$+\\infty$", "$1$"],
+    // Puissances d'une fraction toujours entre parenthèses : « \dfrac{2}{3}^2 » se lirait 2/(3²).
+    const q = fracTex(n, d), qp = `\\left(${q}\\right)`, q1 = n < 0 ? qp : q;
+    return mcq(r, `$\\displaystyle\\lim_{n \\to +\\infty} \\left(1 + ${q1} + ${qp}^2 + \\dots + ${qp}^n\\right) = \\;?$`, frac(d, d - n), [frac(d, d + n), "$+\\infty$", "$1$"],
       `Somme géométrique $\\dfrac{1 - q^{n+1}}{1 - q}$ et $q^{n+1} \\to 0$ car $-1 < q < 1$ : limite $\\dfrac{1}{1 - q} = ${fracTex(d, d - n)}$.`);
   },
   (r) =>
@@ -74,15 +75,15 @@ const limites: Generator[] = [
   (r) => {
     const a = int(r, -5, 5);
     return oneOf(r, [
-      () => mcq(r, `$${LIM(`x \\to ${a}^+`)} \\dfrac{1}{${shift(a)}} = \\;?$`, "$+\\infty$", ["$-\\infty$", "$0$", `$${a}$`], `Pour $x > ${a}$, $${shift(a)} \\to 0^+$ : le quotient est positif et grandit sans limite.`),
-      () => mcq(r, `$${LIM(`x \\to ${a}^-`)} \\dfrac{1}{${shift(a)}} = \\;?$`, "$-\\infty$", ["$+\\infty$", "$0$", `$${a}$`], `Pour $x < ${a}$, $${shift(a)} \\to 0^-$ : le quotient est négatif.`),
+      () => mcq(r, `$${LIM(`x \\to ${a}^+`)} \\dfrac{1}{${shift(a)}} = \\;?$`, "$+\\infty$", ["$-\\infty$", "$0$", `$${a}$`, "pas de limite"], `Pour $x > ${a}$, $${shift(a)} \\to 0^+$ : le quotient est positif et grandit sans limite.`),
+      () => mcq(r, `$${LIM(`x \\to ${a}^-`)} \\dfrac{1}{${shift(a)}} = \\;?$`, "$-\\infty$", ["$+\\infty$", "$0$", `$${a}$`, "pas de limite"], `Pour $x < ${a}$, $${shift(a)} \\to 0^-$ : le quotient est négatif.`),
       () => mcq(r, `$${LIM(`x \\to ${a}`)} \\dfrac{1}{(${shift(a)})^2} = \\;?$`, "$+\\infty$", ["$-\\infty$", "$0$", "pas de limite"], "Un carré est positif : le quotient tend vers $+\\infty$ des deux côtés."),
     ]);
   },
   (r) => {
     const a = nonZero(r, 4), b = int(r, -5, 5);
     return oneOf(r, [
-      () => mcq(r, `$${LIM("x \\to -\\infty")} (${poly([a, 0, b, 1])}) = \\;?$`, a > 0 ? "$-\\infty$" : "$+\\infty$", [a > 0 ? "$+\\infty$" : "$-\\infty$", "$0$", `$${a}$`], `Le terme de plus haut degré $${a}x^3$ l'emporte, et $x^3 \\to -\\infty$.`),
+      () => mcq(r, `$${LIM("x \\to -\\infty")} (${poly([a, 0, b, 1])}) = \\;?$`, a > 0 ? "$-\\infty$" : "$+\\infty$", [a > 0 ? "$+\\infty$" : "$-\\infty$", "$0$", `$${a}$`], `Le terme de plus haut degré $${poly([a, 0, 0, 0])}$ l'emporte, et $x^3 \\to -\\infty$.`),
       () => mcq(r, `$${LIM("x \\to +\\infty")} (\\sqrt{x + ${Math.abs(b) + 1}} - \\sqrt{x}) = \\;?$`, "$0$", ["$+\\infty$", "$1$", `$${Math.abs(b) + 1}$`], `Quantité conjuguée : $\\dfrac{${Math.abs(b) + 1}}{\\sqrt{x + ${Math.abs(b) + 1}} + \\sqrt{x}} \\to 0$.`),
       () => mcq(r, `$${LIM("x \\to +\\infty")} e^{-x^2} = \\;?$`, "$0$", ["$+\\infty$", "$1$", "$-\\infty$"], "Composée : $-x^2 \\to -\\infty$ et $e^X \\to 0$ quand $X \\to -\\infty$."),
       () => mcq(r, `$${LIM("x \\to +\\infty")} \\ln\\left(1 + \\dfrac{1}{x}\\right) = \\;?$`, "$0$", ["$+\\infty$", "$1$", "$-\\infty$"], "$1 + \\frac1x \\to 1$ et $\\ln 1 = 0$."),
@@ -103,12 +104,11 @@ const continuite: Generator[] = [
     // Variations : croissante, décroissante, croissante
     const xs = [0, 2, 5, 8];
     const table = `| $x$ | $${xs[0]}$ | | $${xs[1]}$ | | $${xs[2]}$ | | $${xs[3]}$ |\n|---|---|---|---|---|---|---|---|\n| $f$ | $${v[0]}$ | ↗ | $${v[1]}$ | ↘ | $${v[2]}$ | ↗ | $${v[3]}$ |`;
-    let count = 0;
+    // Solutions : un changement de signe strict par intervalle de monotonie, plus les valeurs nulles du tableau.
+    let count = v.filter((y) => y === 0).length;
     for (let i = 0; i < 3; i++) if ((v[i] < 0 && v[i + 1] > 0) || (v[i] > 0 && v[i + 1] < 0)) count++;
-    const zeros = v.filter((y) => y === 0).length;
-    if (zeros) return numeric(`$f$ continue :\n\n${table}\n\nValeur de $f(${xs[v.indexOf(0)]})$ ?`, 0, "On la lit dans le tableau.");
     return numeric(`$f$ est continue et ses variations sont :\n\n${table}\n\nNombre de solutions de $f(x) = 0$ sur $[0\\,;\\,8]$ ?`, count,
-      `Sur chaque intervalle où $f$ est strictement monotone et change de signe, le TVI (cas monotone) donne une unique solution : ${count} en tout.`);
+      `Sur chaque intervalle où $f$ est strictement monotone et change de signe, le TVI (cas monotone) donne une unique solution${v.includes(0) ? ` ; une valeur nulle du tableau est aussi une solution` : ""} : ${count} en tout.`);
   },
   (r) => {
     const a = int(r, 0, 3), len = pick(r, [1, 2, 4]), n = int(r, 2, 5);
@@ -116,9 +116,9 @@ const continuite: Generator[] = [
       `Chaque étape divise la longueur par 2 : $\\dfrac{${len}}{2^{${n}}} = ${tex(len / 2 ** n, 5)}$.`, undefined, 0.0001);
   },
   (r) => {
-    const l = int(r, 2, 6), a = int(r, 1, l), b = l * l - a * l;
+    const l = int(r, 2, 6), a = int(r, 1, l - 1), b = l * l - a * l;
     return numeric(`$u_{n+1} = \\sqrt{${a === 1 ? "" : a}u_n + ${b}}$ et $(u_n)$ converge vers $\\ell > 0$. Que vaut $\\ell$ ?`, l,
-      `$f(x) = \\sqrt{${a === 1 ? "" : a}x + ${b}}$ est continue, donc $\\ell = \\sqrt{${a}\\ell + ${b}}$ : $\\ell^2 - ${a}\\ell - ${b} = 0$, dont la solution positive est $${l}$.`);
+      `$f(x) = \\sqrt{${a === 1 ? "" : a}x + ${b}}$ est continue, donc $\\ell = \\sqrt{${a === 1 ? "" : a}\\ell + ${b}}$ : $\\ell^2 - ${a === 1 ? "" : a}\\ell - ${b} = 0$, dont la solution positive est $${l}$.`);
   },
   claims([
     ["Toute fonction continue est dérivable.", false, "La valeur absolue est continue en 0 mais pas dérivable en 0."],
@@ -134,7 +134,7 @@ const convexite: Generator[] = [
   (r) => {
     const a = nonZero(r, 3);
     return oneOf(r, [
-      () => mcq(r, `Dérivée de $e^{${a === 1 ? "" : a === -1 ? "-" : a}x^2}$ ?`, `$${2 * a}xe^{${a === 1 ? "" : a === -1 ? "-" : a}x^2}$`, [`$e^{${2 * a}x}$`, `$${a}x^2e^{${a === 1 ? "" : a === -1 ? "-" : a}x^2 - 1}$`, `$e^{${a === 1 ? "" : a === -1 ? "-" : a}x^2}$`], "$(e^u)' = u'e^u$ avec $u = " + (a === 1 ? "" : a === -1 ? "-" : String(a)) + "x^2$."),
+      () => mcq(r, `Dérivée de $e^{${a === 1 ? "" : a === -1 ? "-" : a}x^2}$ ?`, `$${2 * a}xe^{${a === 1 ? "" : a === -1 ? "-" : a}x^2}$`, [`$e^{${2 * a}x}$`, `$${a === 1 ? "" : a === -1 ? "-" : a}x^2e^{${a === 1 ? "" : a === -1 ? "-" : a}x^2 - 1}$`, `$e^{${a === 1 ? "" : a === -1 ? "-" : a}x^2}$`], "$(e^u)' = u'e^u$ avec $u = " + (a === 1 ? "" : a === -1 ? "-" : String(a)) + "x^2$."),
       () => mcq(r, `Dérivée de $\\ln(x^2 + ${Math.abs(a)})$ ?`, `$\\dfrac{2x}{x^2 + ${Math.abs(a)}}$`, [`$\\dfrac{1}{x^2 + ${Math.abs(a)}}$`, `$\\dfrac{2x}{x}$`, `$2x\\ln(x^2 + ${Math.abs(a)})$`], "$(\\ln u)' = \\dfrac{u'}{u}$."),
       () => mcq(r, `Dérivée de $\\sqrt{x^2 + ${Math.abs(a)}}$ ?`, `$\\dfrac{x}{\\sqrt{x^2 + ${Math.abs(a)}}}$`, [`$\\dfrac{1}{2\\sqrt{x^2 + ${Math.abs(a)}}}$`, `$\\dfrac{2x}{\\sqrt{x^2 + ${Math.abs(a)}}}$`, `$2x\\sqrt{x^2 + ${Math.abs(a)}}$`], "$(\\sqrt u)' = \\dfrac{u'}{2\\sqrt u} = \\dfrac{2x}{2\\sqrt{\\ldots}}$."),
     ]);
@@ -142,8 +142,8 @@ const convexite: Generator[] = [
   (r) => {
     const k = nonZero(r, 4);
     return oneOf(r, [
-      () => mcq(r, `$f(x) = ${poly([1, -3 * k, 0, 1])}$. Sur quel intervalle $f$ est-elle convexe ?`, `$[${k}\\,;\\,+\\infty[$`, [`$]-\\infty\\,;\\,${k}]$`, "$\\mathbb{R}$", `$[${-k}\\,;\\,+\\infty[$`], `$f''(x) = 6x - ${par(6 * k)}$, positive pour $x \\geq ${k}$.`),
-      () => numeric(`$f(x) = (x ${k < 0 ? "-" : "+"} ${Math.abs(k)})e^{x}$. Abscisse du point d'inflexion ?`, -k - 2, `$f'(x) = (x + ${par(k + 1)})e^x$ et $f''(x) = (x + ${par(k + 2)})e^x$, qui s'annule en changeant de signe en $${-k - 2}$.`),
+      () => mcq(r, `$f(x) = ${poly([1, -3 * k, 0, 1])}$. Sur quel intervalle $f$ est-elle convexe ?`, `$[${k}\\,;\\,+\\infty[$`, [`$]-\\infty\\,;\\,${k}]$`, "$\\mathbb{R}$", `$[${-k}\\,;\\,+\\infty[$`], `$f''(x) = ${poly([6, -6 * k])}$, positive pour $x \\geq ${k}$.`),
+      () => numeric(`$f(x) = (x ${k < 0 ? "-" : "+"} ${Math.abs(k)})e^{x}$. Abscisse du point d'inflexion ?`, -k - 2, `$f'(x) = ${k === -1 ? "x" : `(${poly([1, k + 1])})`}e^x$ et $f''(x) = ${k === -2 ? "x" : `(${poly([1, k + 2])})`}e^x$, qui s'annule en changeant de signe en $${-k - 2}$.`),
     ]);
   },
   claims([
@@ -173,7 +173,10 @@ const ln: Generator[] = [
   (r) => {
     const k = int(r, 1, 4);
     return oneOf(r, [
-      () => mcq(r, `Solutions de $\\ln x > ${k}$ ?`, `$]e^{${k}}\\,;\\,+\\infty[$`, [`$]${k}\\,;\\,+\\infty[$`, `$]0\\,;\\,e^{${k}}[$`, `$]\\ln ${k}\\,;\\,+\\infty[$`], `$\\ln x > ${k} = \\ln e^{${k}} \\iff x > e^{${k}}$ (fonction croissante).`),
+      () => {
+        const ek = k === 1 ? "e" : `e^{${k}}`;
+        return mcq(r, `Solutions de $\\ln x > ${k}$ ?`, `$]${ek}\\,;\\,+\\infty[$`, [`$]${k}\\,;\\,+\\infty[$`, `$]0\\,;\\,${ek}[$`, k === 1 ? `$]-\\infty\\,;\\,e[$` : `$]\\ln ${k}\\,;\\,+\\infty[$`], `$\\ln x > ${k} = \\ln ${ek} \\iff x > ${ek}$ (fonction strictement croissante).`);
+      },
       () => mcq(r, "Solutions de $\\ln x < 0$ ?", "$]0\\,;\\,1[$", ["$]-\\infty\\,;\\,1[$", "$]-\\infty\\,;\\,0[$", "$]1\\,;\\,+\\infty[$"], "$\\ln x < \\ln 1$ et $\\ln$ n'est définie que pour $x > 0$."),
       () => mcq(r, `Ensemble de définition de $\\ln(${k} - x)$ ?`, `$]-\\infty\\,;\\,${k}[$`, [`$]${k}\\,;\\,+\\infty[$`, "$\\mathbb{R}$", `$[${k}\\,;\\,+\\infty[$`], `Il faut $${k} - x > 0$.`),
     ]);
@@ -185,10 +188,19 @@ const ln: Generator[] = [
   },
   (r) =>
     oneOf(r, [
-      () => numeric("$\\ln\\left(e^{3}\\sqrt{e}\\right) = \\;?$", 3.5, "$\\ln e^3 + \\ln e^{1/2} = 3 + 0{,}5$."),
-      () => numeric("$\\ln(e^{2}) - 2\\ln(e) = \\;?$", 0, "$2 - 2 = 0$."),
-      () => numeric("$\\dfrac{\\ln 8}{\\ln 2} = \\;?$", 3, "$\\ln 8 = \\ln 2^3 = 3\\ln 2$."),
-      () => numeric("$\\ln(\\sqrt{e}) = \\;?$", 0.5, "$\\sqrt e = e^{1/2}$."),
+      () => {
+        const n = int(r, 2, 6);
+        return numeric(`$\\ln\\left(\\dfrac{e^{${n}}}{\\sqrt{e}}\\right) = \\;?$`, n - 0.5, `$\\ln e^{${n}} - \\ln e^{1/2} = ${n} - 0{,}5$.`);
+      },
+      () => {
+        const [b, n] = pick(r, [[2, 5], [2, 7], [3, 4], [5, 3], [2, 10], [3, 5]] as const);
+        return numeric(`$\\dfrac{\\ln ${b ** n}}{\\ln ${b}} = \\;?$`, n, `$${b ** n} = ${b}^{${n}}$, donc $\\ln ${b ** n} = ${n}\\ln ${b}$.`);
+      },
+      () => {
+        const [a, b] = pick(r, [[2, 3], [4, 5], [3, 7], [5, 2]] as const);
+        return mcq(r, `$\\ln ${a * a * b} - 2\\ln ${a} = \\;?$`, `$\\ln ${b}$`, [`$\\ln ${a * a * b - 2 * a}$`, `$\\ln ${a * b}$`, `$2\\ln ${b}$`, `$\\ln ${a * a * b - a * a}$`], `$2\\ln ${a} = \\ln ${a * a}$ et $\\ln ${a * a * b} - \\ln ${a * a} = \\ln\\dfrac{${a * a * b}}{${a * a}} = \\ln ${b}$.`);
+      },
+      () => numeric("$\\ln(\\sqrt{e}) + \\ln\\left(\\dfrac{1}{e^{2}}\\right) = \\;?$", -1.5, "$\\dfrac12 - 2 = -1{,}5$."),
     ]),
   (r) => {
     const k = pick(r, [0.1, 0.2, 0.5, 0.05]);
@@ -272,11 +284,17 @@ const integrale: Generator[] = [
 
 // ───────────── Loi binomiale, somme de variables ─────────────
 
+/** Variance V et écart δ pour Bienaymé-Tchebychev : V < δ² (majorant utile, < 1) et V/δ² décimal. */
+const btCase = (r: Rand): [number, number] => {
+  const d = pick(r, [2, 4, 5, 10]);
+  return [d === 2 ? int(r, 1, 3) : d === 4 ? 2 * int(r, 1, 7) : d === 5 ? int(r, 1, 20) : int(r, 5, 60), d];
+};
+
 const binomiale: Generator[] = [
   (r) => {
     const [p, pq] = pick(r, [[0.2, 0.8], [0.1, 0.9], [0.3, 0.7], [0.5, 0.5]] as const), n = pick(r, [3, 4]), k = int(r, 1, n - 1);
     const val = binom(n, k) * p ** k * pq ** (n - k);
-    return numeric(`$X \\sim \\mathcal{B}(${n}\\,;\\,${tex(p)})$. $P(X = ${k})$ (valeur exacte) ?`, val, `$\\dbinom{${n}}{${k}} \\times ${tex(p)}^{${k}} \\times ${tex(pq)}^{${n - k}} = ${binom(n, k)} \\times ${tex(p ** k, 6)} \\times ${tex(pq ** (n - k), 6)} = ${tex(val, 6)}$.`, undefined, 0.0001);
+    return numeric(`$X \\sim \\mathcal{B}(${n}\\,;\\,${tex(p)})$. $P(X = ${k})$ (valeur exacte) ?`, val, `$\\dbinom{${n}}{${k}} \\times ${tex(p)}${k === 1 ? "" : `^{${k}}`} \\times ${tex(pq)}${n - k === 1 ? "" : `^{${n - k}}`} = ${binom(n, k)} \\times ${tex(p ** k, 6)} \\times ${tex(pq ** (n - k), 6)} = ${tex(val, 6)}$.`, undefined, 0.0001);
   },
   (r) => {
     const [p, n] = pick(r, [[0.5, 5], [0.1, 29], [0.2, 14], [0.3, 9]] as const);
@@ -289,9 +307,39 @@ const binomiale: Generator[] = [
       () => numeric(`$E(X) = ${ex}$ et $E(Y) = ${ey}$. $E(X + Y) = \\;?$`, ex + ey, "Linéarité de l'espérance (toujours vraie)."),
       () => numeric(`$X$ et $Y$ indépendantes, $V(X) = ${vx}$ et $V(Y) = ${vy}$. $V(X + Y) = \\;?$`, vx + vy, "Pour des variables indépendantes, les variances s'additionnent."),
       () => numeric(`$X_1, \\dots, X_{${n}}$ indépendantes de même loi, de variance $${vx * n}$. Variance de la moyenne $M = \\dfrac{X_1 + \\dots + X_{${n}}}{${n}}$ ?`, vx, `$V(M) = \\dfrac{V(X)}{n} = \\dfrac{${vx * n}}{${n}} = ${vx}$.`),
-      () => numeric(`$V(X) = ${vx}$. Majorant donné par l'inégalité de Bienaymé-Tchebychev pour $P(|X - E(X)| \\geq ${2})$ ?`, vx / 4, `$P(|X - E(X)| \\geq \\delta) \\leq \\dfrac{V(X)}{\\delta^2} = \\dfrac{${vx}}{4}$.`, undefined, 0.001),
+      () => {
+        const [v, d] = btCase(r);
+        return numeric(`$V(X) = ${v}$. Majorant donné par l'inégalité de Bienaymé-Tchebychev pour $P(|X - E(X)| \\geq ${d})$ ?`, v / (d * d), `$P(|X - E(X)| \\geq \\delta) \\leq \\dfrac{V(X)}{\\delta^2} = \\dfrac{${v}}{${d * d}} = ${tex(v / (d * d), 4)}$.`, undefined, 0.0001);
+      },
     ]);
   },
+  // Inégalités de Bienaymé-Tchebychev et de concentration (programme de Terminale).
+  (r) =>
+    oneOf(r, [
+      () => {
+        const [v, d] = btCase(r), mu = int(r, 5, 50), low = 1 - v / (d * d);
+        return numeric(`$E(X) = ${mu}$ et $V(X) = ${v}$. Quel minorant de $P(${mu - d} < X < ${mu + d})$ l'inégalité de Bienaymé-Tchebychev donne-t-elle ?`, low,
+          `$P(${mu - d} < X < ${mu + d}) = P(|X - ${mu}| < ${d}) = 1 - P(|X - ${mu}| \\geq ${d}) \\geq 1 - \\dfrac{${v}}{${d * d}} = ${tex(low, 4)}$.`, undefined, 0.0001);
+      },
+      () => {
+        const [n, p, d] = pick(r, [[100, 0.5, 10], [400, 0.5, 25], [200, 0.1, 6], [100, 0.2, 10], [300, 0.4, 15], [150, 0.2, 8], [1000, 0.5, 25]] as const);
+        const e = Math.round(n * p), v = Math.round(n * p * (1 - p) * 100) / 100, low = 1 - v / (d * d);
+        return numeric(`$X \\sim \\mathcal{B}(${n}\\,;\\,${tex(p)})$. Quel minorant de $P(${e - d} < X < ${e + d})$ l'inégalité de Bienaymé-Tchebychev donne-t-elle ?`, low,
+          `$E(X) = np = ${e}$ et $V(X) = np(1 - p) = ${tex(v)}$. Donc $P(|X - ${e}| < ${d}) \\geq 1 - \\dfrac{${tex(v)}}{${d * d}} = ${tex(low, 4)}$.`, undefined, 0.0001);
+      },
+      () => {
+        const v = pick(r, [1, 2, 4, 9]), n = pick(r, [50, 100, 200, 400]), d = pick(r, [0.5, 1]), bound = v / (n * d * d);
+        return numeric(`$M_{${n}}$ est la moyenne d'un échantillon de $${n}$ variables indépendantes de même loi, d'espérance $\\mu$ et de variance $${v}$. Majorant de $P(|M_{${n}} - \\mu| \\geq ${tex(d)})$ donné par l'inégalité de concentration ?`, bound,
+          `$P(|M_n - \\mu| \\geq \\delta) \\leq \\dfrac{V(X)}{n\\delta^2} = \\dfrac{${v}}{${n} \\times ${tex(d * d)}} = ${tex(bound, 4)}$.`, undefined, 0.0001);
+      },
+      () => {
+        // Pièce équilibrée : V(X_i) = 0,25 ; n ≥ 0,25 / (δ² s), calculé en entiers (δ = dd/100, s = ss/100).
+        const dd = pick(r, [5, 10, 20]), ss = pick(r, [1, 5, 10]), n = Math.ceil(250000 / (dd * dd * ss));
+        const exact = 250000 % (dd * dd * ss) === 0;
+        return numeric(`On lance $n$ fois une pièce équilibrée et on note $F_n$ la fréquence de « pile » (variance d'un lancer : $0{,}25$). Pour quelle valeur minimale de $n$ l'inégalité de concentration garantit-elle $P(|F_n - 0{,}5| \\geq ${tex(dd / 100)}) \\leq ${tex(ss / 100)}$ ?`, n,
+          `Il faut $\\dfrac{0{,}25}{n \\times ${tex(dd / 100)}^2} \\leq ${tex(ss / 100)}$, soit $n \\geq \\dfrac{0{,}25}{${tex((dd * dd) / 10000, 4)} \\times ${tex(ss / 100)}} = ${tex(250000 / (dd * dd * ss), 1)}$${exact ? "" : `, donc $n = ${n}$`}.`);
+      },
+    ]),
   cards([
     ["Pour qu'une variable suive une loi binomiale, il faut…", "des épreuves de Bernoulli identiques et indépendantes", ["des tirages sans remise", "une probabilité de succès de 0,5", "au moins 30 répétitions"], "Tirages sans remise : les épreuves ne sont pas indépendantes."],
     ["$\\dbinom{n}{k}$ compte…", "le nombre de chemins de l'arbre réalisant $k$ succès", ["la probabilité de $k$ succès", "le nombre d'épreuves", "l'espérance"], "C'est aussi le nombre de façons de choisir $k$ éléments parmi $n$."],
@@ -345,13 +393,13 @@ const espace: Generator[] = [
     const d = n * dist - (a * P[0] + b * P[1] + c * P[2]);
     const plane = plane3(a, b, c, d);
     return numeric(`Distance du point $A${pt(P[0], P[1], P[2])}$ au plan $${plane}$ ?`, dist,
-      `$d = \\dfrac{|${a}x_A + ${b}y_A + ${c}z_A + ${par(d)}|}{\\sqrt{${a}^2 + ${b}^2 + ${c}^2}} = \\dfrac{${n * dist}}{${n}} = ${dist}$.`);
+      `$d = \\dfrac{|${a} \\times ${par(P[0])} + ${b} \\times ${par(P[1])} + ${c} \\times ${par(P[2])} + ${par(d)}|}{\\sqrt{${a}^2 + ${b}^2 + ${c}^2}} = \\dfrac{${n * dist}}{${n}} = ${dist}$.`);
   },
   (r) => {
     const A = [int(r, -3, 3), int(r, -3, 3), int(r, -3, 3)], n = [nonZero(r, 3), nonZero(r, 3), nonZero(r, 3)];
     const d = -(n[0] * A[0] + n[1] * A[1] + n[2] * A[2]);
     const eq = (v: number[], dd: number) => plane3(v[0], v[1], v[2], dd);
-    return mcq(r, `Équation du plan passant par $A${pt(A[0], A[1], A[2])}$ et de vecteur normal $\\vec n${pt(n[0], n[1], n[2])}$ ?`, `$${eq(n, d)}$`, [`$${eq(n, -d)}$`, `$${eq(n, d + 1)}$`, `$${eq([n[1], n[0], n[2]], d)}$`].filter((w) => w !== `$${eq(n, d)}$`),
+    return mcq(r, `Équation du plan passant par $A${pt(A[0], A[1], A[2])}$ et de vecteur normal $\\vec n${pt(n[0], n[1], n[2])}$ ?`, `$${eq(n, d)}$`, [`$${eq(n, -d)}$`, `$${eq(n, d + 1)}$`, `$${eq([n[1], n[0], n[2]], d)}$`, `$${eq(n, d - 1)}$`, `$${eq([n[0], n[1], -n[2]], d)}$`].filter((w) => w !== `$${eq(n, d)}$`),
       `$\\vec n$ donne les coefficients ; $d$ se trouve en écrivant que $A$ vérifie l'équation : $d = ${d}$.`);
   },
   (r) => {

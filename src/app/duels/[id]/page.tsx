@@ -69,7 +69,7 @@ export default function DuelPage() {
         title={`Duel contre ${duel.opponent.pseudo}`}
         subtitle={duel.chapterTitle}
         secondsPerQuestion={duelThemeById(duel.chapterId) ? DUEL_SECONDS : undefined}
-        exitHref={`/duels/${duel.id}`}
+        exitHref="/duels"
         onComplete={async (result) => {
           setBusy(true);
           try {
@@ -105,7 +105,7 @@ export default function DuelPage() {
   };
 
   const side = (name: string, avatar: string, photo: string | undefined, play: DuelView["mine"], hidden: boolean) => (
-    <div className="flex-1 rounded-2xl bg-slate-950/50 p-4 text-center">
+    <div className="min-w-0 flex-1 rounded-2xl bg-slate-950/50 p-4 text-center">
       <Avatar emoji={avatar} photo={photo} name={name} size="lg" className="mx-auto" />
       <p className="mt-2 truncate font-bold text-white">{name}</p>
       {play ? (
@@ -161,7 +161,7 @@ export default function DuelPage() {
           ) : (
             <p className="text-sm text-slate-400">Récompense récupérée.</p>
           )}
-          <Link href={`/duels?ami=${duel.opponent.id}`} className="block text-sm text-violet-300 underline">Lancer une revanche</Link>
+          <Link href={`/duels?ami=${encodeURIComponent(duel.opponent.id)}`} className="block text-sm text-violet-300 underline">Lancer une revanche</Link>
         </div>
       )}
 

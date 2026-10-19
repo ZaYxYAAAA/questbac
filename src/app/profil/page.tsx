@@ -98,7 +98,7 @@ export default function ProfilePage() {
       <Tabs
         value={tab}
         onChange={setTab}
-        className="w-full flex-nowrap sm:w-auto [&>button]:flex-1 sm:[&>button]:flex-none"
+        className="w-full flex-nowrap sm:w-auto [&>button]:flex-1 [&>button]:px-2 sm:[&>button]:flex-none sm:[&>button]:px-3"
         options={[
           { value: "stats", label: "Stats" },
           { value: "carte", label: "🎨 Carte" },
@@ -465,6 +465,7 @@ function BossTrophies() {
               key={b.id}
               href={`/boss/${b.id}`}
               title={b.name}
+              aria-label={state === "defeated" ? `${b.name} : vaincu${r?.flawless ? " du premier coup" : ""}` : state === "lost" ? `${b.name} : perdu` : "Boss pas encore vaincu"}
               className={clsx(
                 "relative flex aspect-square flex-col items-center justify-center rounded-2xl border text-3xl transition hover:-translate-y-0.5",
                 state === "defeated" ? (r?.flawless ? "border-amber-300/60 bg-amber-400/15" : "border-emerald-400/40 bg-emerald-500/10") : "border-white/10 bg-slate-900/70",

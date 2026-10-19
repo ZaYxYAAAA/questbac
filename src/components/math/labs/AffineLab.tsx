@@ -5,7 +5,7 @@ import { Shuffle, Trophy } from "lucide-react";
 import { COLORS, Graph, Label, Line, MovablePoint, Point, Segment } from "@/components/math/Graph";
 import { Tex } from "@/components/ui/Tex";
 import { fmt } from "@/lib/math/parser";
-import { LabShell, Panel, Readout, polyTex } from "./common";
+import { LabShell, Panel, Readout, polyTex, texNum } from "./common";
 
 const randInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
 
@@ -26,7 +26,7 @@ export default function AffineLab() {
   const p = vertical ? NaN : A.y - m * A.x;
   const success = target && !vertical && Math.abs(m - target.m) < 1e-6 && Math.abs(p - target.p) < 1e-6;
 
-  const equation = vertical ? `x = ${fmt(A.x)}` : `y = ${polyTex([m, p])}`;
+  const equation = vertical ? `x = ${texNum(A.x)}` : `y = ${polyTex([m, p])}`;
 
   return (
     <LabShell

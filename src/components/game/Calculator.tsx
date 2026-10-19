@@ -91,6 +91,8 @@ export function Calculator({ onUse }: { onUse?: (value: string) => void }) {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.tagName === "INPUT") return;
+      // Raccourcis du navigateur (Ctrl+1, Cmd+R…) : laissés au navigateur.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       const map: Record<string, Key | undefined> = {
         Enter: KEYS.find((k) => k.action === "equal"),
         "=": KEYS.find((k) => k.action === "equal"),

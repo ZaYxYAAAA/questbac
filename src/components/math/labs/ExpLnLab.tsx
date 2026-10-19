@@ -55,7 +55,7 @@ export default function ExpLnLab() {
             <Readout label={<>Pente en N : <Tex>{"\\ln'(e^a) = \\frac{1}{e^a}"}</Tex></>} value={fmt(1 / ea, 4)} color={COLORS.cyan} />
             <p className="text-xs text-slate-500">Les pentes sont inverses l&apos;une de l&apos;autre : c&apos;est la symétrie par rapport à y = x.</p>
           </Panel>
-          <Panel title="Fonctions x ↦ aˣ">
+          <Panel title="Fonctions x ↦ bˣ">
             <Toggle checked={showBase} onChange={setShowBase}>Comparer avec bˣ = e^(x ln b)</Toggle>
             {showBase && <Slider label="b" value={base} min={0.1} max={5} step={0.05} onChange={setBase} color="#f472b6" />}
             <div className="space-y-1 rounded-xl bg-slate-950 p-3 text-sm text-slate-200">

@@ -102,14 +102,20 @@ function tokenize(src: string): Token[] {
   const s = src.replace(/\s+/g, "").replace(/×/g, "*").replace(/÷/g, "/").replace(/−/g, "-").replace(/√/g, "sqrt").replace(/π/g, "pi").replace(/,/g, ".");
   const out: Token[] = [];
   let i = 0;
+  /** Le jeton précédent est un nombre écrit en chiffres. */
+  let literal = false;
   while (i < s.length) {
     const c = s[i];
     const num = /^(\d+\.?\d*|\.\d+)(E[+-]?\d+)?/.exec(s.slice(i));
     if (num) {
+      // Deux nombres collés (« 2,5,3 », « 2E3,5 ») : virgule en trop, pas une multiplication.
+      if (literal) throw new Error("Nombre mal écrit");
+      literal = true;
       out.push({ t: "num", v: Number(num[0]) });
       i += num[0].length;
       continue;
     }
+    literal = false;
     const fn = FN_NAMES.find((f) => s.startsWith(f, i));
     if (fn) {
       out.push({ t: "fn", v: fn });

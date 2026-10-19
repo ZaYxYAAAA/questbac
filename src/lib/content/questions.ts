@@ -120,7 +120,6 @@ const BANK: Record<string, Draft[]> = {
     mcq("$\\cos\\left(\\frac{\\pi}{3}\\right) =$", ["$\\frac12$", "$\\frac{\\sqrt3}{2}$", "$\\frac{\\sqrt2}{2}$", "$0$"], 0, "Valeur remarquable : $\\cos\\frac\\pi3 = \\frac12$ et $\\sin\\frac\\pi3 = \\frac{\\sqrt3}2$."),
     num("Convertis $\\pi$ radians en degrés.", 180, "$\\pi$ rad $= 180°$."),
     tf("Pour tout réel $x$, $\\cos^2 x + \\sin^2 x = 1$.", true, "C'est Pythagore dans le cercle trigonométrique de rayon 1."),
-    mcq("$\\sin(-x) =$", ["$\\sin x$", "$-\\sin x$", "$\\cos x$", "$-\\cos x$"], 1, "Le sinus est une fonction impaire.", 2),
     mcq("$\\frac{\\pi}{4}$ rad correspond à :", ["$30°$", "$45°$", "$60°$", "$90°$"], 1, "$\\frac{180°}{4} = 45°$."),
   ],
   "maths-1-produit-scalaire": [
@@ -349,7 +348,6 @@ const BANK: Record<string, Draft[]> = {
     num("Combien de syllabes compte un alexandrin ?", 12, "Douze syllabes, souvent coupé à l'hémistiche (6/6)."),
     mcq("Un sonnet est composé de :", ["deux quatrains et deux tercets", "trois quatrains", "quatre tercets", "un nombre libre de strophes"], 0, "14 vers au total."),
     mcq("Des rimes ABAB sont dites :", ["plates", "croisées", "embrassées", "suivies"], 1, "AABB = plates, ABBA = embrassées."),
-    tf("Un décasyllabe compte 10 syllabes.", true, "Déca = dix."),
   ],
   "fr-1-mouvements": [
     mcq("Victor Hugo est une figure majeure du :", ["classicisme", "romantisme", "surréalisme", "naturalisme"], 1, "La préface de *Cromwell* (1827) est un manifeste romantique."),
@@ -413,7 +411,6 @@ const BANK: Record<string, Draft[]> = {
     tf("« Mustn't » exprime une absence d'obligation.", false, "*Mustn't* = interdiction. L'absence d'obligation : *don't have to* / *needn't*.", 2),
   ],
   "en-t-conditionals": [
-    mcq("« If I ___ rich, I would travel the world. »", ["am", "were", "will be", "have been"], 1, "Type 2 : If + prétérit, would + BV."),
     mcq("« If she had studied, she ___ the exam. »", ["would pass", "would have passed", "will pass", "passed"], 1, "Type 3 (irréel du passé) : would have + participe passé.", 2),
     mcq("« I wish I ___ more time. » (regret présent)", ["have", "had", "will have", "am having"], 1, "Wish + prétérit pour un souhait sur le présent."),
     tf("Le conditionnel de type 1 (If + présent, will + BV) exprime une situation probable.", true, "*If it rains, I will stay home.*"),

@@ -10,7 +10,7 @@ import { celebrate, useCountUp } from "@/components/game/RewardScreen";
 import { Button } from "@/components/ui/Button";
 import { Markdown } from "@/components/ui/Markdown";
 import { chapterById, subjectMeta } from "@/lib/content/curriculum";
-import { ordinal, placeOutcome } from "@/lib/game/match";
+import { ANSWER_GRACE_MS, ordinal, placeOutcome } from "@/lib/game/match";
 import { levelFromXp, rankFromRp } from "@/lib/game/progression";
 import type { GivenAnswer } from "@/lib/game/session";
 import { useGame } from "@/lib/store/game-store";
@@ -144,7 +144,8 @@ export function LiveMatch({
       if (stop) return;
       const v = viewRef.current;
       const t = Date.now() + offset.current;
-      const boundary = [v?.phase === "vote" ? v.voteEndsAt : null, v?.endsAt, v?.nextAt, v?.startsAt].filter((x): x is number => typeof x === "number" && x > t);
+      // Fin de question : le serveur la garde ouverte un court instant après le chrono (réponses en route).
+      const boundary = [v?.phase === "vote" ? v.voteEndsAt : null, v?.endsAt, v?.endsAt ? v.endsAt + ANSWER_GRACE_MS : null, v?.nextAt, v?.startsAt].filter((x): x is number => typeof x === "number" && x > t);
       const soonest = boundary.length ? Math.min(...boundary) - t + 120 : Infinity;
       timer = setTimeout(loop, Math.max(250, Math.min(1000, soonest)));
     };

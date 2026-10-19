@@ -50,6 +50,12 @@ describe("amitiés", () => {
     expect(await friendIds("b")).toEqual([]);
   });
 
+  it("ajoutées en même temps, ne s'effacent pas", async () => {
+    const results = await Promise.all(["m1", "m2", "m3", "m4"].map((id) => addFriendship("simultane", id)));
+    expect(results).toEqual(["added", "added", "added", "added"]);
+    expect([...(await friendIds("simultane"))].sort()).toEqual(["m1", "m2", "m3", "m4"]);
+  });
+
   it("respectent la limite", async () => {
     await getStore().set("friends:plein", Array.from({ length: MAX_FRIENDS }, (_, i) => `f${i}`));
     expect(await addFriendship("plein", "nouveau")).toBe("full");

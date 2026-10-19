@@ -5,8 +5,8 @@ import { Play } from "lucide-react";
 import { COLORS, Graph, Line, MovablePoint, Plot, Point, Segment } from "@/components/math/Graph";
 import { Slider } from "@/components/ui/Slider";
 import { Tex } from "@/components/ui/Tex";
-import { derivative, fmt, tryCompile } from "@/lib/math/parser";
-import { Chips, LabShell, Panel, Readout, Toggle, polyTex } from "./common";
+import { derivative, fmt } from "@/lib/math/parser";
+import { Chips, LabShell, Panel, Readout, Toggle, compileX, polyTex } from "./common";
 
 const PRESETS = {
   carre: { label: "x²", expr: "x^2" },
@@ -19,22 +19,33 @@ const PRESETS = {
 } as const;
 type PresetKey = keyof typeof PRESETS;
 
+/** Abscisse où f est définie, la plus proche possible de a (ex. on passe à ln x alors que M était en a < 0). */
+function definedNear(fn: (x: number) => number, a: number): number {
+  if (Number.isFinite(fn(a))) return a;
+  for (let d = 0.25; d <= 6; d += 0.25) {
+    if (Number.isFinite(fn(a + d))) return a + d;
+    if (Number.isFinite(fn(a - d))) return a - d;
+  }
+  return a;
+}
+
 export default function TangentLab() {
   const [preset, setPreset] = useState<PresetKey>("cube");
   const [custom, setCustom] = useState("x^3/3 - x");
-  const [a, setA] = useState(1.5);
+  const [rawA, setA] = useState(1.5);
   const [h, setH] = useState(1.5);
   const [showDerivative, setShowDerivative] = useState(false);
   const [showSecant, setShowSecant] = useState(true);
   const anim = useRef(0);
 
   const source = preset === "perso" ? custom : PRESETS[preset].expr;
-  const compiled = useMemo(() => tryCompile(source), [source]);
+  const compiled = useMemo(() => compileX(source), [source]);
   const f = useMemo(
     () => (compiled.ok ? (x: number) => compiled.expr.evaluate({ x }) : () => NaN),
     [compiled],
   );
   const fp = useMemo(() => (x: number) => derivative(f, x), [f]);
+  const a = definedNear(f, rawA);
 
   const fa = f(a);
   const slope = fp(a);

@@ -35,12 +35,18 @@ export default function QuadraticLab() {
     setC(Math.round((a * nx * nx + ny) * 100) / 100);
   };
 
-  const canonical = `${a === 1 ? "" : a === -1 ? "-" : texNum(a)}\\left(x ${alpha <= 0 ? "+" : "-"} ${texNum(Math.abs(alpha))}\\right)^2 ${beta < 0 ? "-" : "+"} ${texNum(Math.abs(beta))}`;
+  // Écritures sans « x + 0 », « + 0 » ni « 1(…) » : on n'affiche que ce qui compte (à l'arrondi près).
+  const lead = a === 1 ? "" : a === -1 ? "-" : texNum(a);
+  const shift = (r: number) => (texNum(Math.abs(r)) === "0" ? "x" : `x ${r < 0 ? "+" : "-"} ${texNum(Math.abs(r))}`);
+  const square = (r: number) => (shift(r) === "x" ? "x^2" : `\\left(${shift(r)}\\right)^2`);
+  const betaTex = texNum(Math.abs(beta)) === "0" ? "" : ` ${beta < 0 ? "-" : "+"} ${texNum(Math.abs(beta))}`;
+  const canonical = `${lead}${square(alpha)}${betaTex}`;
+  const factor = (r: number) => (shift(r) === "x" ? "x" : `(${shift(r)})`);
   const factored =
     roots.length === 2
-      ? `${a === 1 ? "" : a === -1 ? "-" : texNum(a)}(x ${roots[0] <= 0 ? "+" : "-"} ${texNum(Math.abs(roots[0]))})(x ${roots[1] <= 0 ? "+" : "-"} ${texNum(Math.abs(roots[1]))})`
+      ? `${lead}${factor(roots[0])}${factor(roots[1])}`
       : roots.length === 1
-        ? `${a === 1 ? "" : texNum(a)}(x ${alpha <= 0 ? "+" : "-"} ${texNum(Math.abs(alpha))})^2`
+        ? `${lead}${square(alpha)}`
         : null;
 
   const won =
@@ -76,8 +82,9 @@ export default function QuadraticLab() {
         <>
           <Panel title="Coefficients">
             <Slider label="a" value={a} min={-3} max={3} step={0.1} onChange={(v) => setA(Math.abs(v) < 0.05 ? (v < 0 ? -0.1 : 0.1) : v)} />
-            <Slider label="b" value={b} min={-8} max={8} step={0.1} onChange={setB} color="#22d3ee" />
-            <Slider label="c" value={c} min={-8} max={8} step={0.1} onChange={setC} color="#f472b6" />
+            {/* Déplacer le sommet peut donner b ou c hors de [−8 ; 8] : le curseur s'élargit pour rester juste. */}
+            <Slider label="b" value={b} min={Math.min(-8, Math.floor(b))} max={Math.max(8, Math.ceil(b))} step={0.1} onChange={setB} color="#22d3ee" />
+            <Slider label="c" value={c} min={Math.min(-8, Math.floor(c))} max={Math.max(8, Math.ceil(c))} step={0.1} onChange={setC} color="#f472b6" />
             <p className="text-xs text-slate-500">Astuce : attrape directement le sommet S pour déplacer la parabole.</p>
           </Panel>
 

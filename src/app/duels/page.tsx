@@ -21,7 +21,7 @@ const OUTCOME = {
 
 function DuelRow({ d }: { d: DuelView }) {
   const meta = subjectMeta(d.subject);
-  const hoursLeft = Math.max(0, Math.round((d.expiresAt - Date.now()) / 3_600_000));
+  const hoursLeft = Math.max(0, Math.floor((d.expiresAt - Date.now()) / 3_600_000));
   return (
     <Link href={`/duels/${d.id}`} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-900/70 p-3 transition hover:border-violet-400/50">
       <Avatar emoji={d.opponent.avatar} photo={d.opponent.photoThumb} name={d.opponent.pseudo} size="md" />
@@ -31,7 +31,7 @@ function DuelRow({ d }: { d: DuelView }) {
         {d.status === "done" && d.mine && d.theirs && (
           <p className="text-xs text-slate-300">{d.mine.correct} – {d.theirs.correct}</p>
         )}
-        {(d.status === "your_turn" || d.status === "waiting") && <p className="text-xs text-slate-500">Expire dans {hoursLeft} h</p>}
+        {(d.status === "your_turn" || d.status === "waiting") && <p className="text-xs text-slate-500">{hoursLeft > 0 ? `Expire dans ${hoursLeft} h` : "Expire dans moins d'une heure"}</p>}
       </div>
       {d.status === "your_turn" && <span className="rounded-full bg-violet-600 px-3 py-1 text-xs font-bold text-white">À toi !</span>}
       {d.status === "waiting" && <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-400">En attente</span>}
@@ -50,6 +50,7 @@ export default function DuelsPage() {
   const { user, checked } = useCloud();
   const { duels, loaded, error } = useDuels();
   const friends = useFriends((s) => s.friends);
+  const friendsLoaded = useFriends((s) => s.loaded);
   const [friendId, setFriendId] = useState("");
   const [chapterId, setChapterId] = useState(DUEL_THEMES[0].id);
   const [busy, setBusy] = useState(false);
@@ -114,7 +115,9 @@ export default function DuelsPage() {
 
       <form onSubmit={submit} className="space-y-3 rounded-3xl border border-violet-500/30 bg-violet-600/10 p-5">
         <p className="font-bold text-white">Lancer un duel</p>
-        {friends.length === 0 ? (
+        {!friendsLoaded ? (
+          <div className="h-12 animate-pulse rounded-xl bg-slate-900/60" />
+        ) : friends.length === 0 ? (
           <p className="text-sm text-slate-300">Il te faut d&apos;abord des amis : <Link href="/amis" className="text-violet-300 underline">invite-les</Link>.</p>
         ) : (
           <>
@@ -151,6 +154,7 @@ export default function DuelsPage() {
       </form>
 
       {error && <p className="rounded-xl bg-rose-500/15 p-3 text-sm text-rose-300">{error}</p>}
+      {!loaded && !error && <div className="h-20 animate-pulse rounded-2xl bg-slate-900/60" />}
       {loaded && duels.length === 0 && !error && (
         <p className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-slate-500">Aucun duel pour l&apos;instant. Lance le premier !</p>
       )}

@@ -38,22 +38,22 @@ const mobilites: Generator[] = [
     ["mobilité pendulaire", "les trajets quotidiens entre domicile et travail"], ["pays d'accueil", "le pays où s'installent les migrants"], ["frontière", "la limite entre deux territoires souverains"],
   ]),
   (r) => {
-    const [what, value, unit, wrongs] = pick(r, [
-      ["Nombre de migrants internationaux dans le monde (2020)", "281", "millions", ["28", "1 400", "2 800"]],
-      ["Arrivées de touristes internationaux dans le monde (2019)", "1,5", "milliard", ["150 millions", "15 milliards", "500 millions"]],
-      ["Premier pays d'accueil des migrants internationaux", "les États-Unis", "", ["la France", "la Chine", "le Brésil"]],
-      ["Pays le plus visité au monde par les touristes internationaux", "la France", "", ["les États-Unis", "la Chine", "l'Italie"]],
+    const [what, value, wrongs] = pick(r, [
+      ["Nombre de migrants internationaux dans le monde (2020)", "281 millions", ["28 millions", "1,4 milliard", "2,8 milliards"]],
+      ["Arrivées de touristes internationaux dans le monde (2019)", "1,5 milliard", ["150 millions", "15 milliards", "500 millions"]],
+      ["Premier pays d'accueil des migrants internationaux", "les États-Unis", ["l'Allemagne", "l'Arabie saoudite", "la Russie"]],
+      ["Pays le plus visité au monde par les touristes internationaux", "la France", ["l'Espagne", "les États-Unis", "l'Italie"]],
     ] as const);
-    return mcq(r, `${what} ?`, unit ? `${value} ${unit}` : value, wrongs.map((w) => (unit && /^\d/.test(w) && !w.includes(" ") ? `${w} ${unit}` : w)), `${what} : ${value}${unit ? ` ${unit}` : ""}.`);
+    return mcq(r, `${what} ?`, value, [...wrongs], `${what} : ${value}.`);
   },
   (r) => {
     const pop = pick(r, [5, 10, 20, 50]), pct = pick(r, [2, 3, 4, 10, 12, 15]);
     return numeric(`Un pays de $${pop}$ millions d'habitants compte $${pct}\\,\\%$ d'immigrés. Combien (en millions) ?`, (pop * pct) / 100, `$${pop} \\times ${tex(pct / 100)}$.`, "M", 0.01);
   },
   claims([
-    ["La majorité des migrations internationales se font entre pays du Sud.", true, "Les migrations Sud-Sud sont très importantes."],
+    ["Les migrations Sud-Sud sont aussi nombreuses que les migrations Sud-Nord.", true, "Environ un tiers des migrants internationaux chacune (ONU)."],
     ["Les migrants représentent environ 3,5 % de la population mondiale.", true, "Environ 281 millions de personnes en 2020."],
-    ["Le tourisme international ne concerne que les pays riches.", false, "Le tourisme des classes moyennes des pays émergents explose."],
+    ["La majorité des migrants internationaux sont des réfugiés.", false, "Les réfugiés (environ 35 millions en 2022) ne représentent qu'une minorité des quelque 281 millions de migrants : la plupart migrent pour le travail ou la famille."],
     ["La Méditerranée est l'une des routes migratoires les plus meurtrières.", true, "Des dizaines de milliers de morts depuis 2014."],
   ]),
 ];
@@ -66,7 +66,7 @@ const afrique: Generator[] = [
     { ask: (a) => `Capitale de ${a} ?`, reverse: (b) => `${b} est la capitale de…`, claim: (a, b) => `La capitale de ${a} est ${b}.`, explain: (a, b) => `${cap(a)} : ${b}.` },
   ),
   ...chrono([
-    ["Instauration de l'apartheid en Afrique du Sud", 1948], ["Massacre de Sharpeville", 1960], ["Emprisonnement de Nelson Mandela", 1964], ["Émeutes de Soweto", 1976],
+    ["Instauration de l'apartheid en Afrique du Sud", 1948], ["Massacre de Sharpeville", 1960], ["Condamnation de Nelson Mandela à la prison à vie (procès de Rivonia)", 1964], ["Émeutes de Soweto", 1976],
     ["Libération de Nelson Mandela", 1990], ["Abolition des dernières lois de l'apartheid", 1991], ["Élection de Nelson Mandela à la présidence", 1994], ["Coupe du monde de football en Afrique du Sud", 2010],
   ]),
   ...terms([
@@ -92,7 +92,7 @@ const nationalites: Generator[] = [
   ...people([
     ["Napoléon III", "l'empereur des Français de 1852 à 1870"], ["Bismarck", "le chancelier prussien artisan de l'unité allemande"], ["Cavour", "le ministre piémontais artisan de l'unité italienne"],
     ["Garibaldi", "le chef de l'expédition des Mille en Sicile"], ["le baron Haussmann", "le préfet qui transforme Paris sous le Second Empire"], ["Victor Schœlcher", "l'artisan de l'abolition de l'esclavage en 1848"],
-    ["Adolphe Thiers", "le chef du gouvernement qui écrase la Commune"], ["Louise Michel", "une figure de la Commune de Paris"],
+    ["Adolphe Thiers", "le chef du gouvernement qui écrase la Commune"], ["Louise Michel", "l'institutrice communarde déportée en Nouvelle-Calédonie"],
   ]),
   ...terms([
     ["nationalité (principe des)", "l'idée que chaque peuple doit former un État"], ["suffrage universel masculin", "le droit de vote accordé à tous les hommes adultes (1848)"],
@@ -105,13 +105,13 @@ const nationalites: Generator[] = [
 
 const troisieme: Generator[] = [
   ...chrono([
-    ["Proclamation de la IIIe République", 1870], ["Loi sur la liberté de la presse", 1881], ["Lois Ferry : école gratuite, puis laïque et obligatoire", 1882], ["Loi autorisant les syndicats", 1884],
-    ["Conférence de Berlin sur le partage de l'Afrique", 1885], ["Début de l'affaire Dreyfus", 1894], ["« J'accuse… ! » de Zola", 1898], ["Loi sur les associations", 1901],
+    ["Proclamation de la IIIe République", 1870], ["Loi sur la liberté de la presse", 1881], ["Loi Ferry : école laïque et obligatoire", 1882], ["Loi autorisant les syndicats", 1884],
+    ["Acte général de la conférence de Berlin sur l'Afrique", 1885], ["Début de l'affaire Dreyfus", 1894], ["« J'accuse… ! » de Zola", 1898], ["Loi sur les associations", 1901],
     ["Loi de séparation des Églises et de l'État", 1905], ["Réhabilitation du capitaine Dreyfus", 1906], ["Assassinat de Jean Jaurès", 1914],
   ]),
   ...people([
     ["Jules Ferry", "le ministre des lois scolaires, partisan de l'expansion coloniale"], ["Alfred Dreyfus", "l'officier juif injustement condamné pour trahison"], ["Jean Jaurès", "le leader socialiste pacifiste"],
-    ["Georges Clemenceau", "le républicain radical, défenseur de Dreyfus"], ["Émile Zola", "l'écrivain auteur de « J'accuse… ! »"], ["Léon Gambetta", "le fondateur républicain qui proclame la République en 1870"],
+    ["Georges Clemenceau", "le chef radical qui combat la politique coloniale de Jules Ferry"], ["Émile Zola", "l'écrivain auteur de « J'accuse… ! »"], ["Léon Gambetta", "le fondateur républicain qui proclame la République en 1870"],
   ]),
   ...pairs(
     [["l'Algérie", "1830 (début de la conquête)"], ["la Tunisie", "1881 (protectorat)"], ["Madagascar", "1896 (colonie)"], ["le Maroc", "1912 (protectorat)"], ["l'Indochine", "1887 (Union indochinoise)"]],
@@ -137,7 +137,7 @@ const decolonisation: Generator[] = [
     ["Patrice Lumumba", "le premier Premier ministre du Congo indépendant"], ["Léopold Sédar Senghor", "le premier président du Sénégal"],
   ]),
   ...terms([
-    ["décolonisation", "le processus d'accès à l'indépendance des colonies"], ["Tiers-Monde", "l'ensemble des pays pauvres refusant la logique des blocs (A. Sauvy, 1952)"],
+    ["décolonisation", "le processus d'accès à l'indépendance des colonies"], ["Tiers-Monde", "l'ensemble des pays pauvres et sous-développés, « ignoré, exploité, méprisé comme le tiers état » (A. Sauvy, 1952)"],
     ["non-alignement", "le refus de choisir entre les deux blocs"], ["FLN", "le Front de libération nationale algérien"], ["harkis", "les supplétifs algériens de l'armée française"],
     ["pieds-noirs", "les Français d'Algérie rapatriés en 1962"], ["néocolonialisme", "la domination économique persistante des anciennes métropoles"],
   ]),
@@ -155,7 +155,7 @@ const europe: Generator[] = [
     [["la Commission européenne", "propose les lois et veille à l'application des traités"], ["le Parlement européen", "vote les lois et le budget avec le Conseil de l'UE"], ["le Conseil européen", "réunit les chefs d'État ou de gouvernement et fixe les grandes orientations"], ["la Cour de justice de l'UE", "veille au respect du droit européen"], ["la Banque centrale européenne", "conduit la politique monétaire de la zone euro"], ["le Conseil de l'Union européenne", "réunit les ministres des États membres et vote les lois"]],
     { ask: (a) => `Rôle de ${a} ?`, reverse: (b) => `Quelle institution ${b} ?`, claim: (a, b) => `${cap(a)} ${b}.`, explain: (a, b) => `${cap(a)} ${b}.` },
   ),
-  ...people([["Robert Schuman", "le ministre français à l'origine de la CECA"], ["Jean Monnet", "l'inspirateur de la CECA, « père de l'Europe »"], ["Konrad Adenauer", "le chancelier ouest-allemand de la réconciliation"], ["Jacques Delors", "le président de la Commission de l'Acte unique et de Maastricht"]]),
+  ...people([["Robert Schuman", "le ministre français de la déclaration du 9 mai 1950"], ["Jean Monnet", "le premier président de la Haute Autorité de la CECA (1952), ancien commissaire général au Plan"], ["Konrad Adenauer", "le chancelier ouest-allemand de la réconciliation"], ["Jacques Delors", "le président de la Commission de l'Acte unique et de Maastricht"]]),
   (r) => {
     const n = int(r, 0, 2);
     const q = [["Nombre d'États membres de l'UE (depuis 2020)", "27", ["25", "28", "30"]], ["Nombre de pays de la zone euro (2026)", "21", ["12", "27", "17"]], ["Siège du Parlement européen (sessions plénières)", "Strasbourg", ["Bruxelles", "Luxembourg", "Francfort"]]] as const;
@@ -169,8 +169,8 @@ const europe: Generator[] = [
 const monde1990: Generator[] = [
   ...chrono([
     ["Réunification allemande", 1990], ["Début des guerres de Yougoslavie", 1991], ["Génocide des Tutsi au Rwanda", 1994], ["Massacre de Srebrenica", 1995],
-    ["Attentats du 11 septembre", 2001], ["Guerre d'Irak menée par les États-Unis", 2003], ["Crise financière mondiale", 2008], ["Printemps arabes", 2011],
-    ["Accord de Paris sur le climat", 2015], ["Pandémie de Covid-19", 2020], ["Invasion de l'Ukraine par la Russie", 2022],
+    ["Attentats du 11 septembre", 2001], ["Guerre d'Irak menée par les États-Unis", 2003], ["Faillite de la banque Lehman Brothers (crise financière mondiale)", 2008], ["Chute de Ben Ali et de Moubarak (Printemps arabes)", 2011],
+    ["Accord de Paris sur le climat", 2015], ["Déclaration de la pandémie de Covid-19 par l'OMS", 2020], ["Invasion de l'Ukraine par la Russie", 2022],
   ]),
   ...terms([
     ["multilatéralisme", "la coopération entre de nombreux États au sein d'organisations internationales"], ["gouvernance mondiale", "l'ensemble des règles et institutions qui régulent le monde"],
@@ -182,6 +182,8 @@ const monde1990: Generator[] = [
     ["L'Accord de Paris vise à limiter le réchauffement bien en dessous de 2 °C.", true, "Si possible 1,5 °C."],
     ["Les Printemps arabes ont débuté en Tunisie.", true, "Fin 2010 - début 2011."],
     ["Le Conseil de sécurité de l'ONU compte 5 membres permanents avec droit de veto.", true, "États-Unis, Russie, Chine, France, Royaume-Uni."],
+    ["L'Inde est membre permanent du Conseil de sécurité de l'ONU.", false, "Elle le réclame, comme le Brésil, l'Allemagne ou le Japon, mais les cinq membres permanents n'ont pas changé depuis 1945."],
+    ["Les États-Unis ont ratifié le statut de la Cour pénale internationale.", false, "Ils l'ont signé en 2000 sans jamais le ratifier ; la Chine et l'Inde ne l'ont pas signé."],
   ]),
 ];
 

@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/Button";
 import { Tabs } from "@/components/ui/Tabs";
 import { subjectMeta, subjectsForLevel } from "@/lib/content/curriculum";
 import { MATCH_SIZES, type MatchSize, matchXp, ordinal, rpDelta } from "@/lib/game/match";
-import { varietyBonus } from "@/lib/game/ranked";
+import { BOARD_SIZE, varietyBonus } from "@/lib/game/ranked";
 import { RANK_TIERS, rankFromRp } from "@/lib/game/progression";
 import { RANK_STEPS, stepIndex } from "@/lib/game/ranks";
 import { useCloud } from "@/lib/store/cloud-sync";
@@ -29,6 +29,25 @@ type Period = "saison" | "semaine";
 /** Classement de la semaine : trié sur les points (ou l'XP) gagnés depuis lundi, places recalculées. */
 function weekly<T extends { place: number; isMe: boolean }>(rows: T[], key: (r: T) => number): T[] {
   return [...rows].sort((a, b) => key(b) - key(a) || a.place - b.place).map((r, i) => ({ ...r, place: i + 1 }));
+}
+
+/**
+ * Lignes à afficher. Le serveur envoie le haut du général et celui de la semaine
+ * (avec `weekPlace`), plus mes amis et moi même plus loin : entre amis, les places
+ * sont recalculées ; sinon, ce sont celles du serveur.
+ */
+function boardView<T extends { place: number; weekPlace?: number; isMe: boolean; friend: boolean }>(rows: T[], scope: Scope, period: Period, key: (r: T) => number): T[] {
+  if (scope === "amis") {
+    const mine = rows.filter((r) => r.friend || r.isMe);
+    return period === "semaine" ? weekly(mine.filter((r) => key(r) !== 0 || r.isMe), key) : mine.map((r, i) => ({ ...r, place: i + 1 }));
+  }
+  if (period === "semaine") {
+    return rows
+      .filter((r) => r.weekPlace !== undefined && (r.weekPlace <= BOARD_SIZE || r.isMe))
+      .sort((a, b) => a.weekPlace! - b.weekPlace!)
+      .map((r) => ({ ...r, place: r.weekPlace! }));
+  }
+  return rows.filter((r) => r.place <= BOARD_SIZE || r.isMe);
 }
 type Playing = { subject: SubjectId; size: number; matchId?: string | null; key: number };
 
@@ -120,7 +139,7 @@ export default function RankedPage() {
         <p className="text-5xl">⚔️</p>
         <p className="text-xl font-black text-white">Mode classé</p>
         <p className="text-sm text-slate-300">
-          Des parties à 3 joueurs en direct, un classement général des rangs et un classement de l&apos;XP. Il faut un compte : les parties sont arbitrées par le serveur.
+          Des parties à 3, 5 ou 7 joueurs en direct, un classement général des rangs et un classement de l&apos;XP. Il faut un compte : les parties sont arbitrées par le serveur.
         </p>
         <Link href="/profil?onglet=compte" className="inline-flex rounded-xl bg-violet-600 px-4 py-2 font-semibold text-white">Créer mon compte</Link>
       </div>
@@ -250,8 +269,7 @@ export default function RankedPage() {
           <div className="h-40 animate-pulse rounded-2xl bg-slate-900/60" />
         ) : tab === "rangs" ? (
           (() => {
-            const base = scope === "amis" ? board.filter((r) => r.friend || r.isMe) : board;
-            const rows = period === "semaine" ? weekly(base.filter((r) => r.weekDelta !== 0 || r.isMe), (r) => r.weekDelta) : scope === "amis" ? base.map((r, i) => ({ ...r, place: i + 1 })) : base;
+            const rows = boardView(board, scope, period, (r) => r.weekDelta);
             return (
               <>
                 <MyPlace rows={rows} unit={period === "semaine" ? "cette semaine" : "au classement"} />
@@ -261,8 +279,7 @@ export default function RankedPage() {
           })()
         ) : (
           (() => {
-            const base = scope === "amis" ? xp.filter((r) => r.friend || r.isMe) : xp;
-            const rows = period === "semaine" ? weekly(base.filter((r) => r.weeklyXp > 0 || r.isMe), (r) => r.weeklyXp) : scope === "amis" ? base.map((r, i) => ({ ...r, place: i + 1 })) : base;
+            const rows = boardView(xp, scope, period, (r) => r.weeklyXp);
             return (
               <>
                 <MyPlace rows={rows} unit={period === "semaine" ? "cette semaine" : "en XP"} />

@@ -16,7 +16,7 @@ const atome: Generator[] = [
   },
   (r) => {
     const a = int(r, 12, 59), m = Math.round(a * 16.7) / 100;
-    return mcq(r, `Masse approchée d'un atome de $A = ${a}$ nucléons ($m_{nucléon} \\approx 1{,}67 \\times 10^{-27}$ kg) ?`, `${sci(m, -26)} kg`, [`${sci(m, -30)} kg`, `${sci(1.67, -27)} kg`, `${sci(m, -23)} kg`],
+    return mcq(r, `Masse approchée d'un atome de $A = ${a}$ nucléons ($m_{\\text{nucléon}} \\approx 1{,}67 \\times 10^{-27}$ kg) ?`, `${sci(m, -26)} kg`, [`${sci(m, -30)} kg`, `${sci(1.67, -27)} kg`, `${sci(m, -23)} kg`],
       `La masse des électrons est négligeable : $m \\approx ${a} \\times 1{,}67 \\times 10^{-27} = ${tex(a * 1.67, 2)} \\times 10^{-27} \\approx ${tex(m)} \\times 10^{-26}$ kg.`);
   },
   (r) =>
@@ -59,14 +59,14 @@ const solutions: Generator[] = [
   (r) => {
     const n = pick(r, [0.01, 0.02, 0.05, 0.1, 0.2]), V = pick(r, [0.1, 0.25, 0.5, 1, 2]);
     return oneOf(r, [
-      () => numeric(`$${tex(n)}$ mol de soluté dans $${tex(V * 1000)}$ mL de solution. Concentration (mol/L) ?`, n / V, `$C = \\dfrac{n}{V} = \\dfrac{${tex(n)}}{${tex(V)}} = ${tex(n / V)}$ mol/L (volume converti en litres).`, "mol/L", 0.001),
+      () => numeric(`$${tex(n)}$ mol de soluté dans $${tex(V * 1000)}$ mL de solution. Concentration (mol/L) ?`, n / V, `$C = \\dfrac{n}{V} = \\dfrac{${tex(n)}}{${tex(V)}} = ${tex(n / V)}$ mol/L (volume converti en litres).`, "mol/L", 0.0001),
       () => numeric(`Solution de glucose à $${tex(n / V)}$ mol/L ($M = 180$ g/mol). Concentration en masse (g/L) ?`, (n / V) * 180, `$C_m = C \\times M = ${tex(n / V)} \\times 180 = ${tex((n / V) * 180)}$ g/L.`, "g/L", 0.01),
     ]);
   },
   (r) => {
     const V0 = pick(r, [5, 10, 20, 25]), F = pick(r, [2, 4, 5, 10]);
     return oneOf(r, [
-      () => numeric(`On prélève $${V0}$ mL de solution mère et on complète à $${V0 * F}$ mL. Facteur de dilution ?`, F, `$F = \\dfrac{V_{fille}}{V_{mère}} = \\dfrac{${V0 * F}}{${V0}} = ${F}$.`),
+      () => numeric(`On prélève $${V0}$ mL de solution mère et on complète à $${V0 * F}$ mL. Facteur de dilution ?`, F, `$F = \\dfrac{V_{\\text{fille}}}{V_{\\text{mère}}} = \\dfrac{${V0 * F}}{${V0}} = ${F}$.`),
       () => mcq(r, `Pour une dilution, on prélève la solution mère avec…`, "une pipette jaugée", ["une éprouvette graduée", "un bécher", "une fiole jaugée"], "La pipette jaugée est précise ; la fiole jaugée sert à compléter au volume final."),
     ]);
   },
@@ -153,9 +153,11 @@ const ondes2: Generator[] = [
 const electricite: Generator[] = [
   (r) => {
     const U = pick(r, [6, 12, 230]), I = pick(r, [0.5, 1, 2, 5]);
+    const P = pick(r, [500, 750, 1000, 1500, 2000]), h = pick(r, [2, 3, 5, 8]);
     return oneOf(r, [
       () => numeric(`Un appareil fonctionne sous $${U}$ V et est traversé par $${tex(I)}$ A. Puissance (W) ?`, U * I, `$P = U \\times I = ${U} \\times ${tex(I)} = ${tex(U * I)}$ W.`, "W"),
-      () => numeric(`Un radiateur de $${tex(U * I)}$ W fonctionne pendant $3$ h. Énergie consommée (kWh) ?`, (U * I * 3) / 1000, `$E = P \\times t = ${tex((U * I) / 1000)}$ kW $\\times 3$ h $= ${tex((U * I * 3) / 1000)}$ kWh.`, "kWh", 0.001),
+      () => numeric(`Un radiateur électrique de $${tex(P)}$ W fonctionne pendant $${h}$ h. Énergie consommée (kWh) ?`, (P * h) / 1000, `$E = P \\times t = ${tex(P / 1000)}$ kW $\\times ${h}$ h $= ${tex((P * h) / 1000)}$ kWh.`, "kWh", 0.001),
+      () => numeric(`Un radiateur électrique de $${tex(P)}$ W est branché sur le secteur ($230$ V). Intensité du courant qui le traverse (A, au centième) ?`, Math.round((P / 230) * 100) / 100, `$I = \\dfrac{P}{U} = \\dfrac{${tex(P)}}{230} \\approx ${tex(P / 230, 2)}$ A.`, "A", 0.01),
     ]);
   },
   (r) => {
@@ -255,7 +257,10 @@ const ondes1: Generator[] = [
     const lam = pick(r, [0.5, 1, 2, 4]), n = int(r, 2, 6);
     return oneOf(r, [
       () => numeric(`Sur une corde, ${n + 1} crêtes successives sont réparties sur $${tex(n * lam)}$ m. Longueur d'onde (m) ?`, lam, `Entre ${n + 1} crêtes, il y a ${n} longueurs d'onde : $\\lambda = \\dfrac{${tex(n * lam)}}{${n}}$.`, "m"),
-      () => numeric(`Une vague de longueur d'onde $${tex(lam)}$ m a une période de $${tex(lam / 2)}$ s. Célérité (m/s) ?`, 2, `$v = \\dfrac{\\lambda}{T} = \\dfrac{${tex(lam)}}{${tex(lam / 2)}} = 2$ m/s.`, "m/s"),
+      () => {
+        const T = pick(r, [0.5, 0.8, 1.25, 2, 2.5, 4]);
+        return numeric(`Une vague de longueur d'onde $${tex(lam * 2)}$ m a une période de $${tex(T)}$ s. Célérité (m/s) ?`, (lam * 2) / T, `$v = \\dfrac{\\lambda}{T} = \\dfrac{${tex(lam * 2)}}{${tex(T)}} = ${tex((lam * 2) / T)}$ m/s.`, "m/s", 0.01);
+      },
     ]);
   },
   cards([
@@ -303,7 +308,11 @@ const spectro: Generator[] = [
   },
   (r) => {
     const k = pick(r, [200, 500, 1000, 250]), A1 = pick(r, [0.2, 0.4, 0.5, 0.8]), f = pick(r, [2, 0.5, 3]);
-    return numeric(`Une solution a une absorbance $A = ${tex(A1)}$. On prépare une solution ${f > 1 ? `${f} fois plus concentrée` : "deux fois moins concentrée"}. Nouvelle absorbance (Beer-Lambert) ?`, A1 * f, `$A$ est proportionnelle à $C$ : $${tex(A1)} \\times ${tex(f)} = ${tex(A1 * f)}$. (Coefficient $k = ${k}$ L/mol sans importance ici.)`, undefined, 0.001);
+    const C1 = pick(r, [0.5, 1, 2, 4, 5].filter((c) => k * c * 1e-3 <= 1.5)), A2 = Math.round(k * C1 * 1e-3 * 1000) / 1000;
+    return oneOf(r, [
+      () => numeric(`Une solution a une absorbance $A = ${tex(A1)}$. On prépare une solution ${f > 1 ? `${f} fois plus concentrée` : "deux fois moins concentrée"}. Nouvelle absorbance (Beer-Lambert, solutions diluées) ?`, A1 * f, `$A$ est proportionnelle à $C$ : $${tex(A1)} \\times ${tex(f)} = ${tex(A1 * f)}$.`, undefined, 0.001),
+      () => numeric(`La droite d'étalonnage d'une espèce colorée a pour équation $A = ${k} \\times C$ ($C$ en mol/L). Une solution inconnue a une absorbance de $${tex(A2)}$. Concentration (en mmol/L) ?`, C1, `$C = \\dfrac{A}{k} = \\dfrac{${tex(A2)}}{${k}} = ${tex(C1 / 1000, 6)}$ mol/L $= ${tex(C1)}$ mmol/L.`, "mmol/L", 0.01, 2),
+    ]);
   },
   cards([
     ["Un spectrophotomètre mesure…", "l'absorbance d'une solution", ["la masse d'une solution", "le pH", "la température"], "À une longueur d'onde choisie."],
@@ -433,8 +442,14 @@ const thermo: Generator[] = [
     return numeric(`Énergie (J) pour élever de $${dT}$ °C la température de $${tex(m)}$ kg ${mat} ($c = ${c}$ J·kg⁻¹·K⁻¹) ?`, m * c * dT, `$Q = mc\\Delta T = ${tex(m)} \\times ${c} \\times ${dT} = ${tex(m * c * dT)}$ J.`, "J");
   },
   (r) => {
-    const R = pick(r, [0.5, 1, 2, 4]), dT = pick(r, [10, 15, 20]);
-    return numeric(`Un mur a une résistance thermique de $${tex(R)}$ K/W ; l'écart de température est $${dT}$ °C. Flux thermique (W) ?`, dT / R, `$\\Phi = \\dfrac{\\Delta T}{R_{th}} = \\dfrac{${dT}}{${tex(R)}} = ${tex(dT / R)}$ W.`, "W");
+    // Ordres de grandeur réalistes : un mur de quelques dizaines de m² a une résistance thermique
+    // de l'ordre de 0,01 K/W (non isolé) à 0,2 K/W (bien isolé).
+    const R = pick(r, [0.01, 0.02, 0.025, 0.04, 0.05, 0.1, 0.2]), dT = pick(r, [10, 15, 20]);
+    const P = dT / R;
+    return oneOf(r, [
+      () => numeric(`Un mur a une résistance thermique de $${tex(R)}$ K/W ; l'écart de température entre l'intérieur et l'extérieur est $${dT}$ °C. Flux thermique (W) ?`, P, `$\\Phi = \\dfrac{\\Delta T}{R_{th}} = \\dfrac{${dT}}{${tex(R)}} = ${tex(P)}$ W.`, "W", 0.5),
+      () => numeric(`Un mur de résistance thermique $${tex(R)}$ K/W laisse passer un flux de $${tex(P)}$ W. Énergie perdue en $24$ h (kWh) ?`, (P * 24) / 1000, `$E = \\Phi \\times \\Delta t = ${tex(P / 1000)}$ kW $\\times 24$ h $= ${tex((P * 24) / 1000)}$ kWh.`, "kWh", 0.01),
+    ]);
   },
   cards([
     ["Le transfert thermique par mouvement de matière (fluide) s'appelle…", "la convection", ["la conduction", "le rayonnement", "l'évaporation"], "Exemple : l'air chaud qui monte au-dessus d'un radiateur."],

@@ -46,8 +46,21 @@ export function migrateSave(raw: unknown): GameData | null {
   if (!isObject(raw.league)) merged.league = { ...base.league, tierId: rankFromRp(rp).tier.id };
   if (!Array.isArray(merged.feed)) merged.feed = [];
   if (isObject(merged.profile)) merged.profile = migrateProfile(merged.profile);
+  merged.boost = validBoost(merged.boost);
+  if (!isObject(merged.missionPlays) || typeof merged.missionPlays.day !== "string" || !isObject(merged.missionPlays.counts)) merged.missionPlays = base.missionPlays;
   merged.updatedAt = typeof raw.updatedAt === "number" && Number.isFinite(raw.updatedAt) ? raw.updatedAt : 0;
   return merged as unknown as GameData;
+}
+
+const BOOST_SOURCES = new Set(["boss", "quests", "daily"]);
+
+/** Boost d'XP lisible, sinon aucun : un multiplicateur invalide rendrait toute l'XP gagnée NaN. */
+function validBoost(v: unknown): GameData["boost"] {
+  if (!isObject(v)) return null;
+  const { mult, until, source } = v;
+  if (typeof mult !== "number" || !Number.isFinite(mult) || mult < 1 || mult > 2) return null;
+  if (typeof until !== "number" || !Number.isFinite(until) || typeof source !== "string" || !BOOST_SOURCES.has(source)) return null;
+  return { mult, until, source: source as NonNullable<GameData["boost"]>["source"] };
 }
 
 /** Emoji par défaut quand l'avatar enregistré n'en est pas un. */

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { OFFERED_KEPT, chooseChapters } from "./ranked";
+import type { Question } from "@/lib/types";
+import { OFFERED_KEPT, chooseChapters, publicQuestion } from "./ranked";
 import { seededRandom } from "./quests";
 
 describe("thèmes proposés au vote", () => {
@@ -28,5 +29,19 @@ describe("thèmes proposés au vote", () => {
   });
   it("si tout a été vu, propose les plus anciens", () => {
     expect(chooseChapters(["a", "b", "c"], ["c", "a", "b"], seededRandom(1)).sort()).toEqual(["a", "c"]);
+  });
+});
+
+describe("question envoyée avant la réponse", () => {
+  it("ne contient ni la réponse, ni l'explication, ni l'empreinte de l'information", () => {
+    const qs: Question[] = [
+      { id: "q1", type: "mcq", prompt: "Capitale ?", choices: ["Paris", "Lyon"], answer: 0, explanation: "Paris.", fact: "capitale:france", difficulty: 2 },
+      { id: "q2", type: "truefalse", prompt: "Vrai ?", answer: true, explanation: "Oui.", fact: "1789:revolution" },
+      { id: "q3", type: "numeric", prompt: "Combien ?", answer: 42, tolerance: 0.5, unit: "m", explanation: "42.", fact: "x", calc: true },
+    ];
+    const [mcq, tf, num] = qs.map(publicQuestion);
+    expect(mcq).toEqual({ id: "q1", type: "mcq", prompt: "Capitale ?", choices: ["Paris", "Lyon"], answer: -1, explanation: "", difficulty: 2 });
+    expect(tf).toEqual({ id: "q2", type: "truefalse", prompt: "Vrai ?", answer: false, explanation: "" });
+    expect(num).toEqual({ id: "q3", type: "numeric", prompt: "Combien ?", answer: 0, unit: "m", explanation: "", calc: true });
   });
 });

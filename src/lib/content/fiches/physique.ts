@@ -95,7 +95,7 @@ export const PHYSIQUE = String.raw`
 = En m/s : $\dfrac{60}{3{,}6} \approx 16{,}7$ m/s.
 ? Poids d'un sac de 5 kg sur Terre.
 = $P = m \times g = 5 \times 9{,}8 = 49$ N.
-! Masse (kg, la quantité de matière, la même partout) et poids (N, une force, qui dépend de l'astre) sont deux grandeurs différentes.
+! Masse (kg, la même partout) et poids (N, une force, qui dépend de l'astre) sont deux grandeurs différentes : un astronaute de 70 kg garde 70 kg sur la Lune, mais son poids y est 6 fois plus faible.
 
 @pc-2-ondes
 - Période et fréquence : $f = \dfrac1T$.
@@ -304,7 +304,7 @@ export const PHYSIQUE = String.raw`
 = $\mathrm{pH} = -\log(2{,}5 \times 10^{-4}) \approx 3{,}6$ : solution acide.
 ? 20 mL d'acide sont titrés par de la soude à 0,1 mol/L ; $V_E = 15$ mL. Concentration de l'acide ?
 = $C_a = \dfrac{C_b V_E}{V_a} = \dfrac{0{,}1 \times 15}{20} = 0{,}075$ mol/L.
-! Diluer 10 fois un acide fort augmente son pH d'une unité (et non le diviser par 10).
+! Diluer 10 fois un acide fort augmente son pH d'une unité : c'est $[\mathrm{H_3O^+}]$ qui est divisée par 10, pas le pH.
 
 @pc-t-cinetique
 - Vitesse volumique de disparition d'un réactif : $v = -\dfrac{d[\mathrm{R}]}{dt}$ ; d'apparition d'un produit : $v = \dfrac{d[\mathrm{P}]}{dt}$.

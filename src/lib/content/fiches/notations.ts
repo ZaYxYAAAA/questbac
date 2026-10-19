@@ -8,7 +8,11 @@ export interface Notation {
   meaning: string;
 }
 
-const NOTATIONS: (Notation & { re: RegExp })[] = [
+/** Formules ($…$) de ces textes qui contiennent ce motif. */
+const formulasWith = (all: string, re: RegExp) => (all.match(/\$[^$]+\$/g) ?? []).filter((f) => re.test(f));
+
+/** `re` : motif à repérer (ou test sur tout le texte) ; `unless` : contexte où ce sens ne s'applique pas. */
+const NOTATIONS: (Notation & { re: RegExp | ((all: string) => boolean); unless?: RegExp })[] = [
   { re: /\\mathbb\{N\}/, symbol: String.raw`\mathbb{N}`, meaning: "les entiers naturels : 0, 1, 2, 3…" },
   { re: /\\mathbb\{Z\}/, symbol: String.raw`\mathbb{Z}`, meaning: "les entiers relatifs : … −2, −1, 0, 1, 2…" },
   { re: /\\mathbb\{D\}/, symbol: String.raw`\mathbb{D}`, meaning: "les nombres décimaux (nombre fini de chiffres après la virgule)" },
@@ -33,16 +37,20 @@ const NOTATIONS: (Notation & { re: RegExp })[] = [
   { re: /\\mapsto/, symbol: String.raw`x \mapsto f(x)`, meaning: "« x donne f(x) » : la fonction qui à x associe f(x)" },
   { re: /\\mathcal\{C\}/, symbol: String.raw`\mathcal{C}_f`, meaning: "la courbe représentative de f" },
   { re: /f''/, symbol: "f''", meaning: "dérivée seconde : la dérivée de la dérivée" },
-  { re: /(^|[^a-zA-Zéèàù])[fFuvg]'(?!')/, symbol: "f'", meaning: "dérivée de f : la pente de la courbe en chaque point" },
+  // En optique, f' est la distance focale et non une dérivée.
+  { re: /(^|[^a-zA-Zéèàù])[fFuvg]'(?!')/, unless: /\\overline\{OF'\}/, symbol: "f'", meaning: "dérivée de f : la pente de la courbe en chaque point" },
+  { re: /\\overline\{OF'\}/, symbol: "f'", meaning: "distance focale image : distance algébrique du centre O de la lentille à son foyer image F'" },
   { re: /\\lim/, symbol: String.raw`\lim`, meaning: "limite : la valeur dont on se rapproche" },
-  { re: /\\to/, symbol: String.raw`\to`, meaning: "« tend vers » (ou, pour les primitives, « a pour primitive »)" },
+  // Flèche « mathématique » (limites, primitives) : hors des équations chimiques, qui s'écrivent avec \mathrm.
+  { re: (all) => formulasWith(all, /\\to\b/).some((f) => !f.includes("\\mathrm")), symbol: String.raw`\to`, meaning: "« tend vers » (ou, pour les primitives, « a pour primitive »)" },
+  { re: (all) => formulasWith(all, /\\to\b/).some((f) => f.includes("\\mathrm")), symbol: String.raw`\mathrm{A} \to \mathrm{B}`, meaning: "dans une équation de réaction : les réactifs (à gauche) donnent les produits (à droite)" },
   { re: /\\infty/, symbol: String.raw`+\infty`, meaning: "plus l'infini : plus grand que n'importe quel nombre" },
   { re: /0\^\+|0\^-/, symbol: "0^+", meaning: "on s'approche de 0 par des nombres positifs (0⁻ : par des négatifs)" },
   { re: /\\int/, symbol: String.raw`\int_a^b f(x)\,dx`, meaning: "intégrale de a à b : l'aire sous la courbe de f" },
   { re: /\\ln/, symbol: String.raw`\ln`, meaning: "logarithme népérien, réciproque de l'exponentielle" },
   { re: /\\log/, symbol: String.raw`\log`, meaning: "logarithme décimal : log(10ⁿ) = n" },
   { re: /e\^\{|e\^[x0-9a-z]/, symbol: "e^x", meaning: "exponentielle de x, avec e ≈ 2,718" },
-  { re: /\\overrightarrow|\\vec/, symbol: String.raw`\overrightarrow{AB}`, meaning: "vecteur de A vers B : un déplacement (direction, sens, longueur)" },
+  { re: /\\overrightarrow|\\vec/, symbol: String.raw`\overrightarrow{AB}`, meaning: "vecteur (ici de A vers B) : une flèche définie par une direction, un sens et une longueur (déplacement, force, vitesse…)" },
   { re: /\\\|/, symbol: String.raw`\|\vec u\|`, meaning: "norme : la longueur du vecteur" },
   { re: /\\cdot/, symbol: String.raw`\vec u \cdot \vec v`, meaning: "produit scalaire des deux vecteurs (un nombre)" },
   { re: /\\perp/, symbol: String.raw`\perp`, meaning: "« est perpendiculaire (orthogonal) à »" },
@@ -67,9 +75,9 @@ const NOTATIONS: (Notation & { re: RegExp })[] = [
   { re: /\\gamma/, symbol: String.raw`\gamma`, meaning: "gamma : le grandissement d'une lentille" },
   { re: /\\varepsilon/, symbol: String.raw`\varepsilon`, meaning: "epsilon : le coefficient d'absorption molaire" },
   { re: /\\Phi/, symbol: String.raw`\Phi`, meaning: "phi : le flux thermique (W)" },
-  { re: /\\delta/, symbol: String.raw`\delta`, meaning: "delta minuscule : une différence de chemin, ou une charge partielle" },
+  { re: /\\delta/, symbol: String.raw`\delta`, meaning: "delta minuscule : une différence de chemin, une charge partielle, ou la dioptrie (unité de vergence)" },
   { re: /\\mu/, symbol: String.raw`\mu`, meaning: "mu : la valeur moyenne d'une fonction" },
-  { re: /\\dfrac\{d/, symbol: String.raw`\dfrac{dx}{dt}`, meaning: "dérivée par rapport au temps : la vitesse de variation" },
+  { re: /\\d?frac\{d[^}]/, symbol: String.raw`\dfrac{dx}{dt}`, meaning: "dérivée par rapport au temps : la vitesse de variation" },
   { re: /\[\\mathrm/, symbol: String.raw`[\mathrm{X}]`, meaning: "concentration de l'espèce X (mol/L)" },
   { re: /\\rightleftharpoons/, symbol: String.raw`\rightleftharpoons`, meaning: "réaction qui peut se faire dans les deux sens" },
 ];
@@ -77,5 +85,5 @@ const NOTATIONS: (Notation & { re: RegExp })[] = [
 /** Les notations présentes dans ces textes, dans l'ordre du lexique. */
 export function notationsIn(texts: string[]): Notation[] {
   const all = texts.join("\n");
-  return NOTATIONS.filter((n) => n.re.test(all)).map(({ symbol, meaning }) => ({ symbol, meaning }));
+  return NOTATIONS.filter((n) => (typeof n.re === "function" ? n.re(all) : n.re.test(all)) && !n.unless?.test(all)).map(({ symbol, meaning }) => ({ symbol, meaning }));
 }

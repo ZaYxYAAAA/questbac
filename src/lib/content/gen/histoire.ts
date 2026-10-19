@@ -1,13 +1,19 @@
 /** Générateurs de questions — Histoire-Géographie (Seconde, Première, Terminale). */
-import { type Generator, type Pair, claims, int, mcq, numeric, pairs, pick, sample, tf, withFact } from "./kit";
+import { type Generator, type Pair, cards, claims, int, mcq, numeric, pairs, pick, sample, tf, withFact } from "./kit";
 
 type Event = readonly [string, number];
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const year = (y: number) => (y < 0 ? `${-y} av. J.-C.` : String(y));
 
+/** Les six ordres de trois éléments ; le premier est l'ordre trié (la bonne réponse). */
+const ORDERS = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]] as const;
+
 /**
- * Quatre générateurs à partir d'une frise d'événements : trouver l'année,
- * l'événement d'une année, le plus ancien parmi quatre, et vrai/faux sur une date.
+ * Cinq générateurs à partir d'une frise d'événements : trouver l'année,
+ * l'événement d'une année, le plus ancien (ou le plus récent) parmi quatre,
+ * l'ordre chronologique de trois événements, et vrai/faux sur une date.
+ * Les leurres sont pris parmi les événements les plus proches dans le temps,
+ * pour qu'on ne puisse pas répondre en éliminant les anachronismes évidents.
  */
 export function chrono(events: readonly Event[]): Generator[] {
   const uniqueYears = events.filter(([, y]) => events.filter(([, z]) => z === y).length === 1);
@@ -20,13 +26,29 @@ export function chrono(events: readonly Event[]): Generator[] {
     },
     (r) => {
       const [e, y] = pick(r, uniqueYears.length >= 4 ? uniqueYears : events);
-      return withFact(mcq(r, `Que s'est-il passé en **${year(y)}** ?`, e, events.filter(([, z]) => Math.abs(z - y) >= 1).map(([x]) => x), `${year(y)} : ${e}.`), e);
+      // Les quatre événements d'autres années les plus proches (le QCM en garde trois).
+      const near = events.filter(([, z]) => z !== y).sort((a, b) => Math.abs(a[1] - y) - Math.abs(b[1] - y)).slice(0, 4);
+      return withFact(mcq(r, `Que s'est-il passé en **${year(y)}** ?`, e, near.map(([x]) => x), `${year(y)} : ${e}.`, undefined, 2), e);
     },
     (r) => {
-      // Un seul événement par année, pour qu'il y ait toujours un plus ancien sans ambiguïté.
+      // Un seul événement par année, pour qu'il y ait toujours un plus ancien (ou récent) sans ambiguïté.
       const four = sample(r, oneByYear, 4);
-      const first = four.reduce((m, x) => (x[1] < m[1] ? x : m));
-      return withFact(mcq(r, `Lequel de ces événements est le **plus ancien** ?`, first[0], four.map(([x]) => x), [...four].sort((a, b) => a[1] - b[1]).map(([x, y]) => `${x} (${year(y)})`).join(" · ")), first[0]);
+      const latest = r() < 0.35;
+      const target = four.reduce((m, x) => ((latest ? x[1] > m[1] : x[1] < m[1]) ? x : m));
+      return withFact(
+        mcq(r, `Lequel de ces événements est le **plus ${latest ? "récent" : "ancien"}** ?`, target[0], four.map(([x]) => x), [...four].sort((a, b) => a[1] - b[1]).map(([x, y]) => `${x} (${year(y)})`).join(" · "), undefined, 2),
+        target[0],
+      );
+    },
+    (r) => {
+      const three = sample(r, oneByYear, 3);
+      const sorted = [...three].sort((a, b) => a[1] - b[1]);
+      const label = (order: readonly number[]) => order.map((i) => "ABC"[three.indexOf(sorted[i])]).join(" → ");
+      return withFact(
+        mcq(r, `Du plus ancien au plus récent : **A.** ${three[0][0]} ; **B.** ${three[1][0]} ; **C.** ${three[2][0]}`, label(ORDERS[0]), ORDERS.slice(1).map(label),
+          sorted.map(([x, y]) => `${x} (${year(y)})`).join(" → "), undefined, 2),
+        ...sorted.map(([x]) => x),
+      );
     },
     (r) => {
       const [e, y] = pick(r, events);
@@ -49,14 +71,14 @@ const people = (items: readonly Pair[]) =>
 
 const antiquite: Generator[] = [
   ...chrono([
-    ["Fondation légendaire de Rome", -753], ["Réformes de Clisthène à Athènes", -508], ["Bataille de Marathon", -490], ["Début de la guerre du Péloponnèse", -431],
+    ["Fondation légendaire de Rome", -753], ["Victoire grecque de Salamine sur les Perses", -480], ["Bataille de Marathon", -490], ["Début de la guerre du Péloponnèse", -431],
     ["Mort de Périclès", -429], ["Procès et mort de Socrate", -399], ["Assassinat de Jules César", -44], ["Bataille d'Actium", -31], ["Octave reçoit le titre d'Auguste", -27],
     ["Édit de Caracalla : citoyenneté pour tous les hommes libres de l'Empire", 212], ["Édit de Milan : liberté de culte pour les chrétiens", 313], ["Fin de l'Empire romain d'Occident", 476],
   ]),
   ...terms([
     ["ecclésia", "l'assemblée des citoyens athéniens qui vote les lois"], ["boulè", "le conseil qui prépare les lois à Athènes"], ["métèque", "un étranger libre résidant à Athènes, sans droits politiques"],
     ["stratège", "un magistrat athénien élu chargé de l'armée"], ["ostracisme", "le bannissement d'un citoyen par vote pour dix ans"], ["Sénat romain", "l'assemblée des anciens magistrats de Rome"],
-    ["consul", "l'un des deux magistrats principaux de la République romaine"], ["romanisation", "la diffusion du mode de vie romain dans l'Empire"], ["mistophore", "l'indemnité versée aux citoyens pauvres pour participer à la vie politique"],
+    ["consul", "l'un des deux magistrats principaux de la République romaine"], ["romanisation", "la diffusion du mode de vie romain dans l'Empire"], ["misthos", "l'indemnité versée aux citoyens pauvres pour participer à la vie politique"],
     ["Forum", "la place publique, centre de la vie politique d'une cité romaine"],
   ]),
   ...people([
@@ -67,6 +89,7 @@ const antiquite: Generator[] = [
     ["À Athènes, les femmes étaient citoyennes et votaient à l'ecclésia.", false, "Seuls les hommes libres nés de parents athéniens étaient citoyens."],
     ["Les esclaves étaient exclus de la citoyenneté athénienne.", true, "Comme les femmes et les métèques."],
     ["La citoyenneté romaine pouvait être accordée à des non-Romains.", true, "Elle s'étend progressivement jusqu'à l'édit de Caracalla (212)."],
+    ["Depuis la loi de Périclès (451 av. J.-C.), il suffit d'avoir un père athénien pour être citoyen.", false, "Il faut désormais être né d'un père citoyen et d'une mère elle-même fille de citoyen."],
   ]),
 ];
 
@@ -87,20 +110,20 @@ const moyenAge: Generator[] = [
   ),
   claims([
     ["Venise et Gênes contrôlent une grande partie du commerce méditerranéen au Moyen Âge.", true, "Grâce à leurs comptoirs."],
-    ["La Méditerranée médiévale est seulement un lieu d'affrontements.", false, "C'est aussi un espace d'échanges commerciaux et culturels."],
+    ["Les croisés conservent un royaume en Terre sainte jusqu'à la fin du Moyen Âge.", false, "Saint-Jean-d'Acre, dernière place des croisés, tombe en 1291 face aux Mamelouks."],
     ["Les savants arabes ont transmis des textes grecs à l'Occident.", true, "Traductions à Tolède notamment."],
   ]),
 ];
 
 const renaissance: Generator[] = [
   ...chrono([
-    ["Bible de Gutenberg, premier grand livre imprimé", 1455], ["Christophe Colomb atteint l'Amérique", 1492], ["Traité de Tordesillas", 1494], ["Vasco de Gama atteint l'Inde", 1498],
+    ["Prise de Constantinople par les Ottomans", 1453], ["Christophe Colomb atteint l'Amérique", 1492], ["Traité de Tordesillas", 1494], ["Vasco de Gama atteint l'Inde", 1498],
     ["Les 95 thèses de Luther", 1517], ["Départ de l'expédition de Magellan", 1519], ["Prise de Tenochtitlan par Cortés", 1521], ["Calvin publie l'Institution de la religion chrétienne", 1536],
     ["Copernic publie sa théorie héliocentrique", 1543], ["Ouverture du concile de Trente", 1545], ["Massacre de la Saint-Barthélemy", 1572], ["Édit de Nantes", 1598],
   ]),
   ...people([
     ["Érasme", "un humaniste néerlandais, auteur de l'Éloge de la folie"], ["Léonard de Vinci", "un artiste et ingénieur, peintre de la Joconde"], ["Michel-Ange", "le peintre du plafond de la chapelle Sixtine"],
-    ["Martin Luther", "le moine allemand à l'origine de la Réforme protestante"], ["Jean Calvin", "le réformateur protestant installé à Genève"], ["Nicolas Copernic", "l'astronome qui place le Soleil au centre de l'Univers"],
+    ["Martin Luther", "le moine allemand à l'origine de la Réforme protestante"], ["Jean Calvin", "le réformateur protestant installé à Genève"], ["Nicolas Copernic", "l'astronome polonais auteur du De revolutionibus (1543)"],
     ["Galilée", "le savant condamné pour avoir défendu l'héliocentrisme"], ["Gutenberg", "l'inventeur de l'imprimerie à caractères mobiles"], ["Magellan", "le navigateur dont l'expédition réalise le premier tour du monde"],
     ["Hernán Cortés", "le conquistador qui soumet l'Empire aztèque"], ["Henri IV", "le roi qui signe l'édit de Nantes"],
   ]),
@@ -118,7 +141,7 @@ const lumieres: Generator[] = [
     ["Traité de Paris : indépendance américaine reconnue", 1783], ["Constitution des États-Unis", 1787], ["Début de la révolte des esclaves de Saint-Domingue", 1791],
   ]),
   ...people([
-    ["Montesquieu", "le philosophe qui théorise la séparation des pouvoirs"], ["Voltaire", "le philosophe qui combat l'intolérance religieuse"], ["Jean-Jacques Rousseau", "le philosophe de la souveraineté du peuple"],
+    ["Montesquieu", "l'auteur de De l'esprit des lois (1748)"], ["Voltaire", "l'auteur du Traité sur la tolérance, défenseur de Jean Calas"], ["Jean-Jacques Rousseau", "l'auteur du Contrat social, théoricien de la volonté générale"],
     ["Denis Diderot", "le directeur de l'Encyclopédie avec d'Alembert"], ["John Locke", "le philosophe anglais des droits naturels"], ["George Washington", "le premier président des États-Unis"],
     ["Thomas Jefferson", "le principal rédacteur de la Déclaration d'indépendance"], ["Toussaint Louverture", "le chef de la révolte des esclaves de Saint-Domingue"],
   ]),
@@ -141,8 +164,9 @@ const environnement: Generator[] = [
     return tf(`${cap(src)} est une énergie renouvelable.`, renew, `${cap(src)} : énergie ${renew ? "renouvelable" : "non renouvelable (stock limité)"}.`);
   },
   (r) => {
-    const [ev, kind] = pick(r, [["un séisme", "naturel"], ["une crue", "naturel"], ["un cyclone", "naturel"], ["l'explosion d'une usine chimique", "technologique"], ["une marée noire", "technologique"], ["un accident nucléaire", "technologique"], ["une éruption volcanique", "naturel"], ["la rupture d'un barrage", "technologique"]] as const);
-    return mcq(r, `${cap(ev)} relève d'un risque…`, kind, ["naturel", "technologique", "sanitaire"], `${cap(ev)} : risque ${kind}.`);
+    const [ev, kind] = pick(r, [["un séisme", "naturel"], ["une crue", "naturel"], ["un cyclone", "naturel"], ["l'explosion d'une usine chimique", "technologique"], ["une marée noire", "technologique"], ["un accident nucléaire", "technologique"], ["une éruption volcanique", "naturel"], ["la rupture d'un barrage", "technologique"], ["une épidémie de choléra", "sanitaire"], ["un glissement de terrain", "naturel"], ["une pandémie de grippe", "sanitaire"], ["la fuite d'un gazoduc", "technologique"],
+      ["l'accident nucléaire de Fukushima causé par un tsunami", "naturel et technologique à la fois"], ["une fuite de produits toxiques causée par l'inondation d'une usine", "naturel et technologique à la fois"]] as const);
+    return mcq(r, `${cap(ev)} relève d'un risque…`, kind, ["naturel", "technologique", "sanitaire", "naturel et technologique à la fois"].filter((k) => k !== kind), `${cap(ev)} : risque ${kind}${kind.includes("à la fois") ? " (un aléa naturel déclenche un accident technologique : on parle de risque « natech »)" : ""}.`);
   },
   (r) => {
     const pop = pick(r, [2, 5, 10, 20, 50]), conso = pick(r, [50, 100, 150, 200, 250]);
@@ -159,7 +183,7 @@ const revolution: Generator[] = [
     ["Bataille d'Austerlitz", 1805], ["Campagne de Russie", 1812], ["Bataille de Waterloo", 1815],
   ]),
   ...people([
-    ["Maximilien de Robespierre", "un député montagnard, figure de la Terreur"], ["Georges Danton", "un révolutionnaire montagnard guillotiné en 1794"], ["Louis XVI", "le roi guillotiné en 1793"],
+    ["Maximilien de Robespierre", "le chef montagnard du Comité de salut public, renversé le 9 thermidor"], ["Georges Danton", "le tribun de la patrie en danger (« De l'audace… », 1792), chef des Indulgents"], ["Louis XVI", "le roi guillotiné en 1793"],
     ["l'abbé Sieyès", "l'auteur de « Qu'est-ce que le tiers état ? »"], ["La Fayette", "le héros de la guerre d'Amérique, commandant de la garde nationale"], ["Olympe de Gouges", "l'autrice de la Déclaration des droits de la femme et de la citoyenne"],
     ["Napoléon Bonaparte", "le général devenu Premier consul puis empereur"], ["Marat", "le journaliste de L'Ami du peuple, assassiné en 1793"],
   ]),
@@ -176,7 +200,7 @@ const revolution: Generator[] = [
 
 const industrie: Generator[] = [
   ...chrono([
-    ["Brevet de la machine à vapeur perfectionnée de James Watt", 1769], ["Loi Le Chapelier interdisant les corporations", 1791], ["Ligne de chemin de fer Liverpool-Manchester", 1830],
+    ["Brevet de la machine à vapeur perfectionnée de James Watt", 1769], ["Loi Le Chapelier interdisant les coalitions ouvrières et patronales", 1791], ["Ligne de chemin de fer Liverpool-Manchester", 1830],
     ["Manifeste du parti communiste de Marx et Engels", 1848], ["Exposition universelle de Londres (Crystal Palace)", 1851], ["Droit de grève en France", 1864], ["Commune de Paris", 1871],
     ["Loi Waldeck-Rousseau autorisant les syndicats", 1884], ["Inauguration de la tour Eiffel", 1889], ["Encyclique Rerum Novarum", 1891], ["Création de la CGT", 1895],
   ]),
@@ -195,7 +219,7 @@ const industrie: Generator[] = [
 const ww1: Generator[] = [
   ...chrono([
     ["Attentat de Sarajevo", 1914], ["Bataille de la Marne", 1914], ["Génocide des Arméniens", 1915], ["Bataille de Verdun", 1916], ["Entrée en guerre des États-Unis", 1917],
-    ["Révolution bolchevique en Russie", 1917], ["Armistice du 11 novembre", 1918], ["Traité de Versailles", 1919], ["Création de la Société des Nations", 1920],
+    ["Révolution bolchevique en Russie", 1917], ["Armistice du 11 novembre", 1918], ["Traité de Versailles", 1919], ["Entrée en vigueur du pacte de la Société des Nations", 1920],
   ]),
   ...terms([
     ["guerre totale", "une guerre qui mobilise toutes les ressources humaines, économiques et morales d'un pays"], ["poilu", "le surnom du soldat français de la Grande Guerre"],
@@ -212,17 +236,22 @@ const ww1: Generator[] = [
 const metropoles: Generator[] = [
   ...terms([
     ["métropolisation", "la concentration des populations et des activités dans les grandes villes"], ["ville mondiale", "une ville qui concentre des fonctions de commandement à l'échelle mondiale"],
-    ["mégalopole", "un ensemble de métropoles reliées formant un axe urbain continu"], ["périurbanisation", "l'extension des villes vers leurs périphéries rurales"],
+    ["mégalopole", "un ensemble de métropoles reliées formant un axe urbain continu"], ["périurbanisation", "l'installation de citadins dans des communes rurales proches des villes, où ils continuent de travailler"],
     ["gentrification", "l'embourgeoisement d'un quartier populaire"], ["étalement urbain", "l'extension de la surface urbanisée plus rapide que la population"],
     ["CBD", "le quartier central des affaires"], ["fragmentation urbaine", "la séparation socio-spatiale des quartiers d'une ville"], ["aire d'attraction", "l'espace dont une ville attire quotidiennement les travailleurs"],
     ["mégapole", "une très grande agglomération de plus de 10 millions d'habitants"],
   ]),
-  ...pairs(
-    [["Tokyo", "Japon"], ["Delhi", "Inde"], ["Shanghai", "Chine"], ["São Paulo", "Brésil"], ["Mexico", "Mexique"], ["Le Caire", "Égypte"], ["Lagos", "Nigeria"], ["New York", "États-Unis"], ["Paris", "France"], ["Istanbul", "Turquie"]],
-    { ask: (a) => `Dans quel pays se trouve la métropole de ${a} ?`, reverse: (b) => `Quelle grande métropole se trouve dans ce pays : ${b} ?`, claim: (a, b) => `${a} se trouve dans ce pays : ${b}.`, explain: (a, b) => `${a} : ${b}.` },
-  ),
+  cards([
+    ["Quelle ville, première place financière mondiale, est le cœur de la mégalopole du Nord-Est des États-Unis (BosWash) ?", "New York", ["Boston", "Philadelphie", "Washington"], "La BosWash associe la finance et les médias (New York), le pouvoir politique (Washington) et les grandes universités (Boston)."],
+    ["La mégalopole japonaise s'étire surtout…", "sur la façade Pacifique, de Tokyo au nord de Kyushu", ["sur la façade de la mer du Japon, de Niigata à Fukuoka", "dans l'île d'Hokkaido, autour de Sapporo", "dans les montagnes du centre de Honshu"], "Tokyo, Nagoya, Osaka, Kobe, Hiroshima, Fukuoka : un littoral industriel et portuaire très densément peuplé."],
+    ["Laquelle de ces métropoles n'appartient pas à la dorsale européenne (la « banane bleue » de Roger Brunet) ?", "Paris", ["Francfort", "Milan", "Strasbourg"], "La dorsale va du sud de l'Angleterre à l'Italie du Nord par le Benelux, la vallée du Rhin et la Suisse : Paris reste à l'écart."],
+    ["Quel fleuve forme l'axe central de la dorsale européenne ?", "le Rhin", ["le Danube", "le Rhône", "l'Elbe"], "Le Rhin relie la Suisse à Rotterdam, premier port d'Europe."],
+    ["La mégalopole ChiPitts, ancien cœur industriel aujourd'hui en partie « Rust Belt », s'étend…", "autour des Grands Lacs", ["le long du golfe du Mexique", "en Nouvelle-Angleterre", "dans les Grandes Plaines"], "De Chicago à Pittsburgh par Detroit et Cleveland : sidérurgie et automobile, puis désindustrialisation."],
+    ["La mégalopole californienne (SanSan) appartient à…", "la Sun Belt", ["la Rust Belt", "la Corn Belt", "la Manufacturing Belt"], "Le Sud et l'Ouest ensoleillés, dynamiques depuis les années 1970 (Silicon Valley, Los Angeles)."],
+    ["Quelle région urbaine chinoise s'organise autour de Hong Kong, Shenzhen et Canton ?", "le delta de la rivière des Perles", ["le delta du Yangzi", "la région de Pékin-Tianjin", "le bassin du Sichuan"], "Le delta du Yangzi s'organise autour de Shanghai ; Pékin-Tianjin est la région de la capitale."],
+  ]),
   (r) => {
-    const urb = pick(r, [30, 47, 55, 57, 68, 70]);
+    const urb = pick(r, [30, 40, 57, 68, 75]);
     return tf(`Environ ${urb} % de la population mondiale vit aujourd'hui en ville.`, urb === 57, `Un peu plus de la moitié : environ 57 % (ONU, années 2020).`);
   },
 ];
@@ -232,7 +261,7 @@ const metropoles: Generator[] = [
 const totalitarismes: Generator[] = [
   ...chrono([
     ["Marche sur Rome de Mussolini", 1922], ["Mort de Lénine", 1924], ["Krach de Wall Street", 1929], ["Hitler devient chancelier", 1933], ["Lancement du New Deal", 1933],
-    ["Nuit des longs couteaux", 1934], ["Lois de Nuremberg", 1935], ["Front populaire en France", 1936], ["Grande Terreur en URSS", 1937], ["Nuit de Cristal", 1938], ["Accords de Munich", 1938],
+    ["Nuit des longs couteaux", 1934], ["Lois de Nuremberg", 1935], ["Front populaire en France", 1936], ["Début de la guerre d'Espagne", 1936], ["Nuit de Cristal", 1938], ["Accords de Munich", 1938],
   ]),
   ...terms([
     ["totalitarisme", "un régime qui contrôle toute la société par la terreur et la propagande"], ["Goulag", "le système des camps de travail forcé en URSS"], ["culte de la personnalité", "la glorification excessive d'un dirigeant"],
@@ -257,7 +286,7 @@ const ww2: Generator[] = [
   ]),
   ...people([
     ["Charles de Gaulle", "le chef de la France libre"], ["Philippe Pétain", "le chef de l'État français de Vichy"], ["Jean Moulin", "l'unificateur de la Résistance intérieure"],
-    ["Winston Churchill", "le Premier ministre britannique pendant la guerre"], ["Pierre Laval", "le chef du gouvernement de Vichy, partisan de la collaboration"],
+    ["Winston Churchill", "le Premier ministre britannique pendant la guerre"], ["Pierre Laval", "le chef du gouvernement de Vichy à partir de 1942, qui « souhaite la victoire de l'Allemagne »"],
   ]),
   (r) => {
     const [e, d] = pick(r, [["l'appel du général de Gaulle", "18 juin 1940"], ["le débarquement en Normandie", "6 juin 1944"], ["la capitulation allemande", "8 mai 1945"], ["la rafle du Vél d'Hiv", "16 juillet 1942"], ["l'invasion de la Pologne", "1er septembre 1939"], ["l'attaque de Pearl Harbor", "7 décembre 1941"]] as const);
@@ -291,7 +320,7 @@ const veRepublique: Generator[] = [
   ]),
   ...pairs(
     [["Charles de Gaulle", "1959"], ["Georges Pompidou", "1969"], ["Valéry Giscard d'Estaing", "1974"], ["François Mitterrand", "1981"], ["Jacques Chirac", "1995"], ["Nicolas Sarkozy", "2007"], ["François Hollande", "2012"], ["Emmanuel Macron", "2017"]],
-    { ask: (a) => `En quelle année ${a} devient-il président de la République ?`, reverse: (b) => `Quel président entre à l'Élysée en ${b} ?`, claim: (a, b) => `${a} devient président de la République en ${b}.`, explain: (a, b) => `${a} : élu en ${b}.` },
+    { ask: (a) => `En quelle année ${a} devient-il président de la République ?`, reverse: (b) => `Quel président entre à l'Élysée en ${b} ?`, claim: (a, b) => `${a} devient président de la République en ${b}.`, explain: (a, b) => `${a} : président à partir de ${b}${b === "1959" ? " (élu en décembre 1958, il entre en fonctions en janvier 1959)" : ""}.` },
   ),
   ...terms([
     ["cohabitation", "la coexistence d'un président et d'un gouvernement de bords opposés"], ["motion de censure", "le vote par lequel l'Assemblée peut renverser le gouvernement"],
@@ -319,10 +348,10 @@ const mers: Generator[] = [
     return mcq(r, `Le canal ${canal} relie…`, sea, ["la Méditerranée et la mer Rouge", "l'Atlantique et le Pacifique", "la mer du Nord et la Baltique", "la mer Noire et la Méditerranée"], `Canal ${canal} : ${sea}.`);
   },
   claims([
-    ["Environ 90 % du commerce mondial de marchandises (en volume) passe par la mer.", true, "Le transport maritime est le moins cher."],
+    ["Plus de 80 % du commerce mondial de marchandises (en volume) passe par la mer.", true, "Le transport maritime est le moins cher (CNUCED)."],
     ["La France possède la deuxième ZEE du monde grâce à ses territoires ultramarins.", true, "Environ 10 millions de km²."],
     ["Shanghai est le premier port à conteneurs du monde.", true, "Les grands ports mondiaux sont surtout asiatiques."],
-    ["La haute mer appartient à l'État le plus proche.", false, "Elle n'appartient à aucun État."],
+    ["La haute mer commence dès la limite de la mer territoriale (12 milles marins).", false, "Elle commence au-delà des ZEE (200 milles) : la haute mer n'appartient à aucun État."],
   ]),
 ];
 

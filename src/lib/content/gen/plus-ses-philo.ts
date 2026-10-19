@@ -2,7 +2,7 @@
  * SES et philosophie : questions supplémentaires (notions, mécanismes,
  * auteurs, repères du programme, analyse de sujets), en complément des banques existantes.
  */
-import { type Card, type Claim, type Generator, type Pair, cards, claims, pairs } from "./kit";
+import { type Card, type Claim, type Generator, type Pair, cards, claims, mcq, pairs, pick, withFact } from "./kit";
 
 const bank = (c: Card[], v: Claim[] = []): Generator[] => (v.length ? [cards(c), claims(v)] : [cards(c)]);
 
@@ -178,7 +178,7 @@ const SES: Record<string, Generator[]> = {
       ["La mobilité structurelle est…", "la mobilité due à l'évolution de la structure des emplois", ["la mobilité choisie", "la mobilité géographique", "la mobilité due au hasard"], "Exemple : la baisse du nombre d'agriculteurs."],
       ["Pour Bourdieu, la réussite scolaire dépend notamment…", "du capital culturel transmis par la famille", ["uniquement du talent", "du hasard", "du capital économique seulement"], "La reproduction sociale passe par l'école."],
       ["Le paradoxe d'Anderson souligne que…", "un diplôme plus élevé que celui de ses parents ne garantit pas une position sociale plus élevée", ["les diplômes n'ont aucune valeur", "tout le monde progresse socialement", "les parents réussissent mieux que leurs enfants"], "En raison de la hausse générale du niveau de diplôme."],
-      ["La fluidité sociale mesure…", "l'égalité des chances d'accès aux positions sociales, indépendamment des changements de structure", ["le nombre de déménagements", "le revenu moyen", "la mobilité géographique"], "On parle aussi de mobilité nette."],
+      ["La fluidité sociale mesure…", "l'égalité des chances d'accès aux positions sociales, indépendamment des changements de structure", ["le nombre de déménagements", "le revenu moyen", "la mobilité géographique"], "On la mesure par des rapports de chances relatives (odds ratios), qui neutralisent l'évolution de la structure des emplois."],
     ],
     [
       ["La mobilité sociale observée peut augmenter sans que l'égalité des chances progresse.", true, "Si elle vient seulement des changements de structure."],
@@ -213,19 +213,49 @@ const REPERES: Pair[] = [
   ["« principe » / « conséquence »", "ce dont on part / ce qui en découle"],
 ];
 
-/** Sujets de dissertation et notion principale du programme. */
-const SUJETS: Pair[] = [
-  ["Peut-on se connaître soi-même ?", "la conscience"], ["Sommes-nous responsables de ce dont nous n'avons pas conscience ?", "l'inconscient"],
-  ["Être libre, est-ce faire ce que l'on veut ?", "la liberté"], ["Le bonheur est-il le but de la vie ?", "le bonheur"],
-  ["Peut-on être heureux sans le savoir ?", "le bonheur"], ["Faut-il toujours dire la vérité ?", "la vérité"],
-  ["La science peut-elle tout expliquer ?", "la science"], ["Une œuvre d'art doit-elle être belle ?", "l'art"],
-  ["Le travail libère-t-il l'homme ?", "le travail"], ["La technique nous rend-elle plus libres ?", "la technique"],
-  ["Peut-on désobéir aux lois ?", "l'État"], ["Est-il juste d'obéir aux lois ?", "la justice"],
-  ["Le langage trahit-il la pensée ?", "le langage"], ["Peut-on échapper au temps ?", "le temps"],
-  ["Faut-il agir par devoir ?", "le devoir"], ["La raison peut-elle tout connaître ?", "la raison"],
-  ["Peut-on vivre sans religion ?", "la religion"], ["Que doit-on à autrui ?", "le devoir"],
-  ["L'histoire a-t-elle un sens ?", "l'histoire"], ["La nature est-elle un modèle ?", "la nature"],
+/** Les 17 notions du programme de philosophie de terminale (2020). */
+const NOTIONS = [
+  "l'art", "le bonheur", "la conscience", "le devoir", "l'État", "l'inconscient", "la justice", "le langage", "la liberté",
+  "la nature", "la raison", "la religion", "la science", "la technique", "le temps", "le travail", "la vérité",
 ];
+
+/**
+ * Sujets de dissertation : [sujet, notion principale, autres notions directement en jeu].
+ * Les notions voisines ne servent jamais de leurre (elles seraient défendables).
+ */
+const SUJETS: Array<readonly [string, string, readonly string[]]> = [
+  ["Peut-on se connaître soi-même ?", "la conscience", ["l'inconscient", "la vérité", "la raison"]],
+  ["Sommes-nous responsables de ce dont nous n'avons pas conscience ?", "l'inconscient", ["la conscience", "la liberté", "le devoir", "la justice"]],
+  ["Être libre, est-ce faire ce que l'on veut ?", "la liberté", ["le devoir", "le bonheur", "la raison", "l'État"]],
+  ["Le bonheur est-il le but de la vie ?", "le bonheur", ["le devoir", "la raison", "la liberté"]],
+  ["Peut-on être heureux sans le savoir ?", "le bonheur", ["la conscience", "la vérité", "l'inconscient"]],
+  ["Faut-il toujours dire la vérité ?", "la vérité", ["le devoir", "le langage", "la justice"]],
+  ["La science peut-elle tout expliquer ?", "la science", ["la raison", "la vérité", "la religion", "la nature"]],
+  ["Une œuvre d'art doit-elle être belle ?", "l'art", ["la nature", "la vérité"]],
+  ["Le travail libère-t-il l'homme ?", "le travail", ["la liberté", "la technique", "le bonheur"]],
+  ["La technique nous rend-elle plus libres ?", "la technique", ["la liberté", "le travail", "la nature", "la science"]],
+  ["Peut-on désobéir aux lois ?", "l'État", ["la justice", "le devoir", "la liberté"]],
+  ["Est-il juste d'obéir aux lois ?", "la justice", ["l'État", "le devoir", "la liberté"]],
+  ["Le langage trahit-il la pensée ?", "le langage", ["la conscience", "la vérité", "la raison"]],
+  ["Peut-on échapper au temps ?", "le temps", ["la liberté", "la conscience", "la religion"]],
+  ["Faut-il agir par devoir ?", "le devoir", ["la liberté", "la raison", "le bonheur", "la justice"]],
+  ["La raison peut-elle tout connaître ?", "la raison", ["la science", "la vérité", "la religion"]],
+  ["Peut-on vivre sans religion ?", "la religion", ["le bonheur", "la raison", "la vérité"]],
+  ["Que doit-on à autrui ?", "le devoir", ["la justice", "la conscience", "la liberté"]],
+  ["L'État est-il l'ennemi de la liberté ?", "l'État", ["la liberté", "la justice"]],
+  ["La nature est-elle un modèle ?", "la nature", ["l'art", "le devoir", "la technique", "la science"]],
+  ["Le rêve a-t-il un sens ?", "l'inconscient", ["la conscience", "le langage"]],
+];
+
+/** Notion principale d'un sujet ; les leurres excluent les notions voisines du sujet. */
+const sujets: Generator = Object.assign(
+  (r: Parameters<Generator>[0]) => {
+    const [sujet, main, near] = pick(r, SUJETS);
+    const wrongs = NOTIONS.filter((n) => n !== main && !near.includes(n));
+    return withFact(mcq(r, `Sujet : « ${sujet} » Notion principale en jeu ?`, main, wrongs, `« ${sujet} » porte d'abord sur ${main}${near.length ? `, en croisant ${near.slice(0, 2).join(" et ")}` : ""}.`), sujet, main);
+  },
+  { memo: SUJETS.map(([sujet, main]) => ({ front: `Sujet : « ${sujet} » Notion principale en jeu ?`, back: main })) },
+);
 
 const PHILO: Record<string, Generator[]> = {
   "philo-t-methode": [
@@ -234,10 +264,7 @@ const PHILO: Record<string, Generator[]> = {
       reverse: (b) => `Quel couple de repères oppose : ${b} ?`,
       explain: (a, b) => `${a} : ${b}.`,
     }),
-    ...pairs(SUJETS, {
-      ask: (a) => `Sujet : « ${a} » Notion principale en jeu ?`,
-      explain: (a, b) => `« ${a} » porte d'abord sur ${b}, même s'il croise d'autres notions.`,
-    }),
+    sujets,
     cards([
       ["Une problématique de dissertation, c'est…", "la question qui fait apparaître la difficulté (le paradoxe) cachée dans le sujet", ["le résumé du plan", "la définition d'un mot", "la conclusion"], "Elle justifie que le sujet mérite d'être traité."],
       ["Dans une dissertation, un exemple sert à…", "illustrer et appuyer un argument, puis être analysé", ["remplacer l'argument", "raconter une anecdote personnelle", "allonger la copie"], "Un exemple seul ne prouve rien."],
@@ -313,7 +340,7 @@ const PHILO: Record<string, Generator[]> = {
         ["Discours sur l'origine de l'inégalité", "Rousseau"], ["Critique de la raison pure", "Kant"], ["La Généalogie de la morale", "Nietzsche"], ["L'Évolution créatrice", "Bergson"],
         ["L'existentialisme est un humanisme", "Sartre"], ["Condition de l'homme moderne", "Hannah Arendt"], ["Le Mythe de Sisyphe", "Camus"], ["La Formation de l'esprit scientifique", "Bachelard"],
       ],
-      { ask: (a) => `Qui a écrit « ${a} » ?`, reverse: (b) => `Quelle œuvre a écrite ${b} ?`, claim: (a, b) => `« ${a} » est une œuvre de ${b}.`, explain: (a, b) => `« ${a} » : ${b}.` },
+      { ask: (a) => `Qui a écrit « ${a} » ?`, reverse: (b) => `Quelle œuvre a écrite ${b} ?`, claim: (a, b) => `« ${a} » est une œuvre ${/^[AEIOUÉÈ]/.test(b) ? `d'${b}` : `de ${b}`}.`, explain: (a, b) => `« ${a} » : ${b}.` },
     ),
   ],
 };

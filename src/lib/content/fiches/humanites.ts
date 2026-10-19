@@ -546,7 +546,7 @@ export const HUMANITES = String.raw`
 
 @es-t-argumenter
 - Creo que + indicatif ; no creo que + subjonctif ; en mi opinión.
-- Además, sin embargo, por lo tanto, en cambio, por fin.
+- Además, sin embargo, por lo tanto, en cambio, por último.
 - Futur (hablaré), conditionnel (hablaría).
 - Si + présent → futur ; si + subjonctif imparfait → conditionnel.
 ! « No creo que sea » : subjonctif après une opinion négative.

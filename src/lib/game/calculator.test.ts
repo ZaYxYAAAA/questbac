@@ -28,6 +28,9 @@ describe("evaluate", () => {
     expect(() => evaluate("2+")).toThrow();
     expect(() => evaluate("1÷0")).toThrow();
     expect(() => evaluate("alert(1)")).toThrow();
+    // Virgule en trop : pas de multiplication cachée (2,5 × 0,3).
+    expect(() => evaluate("2,5,3")).toThrow();
+    expect(() => evaluate("2E3,5")).toThrow();
   });
   it("affiche à la française", () => {
     expect(formatResult(98.7)).toBe("98,7");

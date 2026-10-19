@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { Check, RotateCcw, Shuffle, X } from "lucide-react";
 import { Markdown } from "@/components/ui/Markdown";
@@ -26,10 +26,18 @@ export function FlashDeck({ memos, onFinish }: { memos: Memo[]; onFinish?: () =>
   const [flipped, setFlipped] = useState(false);
   const [known, setKnown] = useState(0);
   const [review, setReview] = useState<number[]>([]);
+  /** Carte en train de passer à la suivante : on ignore un second appui (double clic, touche Entrée répétée). */
+  const moving = useRef<ReturnType<typeof setTimeout> | null>(null);
   const done = pos >= order.length;
   const card = done ? null : memos[order[pos]];
 
+  useEffect(() => () => {
+    if (moving.current) clearTimeout(moving.current);
+  }, []);
+
   const restart = (next: number[]) => {
+    if (moving.current) clearTimeout(moving.current);
+    moving.current = null;
     setOrder(next);
     setPos(0);
     setFlipped(false);
@@ -37,12 +45,16 @@ export function FlashDeck({ memos, onFinish }: { memos: Memo[]; onFinish?: () =>
     setReview([]);
   };
   const answer = (ok: boolean) => {
+    if (!flipped || moving.current) return;
     if (ok) setKnown((k) => k + 1);
     else setReview((r) => [...r, order[pos]]);
     setFlipped(false);
     if (pos + 1 >= order.length) onFinish?.();
     // Laisse la carte se retourner avant de passer à la suivante.
-    setTimeout(() => setPos((p) => p + 1), 180);
+    moving.current = setTimeout(() => {
+      moving.current = null;
+      setPos((p) => p + 1);
+    }, 180);
   };
 
   const ratio = useMemo(() => (order.length ? pos / order.length : 0), [pos, order.length]);
@@ -81,7 +93,7 @@ export function FlashDeck({ memos, onFinish }: { memos: Memo[]; onFinish?: () =>
         </button>
       </div>
 
-      <button key={`${order[pos]}-${pos}`} type="button" onClick={() => setFlipped((f) => !f)} className="qb-flip qb-card-in block w-full text-left" aria-label={flipped ? "Voir la question" : "Voir la réponse"}>
+      <button key={`${order[pos]}-${pos}`} type="button" onClick={() => !moving.current && setFlipped((f) => !f)} className="qb-flip qb-card-in block w-full text-left" aria-label={flipped ? "Voir la question" : "Voir la réponse"}>
         <div className={clsx("qb-flip-inner", flipped && "is-flipped")}>
           <div className="qb-face flex min-h-48 flex-col justify-between gap-3 rounded-3xl border border-white/10 bg-gradient-to-br from-slate-800 to-slate-900 p-5 shadow-xl">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Question</span>
@@ -100,10 +112,10 @@ export function FlashDeck({ memos, onFinish }: { memos: Memo[]; onFinish?: () =>
       </button>
 
       <div className={clsx("grid grid-cols-2 gap-2 transition-opacity duration-300", flipped ? "opacity-100" : "pointer-events-none opacity-30")}>
-        <button type="button" onClick={() => answer(false)} className="qb-press flex items-center justify-center gap-2 rounded-2xl border border-rose-400/40 bg-rose-500/15 py-3 font-bold text-rose-200">
+        <button type="button" disabled={!flipped} onClick={() => answer(false)} className="qb-press flex items-center justify-center gap-2 rounded-2xl border border-rose-400/40 bg-rose-500/15 py-3 font-bold text-rose-200">
           <X size={18} /> À revoir
         </button>
-        <button type="button" onClick={() => answer(true)} className="qb-press flex items-center justify-center gap-2 rounded-2xl border border-emerald-400/40 bg-emerald-500/15 py-3 font-bold text-emerald-200">
+        <button type="button" disabled={!flipped} onClick={() => answer(true)} className="qb-press flex items-center justify-center gap-2 rounded-2xl border border-emerald-400/40 bg-emerald-500/15 py-3 font-bold text-emerald-200">
           <Check size={18} /> Je savais
         </button>
       </div>

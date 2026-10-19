@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { codeFromBytes } from "@/lib/friend-code";
 import type { PublicProfile } from "@/lib/game/save";
 import { publicPlayerId } from "./auth";
+import { withLocks } from "./lock";
 import { getStore } from "./store";
 
 /**
@@ -32,28 +33,36 @@ export async function friendIds(accountId: string): Promise<string[]> {
 
 export type AddResult = "added" | "already" | "self" | "full";
 
+/** Verrou des listes d'amis : deux ajouts simultanés ne s'effacent pas l'un l'autre. */
+const friendsLock = (id: string) => `friends:lock:${id}`;
+
 /** Ajoute l'amitié dans les deux sens. */
 export async function addFriendship(a: string, b: string): Promise<AddResult> {
   if (a === b) return "self";
   const store = getStore();
-  const [mine, theirs] = await Promise.all([friendIds(a), friendIds(b)]);
-  if (mine.includes(b)) return "already";
-  if (mine.length >= MAX_FRIENDS || theirs.length >= MAX_FRIENDS) return "full";
-  await store.set(`friends:${a}`, [...mine, b]);
-  if (!theirs.includes(a)) await store.set(`friends:${b}`, [...theirs, a]);
-  return "added";
+  return withLocks([friendsLock(a), friendsLock(b)], async () => {
+    const [mine, theirs] = await Promise.all([friendIds(a), friendIds(b)]);
+    if (mine.includes(b)) return "already";
+    if (mine.length >= MAX_FRIENDS || theirs.length >= MAX_FRIENDS) return "full";
+    await store.set(`friends:${a}`, [...mine, b]);
+    if (!theirs.includes(a)) await store.set(`friends:${b}`, [...theirs, a]);
+    return "added";
+  });
 }
 
 /** Retire l'amitié des deux côtés ; `publicId` est l'identifiant vu par le client. */
 export async function removeFriendship(a: string, publicId: string): Promise<boolean> {
   const store = getStore();
-  const mine = await friendIds(a);
-  const b = mine.find((id) => publicPlayerId(id) === publicId);
+  const b = (await friendIds(a)).find((id) => publicPlayerId(id) === publicId);
   if (!b) return false;
-  await store.set(`friends:${a}`, mine.filter((id) => id !== b));
-  const theirs = await friendIds(b);
-  await store.set(`friends:${b}`, theirs.filter((id) => id !== a));
-  return true;
+  return withLocks([friendsLock(a), friendsLock(b)], async () => {
+    const mine = await friendIds(a);
+    if (!mine.includes(b)) return false;
+    await store.set(`friends:${a}`, mine.filter((id) => id !== b));
+    const theirs = await friendIds(b);
+    await store.set(`friends:${b}`, theirs.filter((id) => id !== a));
+    return true;
+  });
 }
 
 /** Profils publics des amis (ceux qui n'ont encore rien sauvegardé sont ignorés). */

@@ -34,6 +34,30 @@ function Logo({ size = 20 }: { size?: number }) {
   );
 }
 
+/** Luminance relative (WCAG) d'une couleur « #RRGGBB ». */
+function luminance(hex: string): number {
+  const n = parseInt(hex.slice(1, 7), 16);
+  const [r, g, b] = [n >> 16, (n >> 8) & 255, n & 255].map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+export function contrastRatio(a: string, b: string): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/** Assombrit une couleur jusqu'à ce qu'elle soit lisible en texte sur papier blanc (contraste ≥ 4,5). */
+export function readableOnWhite(hex: string): string {
+  const n = parseInt(hex.slice(1, 7), 16);
+  let rgb = [n >> 16, (n >> 8) & 255, n & 255];
+  const toHex = (c: number[]) => `#${c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`;
+  for (let i = 0; i < 30 && contrastRatio(toHex(rgb), "#FFFFFF") < 4.5; i++) rgb = rgb.map((v) => v * 0.92);
+  return toHex(rgb);
+}
+
 interface Ink {
   accent: string;
   accent2: string;
@@ -77,18 +101,24 @@ export function FichePaper({ chapter, fiche, notations, quiz, options, look }: {
   const theme = THEMES[look.theme];
   const font = FONTS[look.font];
   const accent = theme.accent ?? meta.color;
-  const k: Ink = { accent, accent2: theme.accent2, ink: theme.ink, onAccent: theme.onAccent, title: font.title };
+  // Couleur de la matière (souvent claire : ambre, citron, cyan…) : chiffres en blanc ou en encre, selon le plus lisible.
+  const onAccent = theme.accent ? theme.onAccent : contrastRatio("#FFFFFF", accent) >= contrastRatio(theme.ink, accent) ? "#FFFFFF" : theme.ink;
+  // Texte écrit avec la couleur principale (étiquettes, numéros) : assez foncé pour se lire, aussi une fois imprimé.
+  const accentText = theme.marker ? theme.ink : readableOnWhite(accent);
+  const k: Ink = { accent, accent2: theme.accent2, ink: theme.ink, onAccent, title: font.title };
   let section = 0;
   const next = () => ++section;
 
   return (
     <article className="qb-paper mx-auto bg-white text-slate-800 shadow-2xl print:shadow-none" style={{ fontFamily: font.body, fontSize: `${13.5 * font.scale}px` }}>
+      {/* À l'impression, la règle générale « texte Markdown en noir » ne doit pas effacer les couleurs choisies pour la fiche. */}
+      <style>{"@media print { .qb-paper .qb-md, .qb-paper .qb-md * { color: inherit; } }"}</style>
       <div className="h-2" style={{ background: `linear-gradient(90deg, ${accent}, ${theme.accent2})` }} />
       <div className="qb-paper-body" style={paperStyle(look.paper)}>
         {/* En-tête */}
         <header className="flex items-start gap-4 border-b-2 border-slate-100 pb-4">
           <div className="min-w-0 flex-1">
-            <p className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[0.8em] font-bold uppercase tracking-wider" style={{ background: `${accent}22`, color: theme.marker ? theme.ink : accent, fontFamily: "ui-sans-serif, system-ui, sans-serif" }}>
+            <p className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[0.8em] font-bold uppercase tracking-wider" style={{ background: `${accent}22`, color: accentText, fontFamily: "ui-sans-serif, system-ui, sans-serif" }}>
               {meta.emoji} {meta.name}{meta.extra ? "" : ` · ${levelLabel(chapter.level)}`}
             </p>
             <h1 className="mt-2 text-[1.95em] font-black leading-tight" style={{ color: theme.ink, fontFamily: font.title }}>
@@ -119,7 +149,7 @@ export function FichePaper({ chapter, fiche, notations, quiz, options, look }: {
             <ol className="space-y-2.5">
               {fiche.essentiel.map((p, i) => (
                 <li key={i} className="qb-avoid-break flex gap-3">
-                  <span className="mt-[0.15em] grid h-[1.45em] w-[1.45em] shrink-0 place-items-center rounded-full text-[0.8em] font-black" style={{ background: accent, color: theme.onAccent, fontFamily: "ui-sans-serif, system-ui, sans-serif" }}>{i + 1}</span>
+                  <span className="mt-[0.15em] grid h-[1.45em] w-[1.45em] shrink-0 place-items-center rounded-full text-[0.8em] font-black" style={{ background: accent, color: onAccent, fontFamily: "ui-sans-serif, system-ui, sans-serif" }}>{i + 1}</span>
                   <div className="min-w-0 flex-1">
                     <div className="text-[1em] font-medium leading-relaxed" style={{ color: theme.ink }}><Markdown compact>{p.text}</Markdown></div>
                     {options.explain && p.explain && (
@@ -156,7 +186,7 @@ export function FichePaper({ chapter, fiche, notations, quiz, options, look }: {
             <div className="grid gap-3">
               {fiche.exemples.map((ex, i) => (
                 <div key={i} className="qb-avoid-break rounded-xl border border-slate-200 bg-white/85 p-3.5">
-                  <p className="text-[0.75em] font-black uppercase tracking-wider" style={{ color: theme.marker ? theme.ink : accent }}>Exemple {i + 1}</p>
+                  <p className="text-[0.75em] font-black uppercase tracking-wider" style={{ color: accentText }}>Exemple {i + 1}</p>
                   <div className="mt-0.5 text-[1em] font-semibold leading-relaxed" style={{ color: theme.ink }}><Markdown compact>{ex.question}</Markdown></div>
                   {options.corrections ? (
                     <ol className="mt-2 space-y-1 border-t border-dashed border-slate-200 pt-2">
@@ -205,7 +235,7 @@ export function FichePaper({ chapter, fiche, notations, quiz, options, look }: {
             <ol className="grid gap-x-6 gap-y-2.5 sm:grid-cols-2 print:grid-cols-2">
               {quiz.map((q, i) => (
                 <li key={i} className="flex gap-2 text-[0.93em] leading-snug" style={{ color: theme.ink }}>
-                  <span className="font-black" style={{ color: theme.marker ? theme.ink : accent }}>{i + 1}.</span>
+                  <span className="font-black" style={{ color: accentText }}>{i + 1}.</span>
                   <div className="min-w-0 flex-1">
                     <Markdown compact>{q.front}</Markdown>
                     <div className="mt-1 flex gap-3 text-[0.75em] font-semibold text-slate-400">

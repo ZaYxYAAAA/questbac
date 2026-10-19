@@ -68,7 +68,7 @@ export const PAPERS: Record<PaperId, { name: string }> = {
   points: { name: "Pointillés" },
 };
 
-const isId = <T extends string>(v: unknown, list: Record<T, unknown>): v is T => typeof v === "string" && v in list;
+const isId = <T extends string>(v: unknown, list: Record<T, unknown>): v is T => typeof v === "string" && Object.hasOwn(list, v);
 
 /** Relit un choix enregistré, en revenant aux valeurs par défaut pour ce qui est inconnu. */
 export function parseLook(raw: unknown): PaperLook {

@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import clsx from "clsx";
-import { fmt } from "@/lib/math/parser";
+import { fmt, tryCompile } from "@/lib/math/parser";
 
 /** Mise en page standard d'un labo : graphique à gauche, panneau à droite. */
 export function LabShell({ graph, panel }: { graph: ReactNode; panel: ReactNode }) {
@@ -72,10 +72,11 @@ export function Chips<T extends string>({ value, onChange, options }: { value: T
 
 /** Coefficient LaTeX « propre » : 1x → x, -1x → -x, +- → -. */
 function term(coef: number, variable: string, first: boolean): string {
-  if (Math.abs(coef) < 1e-9) return "";
+  // On décide sur la valeur affichée (arrondie) : 0,999 s'écrit « x » et 0,001 disparaît, comme à l'écran.
+  const shown = fmt(Math.abs(coef));
+  if (shown === "0") return "";
   const sign = coef < 0 ? "-" : first ? "" : "+";
-  const abs = Math.abs(coef);
-  const c = variable && Math.abs(abs - 1) < 1e-9 ? "" : fmt(abs).replace("−", "");
+  const c = variable && shown === "1" ? "" : shown;
   return `${sign} ${c}${variable} `;
 }
 
@@ -89,6 +90,17 @@ export function polyTex(coefs: number[], variable = "x"): string {
     out += term(c, v, out.trim() === "");
   });
   return out.trim() === "" ? "0" : out.trim().replace(/,/g, "{,}");
+}
+
+/**
+ * Compile une fonction de x pour un labo sans curseurs de paramètres :
+ * une autre lettre (« a*x ») donnerait une courbe vide sans explication.
+ */
+export function compileX(source: string): ReturnType<typeof tryCompile> {
+  const result = tryCompile(source);
+  if (!result.ok || result.expr.params.length === 0) return result;
+  const names = result.expr.params.join(", ");
+  return { ok: false, error: `Lettre inconnue : ${names}. Ici, seule la variable x est permise (le traceur universel gère les paramètres).` };
 }
 
 /** Nombre LaTeX avec virgule décimale. */

@@ -2,6 +2,7 @@ import "server-only";
 import { createECDH, createHmac } from "node:crypto";
 import webpush, { type PushSubscription } from "web-push";
 import { sessionSecret } from "./accounts";
+import { withLock } from "./lock";
 import { getStore } from "./store";
 
 /**
@@ -55,15 +56,22 @@ async function subsOf(uid: string): Promise<StoredSubscription[]> {
   return Array.isArray(subs) ? subs : [];
 }
 
+/** Les appareils d'un joueur changent sous verrou : deux appareils abonnés en même temps restent tous les deux. */
+const subsLock = (uid: string) => `${SUBS}:lock:${uid}`;
+
 export async function addSubscription(uid: string, sub: StoredSubscription) {
-  const subs = (await subsOf(uid)).filter((s) => s.endpoint !== sub.endpoint);
-  await getStore().hset(SUBS, uid, [{ endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } }, ...subs].slice(0, MAX_DEVICES));
+  await withLock(subsLock(uid), async () => {
+    const subs = (await subsOf(uid)).filter((s) => s.endpoint !== sub.endpoint);
+    await getStore().hset(SUBS, uid, [{ endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } }, ...subs].slice(0, MAX_DEVICES));
+  });
 }
 
 export async function removeSubscription(uid: string, endpoint: string) {
-  const subs = await subsOf(uid);
-  const kept = subs.filter((s) => s.endpoint !== endpoint);
-  if (kept.length !== subs.length) await getStore().hset(SUBS, uid, kept);
+  await withLock(subsLock(uid), async () => {
+    const subs = await subsOf(uid);
+    const kept = subs.filter((s) => s.endpoint !== endpoint);
+    if (kept.length !== subs.length) await getStore().hset(SUBS, uid, kept);
+  });
 }
 
 export async function hasSubscription(uid: string, endpoint?: string) {

@@ -82,7 +82,13 @@ export default function FriendsPage() {
           <p className="my-2 font-mono text-3xl font-black tracking-widest text-white">{code ?? "…"}</p>
           <div className="flex flex-wrap gap-2">
             <Button onClick={share} disabled={!code}><Share2 size={16} /> Inviter</Button>
-            <Button variant="secondary" disabled={!code} onClick={() => code && navigator.clipboard?.writeText(code).then(() => push({ emoji: "📋", title: "Code copié", tone: "emerald" }))}>
+            <Button variant="secondary" disabled={!code} onClick={() =>
+                code &&
+                navigator.clipboard
+                  ?.writeText(code)
+                  .then(() => push({ emoji: "📋", title: "Code copié", tone: "emerald" }))
+                  .catch(() => push({ emoji: "⚠️", title: "Copie impossible", body: `Ton code : ${code}`, tone: "rose" }))
+              }>
               <Copy size={16} /> Copier le code
             </Button>
           </div>
@@ -109,6 +115,7 @@ export default function FriendsPage() {
       <section className="space-y-2">
         <h2 className="text-lg font-black text-white">Mes amis ({friends.length})</h2>
         {error && <p className="rounded-xl bg-rose-500/15 p-3 text-sm text-rose-300">{error}</p>}
+        {!loaded && !error && <div className="h-16 animate-pulse rounded-2xl bg-slate-900/60" />}
         {loaded && friends.length === 0 && !error && (
           <p className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-slate-500">Pas encore d&apos;amis : partage ton lien d&apos;invitation !</p>
         )}
@@ -129,12 +136,12 @@ export default function FriendsPage() {
               </span>
             </button>
             <span className="relative hidden sm:block"><RankBadge rp={f.rp} size="sm" /></span>
-            <Link href={`/duels?ami=${encodeURIComponent(f.id)}`} aria-label={`Défier ${f.pseudo}`} className="relative rounded-xl bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-500">⚔️ Défier</Link>
+            <Link href={`/duels?ami=${encodeURIComponent(f.id)}`} aria-label={`Défier ${f.pseudo}`} className="relative shrink-0 rounded-xl bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-500">⚔️ Défier</Link>
             <button
               type="button"
               aria-label={`Retirer ${f.pseudo} de mes amis`}
               onClick={() => confirm(`Retirer ${f.pseudo} de tes amis ?`) && removeFriend(f.id).catch((e) => push({ emoji: "⚠️", title: e.message, tone: "rose" }))}
-              className="relative rounded-xl p-2 text-slate-500 hover:bg-rose-600 hover:text-white"
+              className="relative shrink-0 rounded-xl p-2 text-slate-500 hover:bg-rose-600 hover:text-white"
             >
               <UserMinus size={18} />
             </button>
