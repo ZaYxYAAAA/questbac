@@ -49,7 +49,7 @@ export const LABS: LabMeta[] = [
   {
     id: "exp-ln", title: "Exponentielle & logarithme", emoji: "🌋", levels: ["premiere", "terminale"],
     description: "Deux courbes symétriques par rapport à y = x : déplace un point et compare les tangentes.",
-    interactions: ["Symétrie y = x", "Tangentes", "Bases a^x"],
+    interactions: ["Symétrie y = x", "Tangentes", "Fonctions bˣ"],
   },
   {
     id: "integrale", title: "Intégrales & aires", emoji: "🟪", levels: ["terminale"],

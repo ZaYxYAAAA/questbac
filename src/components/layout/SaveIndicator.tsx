@@ -22,7 +22,7 @@ export function SaveIndicator() {
 
   return (
     <Link
-      href="/profil#compte"
+      href="/profil?onglet=compte"
       title={status === "guest" && expired ? "Session expirée : reconnecte-toi pour sauvegarder" : status === "guest" ? "Progression enregistrée sur cet appareil uniquement : crée un compte pour la sauvegarder" : view.label}
       aria-label={view.label}
       data-testid="save-indicator"

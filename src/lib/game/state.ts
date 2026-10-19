@@ -3,7 +3,7 @@
  * (testables, indépendantes du stockage). Le store Zustand ne fait que les appeler.
  */
 import type { CustomMission, Level, QuizResult, SavedFiche, SubjectId } from "@/lib/types";
-import { type BossRecord, bossState, fightInProgress, triesLeft } from "./boss-rules";
+import { type BossRecord, bossState, fightStarted, triesLeft } from "./boss-rules";
 import { type XpBoost, activeBoost, fmtMult, grantBoost, replayFactor } from "./boost";
 import { DUEL_REWARDS, type DuelOutcome } from "./duel";
 import { matchXp, ordinal } from "./match";
@@ -12,6 +12,7 @@ import { type DailyReward, type DailyState, claimDaily } from "./daily";
 import type { LeagueState } from "./league";
 import {
   dayKey,
+  daysBetween,
   levelFromXp,
   missionRewards,
   nextStreak,
@@ -100,7 +101,8 @@ export interface GameData {
     bySubject: Partial<Record<SubjectId, { answered: number; correct: number }>>;
   };
   achievements: Record<string, number>;
-  quests: { day: string; progress: Record<string, number>; done: string[]; chest: boolean };
+  /** `labs` : labos déjà explorés aujourd'hui (rouvrir le même ne fait pas avancer la quête). */
+  quests: { day: string; progress: Record<string, number>; done: string[]; chest: boolean; labs?: string[] };
   weekly: { week: string; xp: number };
   league: LeagueState;
   daily: DailyState;
@@ -176,7 +178,8 @@ export interface RewardSummary {
 
 
 /**
- * Réinitialise quêtes et XP hebdomadaire si le jour / la semaine a changé.
+ * Réinitialise quêtes et XP hebdomadaire si le jour / la semaine a changé,
+ * et remet à zéro l'affichage d'une série interrompue.
  * Au changement de semaine, la ligue écoulée est close : place finale,
  * récompense (XP / RP) et nouveau groupe selon le rang actuel.
  */
@@ -185,6 +188,10 @@ export function refreshPeriods(d: GameData, now = new Date()): GameData {
   const week = weekKey(now);
   let next = d;
   if (d.quests.day !== today) next = { ...next, quests: { day: today, progress: {}, done: [], chest: false } };
+  // Série interrompue (au moins un jour sans réviser) : elle n'est plus affichée, la prochaine activité repart à 1.
+  if (d.streak.count > 0 && d.streak.lastDay && daysBetween(d.streak.lastDay, today) >= 2) {
+    next = { ...next, streak: { ...next.streak, count: 0 } };
+  }
   if (d.weekly.week !== week || d.league.week !== week) {
     // L'ancienne ligue d'XP est remplacée par les groupes du mode classé : plus de récompense ici.
     next = {
@@ -219,6 +226,12 @@ function progressQuests(d: GameData, events: Partial<Record<QuestEvent, number>>
   }
   const chest = !d.quests.chest && done.length === quests.length;
   return { quests: { ...d.quests, progress, done, chest: d.quests.chest || chest }, completed, chest };
+}
+
+/** Ligne du résumé pour un boost gagné : un boost plus fort déjà en cours le rend sans effet (ils ne se cumulent pas). */
+function boostLine(kept: XpBoost, mult: number, duration: string): RewardLine {
+  if (kept.mult > mult) return { label: `Boost XP ×${fmtMult(mult)} sans effet : un boost ×${fmtMult(kept.mult)} est déjà actif`, value: "" };
+  return { label: `🚀 Boost XP ×${fmtMult(mult)} activé`, value: duration };
 }
 
 function addXp(d: GameData, xp: number, now: Date): GameData {
@@ -272,7 +285,7 @@ function finalize(
     xpGained += CHEST_XP;
     lines.push({ label: "Coffre des quêtes du jour", value: `+${CHEST_XP} XP` });
     d = { ...d, boost: grantBoost(d.boost, 1.5, 30, "quests", now) };
-    lines.push({ label: "🚀 Boost XP ×1,5 activé", value: "30 min" });
+    lines.push(boostLine(d.boost!, 1.5, "30 min"));
   }
 
   // Les succès peuvent en débloquer d'autres (ex. niveau atteint grâce à l'XP d'un succès).
@@ -362,8 +375,11 @@ export type SessionInput =
 
 export function applySession(input: GameData, session: SessionInput, now = new Date()) {
   const before = refreshPeriods(input, now);
+  // Combat lancé par startBossFight (essai déjà compté) : son résultat compte, même
+  // s'il a duré plus que FIGHT_TIMEOUT_MS (explications lues longuement entre deux questions).
+  const started = session.kind === "boss" && fightStarted(before.bosses[session.bossId]);
   // Boss déjà vaincu ou perdu (3 essais épuisés) : le combat ne compte pour rien.
-  if (session.kind === "boss" && bossState(before.bosses[session.bossId], now.getTime()) !== "available") {
+  if (session.kind === "boss" && !started && bossState(before.bosses[session.bossId], now.getTime()) !== "available") {
     return finalize(before, before, { xp: 0, rp: 0, lines: [], events: {} }, now);
   }
   let d = touchStreak(applyAnswerStats(before, session.subject, session.result), now);
@@ -373,7 +389,7 @@ export function applySession(input: GameData, session: SessionInput, now = new D
   if (session.kind === "boss") {
     const record: BossRecord = d.bosses[session.bossId] ?? { victories: 0, attempts: 0, bestTimeMs: null };
     // Essai déjà compté au lancement du combat (startBossFight) ; sinon on le compte maintenant.
-    const tries = fightInProgress(record, now.getTime()) ? record.tries ?? 1 : (record.tries ?? 0) + 1;
+    const tries = started ? Math.max(1, record.tries ?? 1) : (record.tries ?? 0) + 1;
     const flawless = session.won && tries === 1;
     d = {
       ...d,
@@ -406,7 +422,7 @@ export function applySession(input: GameData, session: SessionInput, now = new D
       ...(chest ? [{ label: "🎁 Coffre du boss", value: `+${chest} XP` }] : []),
       ...(perfect ? [{ label: "🏅 Trophée « Imbattable » (vaincu au 1er essai)", value: `+${perfect} XP` }] : []),
       ...(bonus > 0 ? [{ label: `Bonus de série (${d.streak.count} j)`, value: `+${bonus} XP` }] : []),
-      ...(session.won ? [{ label: "🚀 Boost XP ×2 activé", value: "30 min" }] : []),
+      ...(session.won ? [boostLine(d.boost!, 2, "30 min")] : []),
       ...(!session.won ? [{ label: left > 0 ? `Essais restants pour ce boss` : "💀 Boss perdu : plus aucun essai", value: left > 0 ? `${left}/3` : "0/3" }] : []),
     ];
     const feed = session.won ? [{ kind: "boss" as const, ref: session.bossId }] : [];
@@ -504,7 +520,12 @@ export function applyActivity(input: GameData, activity: ActivityInput, now = ne
   if (activity.kind === "lab") {
     const firstTime = !d.stats.labsOpened.includes(activity.labId);
     if (firstTime) d = { ...d, stats: { ...d.stats, labsOpened: [...d.stats.labsOpened, activity.labId] } };
-    events.lab = 1;
+    // « Explore 3 labos » : 3 labos différents dans la journée, pas 3 fois le même.
+    const labsToday = d.quests.labs ?? [];
+    if (!labsToday.includes(activity.labId)) {
+      d = { ...d, quests: { ...d.quests, labs: [...labsToday, activity.labId] } };
+      events.lab = 1;
+    }
   } else if (activity.kind === "fiche") {
     d = { ...d, fiches: [activity.fiche, ...d.fiches], stats: { ...d.stats, fichesGenerated: d.stats.fichesGenerated + 1 } };
     events.fiche = 1;
@@ -543,7 +564,7 @@ export function applyDailyClaim(input: GameData, now = new Date()): { data: Game
   let after: GameData = { ...before, daily: claimed.state };
   if (reward.day === 7) {
     after = { ...after, boost: grantBoost(after.boost, 1.5, 60, "daily", now) };
-    lines.push({ label: "🚀 Boost XP ×1,5 activé", value: "1 h" });
+    lines.push(boostLine(after.boost!, 1.5, "1 h"));
   }
   const { data, summary } = finalize(before, after, { xp: reward.xp, rp: reward.rp, lines, events: {} }, now);
   return { data, summary, reward };

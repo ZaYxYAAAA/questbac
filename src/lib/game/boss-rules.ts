@@ -27,6 +27,10 @@ export const FIGHT_TIMEOUT_MS = 30 * 60_000;
 export const fightInProgress = (record: BossRecord | undefined, now = Date.now()) =>
   typeof record?.pending === "number" && now - record.pending < FIGHT_TIMEOUT_MS;
 
+/** Combat lancé (essai compté) et pas encore terminé, quelle que soit sa durée ; un boss déjà vaincu n'en a plus. */
+export const fightStarted = (record: BossRecord | undefined) =>
+  (record?.victories ?? 0) === 0 && (typeof record?.pending === "number" || record?.pending === true);
+
 export function bossState(record: BossRecord | undefined, now = Date.now()): BossState {
   if ((record?.victories ?? 0) > 0) return "defeated";
   // Le dernier essai, tant que son combat est en cours, peut encore être gagné.
@@ -40,6 +44,12 @@ export function triesLeft(record: BossRecord | undefined, now = Date.now()): num
 }
 
 const count = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0);
+
+/** Meilleur temps connu des deux versions (null si aucune n'en a). */
+function bestTime(a: unknown, b: unknown): number | null {
+  const times = [a, b].filter((v): v is number => typeof v === "number" && Number.isFinite(v) && v > 0);
+  return times.length ? Math.min(...times) : null;
+}
 
 /**
  * Fusion serveur : on garde toujours le plus grand nombre d'essais et de victoires
@@ -58,6 +68,7 @@ export function keepBossProgress(stored: Record<string, unknown> | undefined, in
       attempts: Math.max(count(old.attempts), count(now.attempts)),
       tries: Math.max(count(old.tries), count(now.tries)),
       flawless: Boolean(old.flawless || now.flawless),
+      bestTimeMs: bestTime(old.bestTimeMs, now.bestTimeMs),
     };
   }
   return out;

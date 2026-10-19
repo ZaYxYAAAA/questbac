@@ -24,7 +24,7 @@ import {
   tick,
 } from "@/lib/game/match";
 import { hashString, seededRandom, shuffle } from "@/lib/game/quests";
-import { DAILY_SUBJECT_BONUS, OFFERED_KEPT, type RankProfile, RANK_EPOCH, applyResult, chooseChapters, currentWeek, newRankProfile, publicQuestion, rankedWeek, subjectOfDay, subjectRestUntil, varietyBonus } from "@/lib/game/ranked";
+import { BOARD_SIZE, DAILY_SUBJECT_BONUS, OFFERED_KEPT, type RankProfile, RANK_EPOCH, applyResult, chooseChapters, currentWeek, newRankProfile, publicQuestion, rankedWeek, subjectOfDay, subjectRestUntil, varietyBonus } from "@/lib/game/ranked";
 import { rankFromRp } from "@/lib/game/progression";
 import type { PublicProfile } from "@/lib/game/save";
 import { isCorrect } from "@/lib/game/session";
@@ -32,11 +32,13 @@ import type { Level, SubjectId } from "@/lib/types";
 import { getSave } from "./accounts";
 import { publicPlayerId } from "./auth";
 import { friendIds } from "./friends";
+import { withLock } from "./lock";
+import { indexPublicId } from "./players";
 import { getStore } from "./store";
 
 /**
- * Classé en parties à 3 : file d'attente par matière (3 s, puis bots au
- * niveau du joueur), parties `match:<id>` et profils de rang (hash `rank3`).
+ * Classé en parties à 3, 5 ou 7 : file d'attente par matière, niveau et format
+ * (3 s, puis bots au niveau du joueur), parties `match:<id>` et profils de rang (hash `rank3`).
  * Le serveur tire les questions, chronomètre et corrige.
  */
 
@@ -58,7 +60,16 @@ interface Ticket {
 }
 
 const newId = () => randomBytes(9).toString("base64url");
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Refus attendu (pas une panne du stockage) : message pour le joueur et statut HTTP. */
+export class RankedError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
 
 // ─────────────────────────── Profils de rang ───────────────────────────
 
@@ -82,6 +93,20 @@ export async function getRank(uid: string, pseudo: string): Promise<RankProfile>
   return currentWeek(p ?? newRankProfile(pseudo, rankedWeek()), rankedWeek());
 }
 const putRank = (uid: string, p: RankProfile) => getStore().hset(RANKS, uid, p);
+
+/**
+ * Modifie le profil de rang sous verrou : la fin d'une partie (points) et le
+ * lancement d'une autre (partie en cours, thèmes proposés) ne s'écrasent plus.
+ * Indexe aussi l'identifiant public : le joueur apparaît aux classements dès sa
+ * première partie, même s'il n'a jamais sauvegardé (fiche, ajout en ami).
+ */
+async function updateRank(uid: string, pseudo: string, change: (p: RankProfile) => RankProfile): Promise<RankProfile> {
+  return withLock(`rkl:${uid}`, async () => {
+    const next = change(await getRank(uid, pseudo));
+    await Promise.all([putRank(uid, next), indexPublicId(uid)]);
+    return next;
+  });
+}
 
 /** Rang à recopier dans la sauvegarde (badge affiché partout) : c'est le serveur qui fait foi. */
 export async function rankForSave(uid: string): Promise<{ rp: number; peakRp: number }> {
@@ -111,10 +136,10 @@ function look(pub: PublicProfile | null | undefined): RowLook {
   };
 }
 
-/** Retire les miniatures de bannière hors du haut du classement, de mes amis et de moi. */
-function trimBanners<T extends RowLook & { place: number; isMe: boolean; friend: boolean }>(rows: T[]): T[] {
+/** Retire les miniatures de bannière hors du haut des classements, de mes amis et de moi. */
+function trimBanners<T extends RowLook & { place: number; weekPlace?: number; isMe: boolean; friend: boolean }>(rows: T[]): T[] {
   return rows.map((r) => {
-    if (!r.bannerThumb || r.place <= BANNER_ROWS || r.isMe || r.friend) return r;
+    if (!r.bannerThumb || r.place <= BANNER_ROWS || (r.weekPlace ?? Infinity) <= BANNER_ROWS || r.isMe || r.friend) return r;
     const { bannerThumb: _b, bannerId: _i, ...rest } = r;
     return rest as T;
   });
@@ -122,6 +147,8 @@ function trimBanners<T extends RowLook & { place: number; isMe: boolean; friend:
 
 export interface BoardRow extends RowLook {
   id: string;
+  /** Place au classement de la semaine (lignes qui y figurent). */
+  weekPlace?: number;
   pseudo: string;
   avatar: string;
   photoThumb?: string;
@@ -135,14 +162,18 @@ export interface BoardRow extends RowLook {
   place: number;
 }
 
-const BOARD_SIZE = 200;
-
-/** Les `BOARD_SIZE` premiers, numérotés, plus ma ligne si je suis plus loin. */
-function topWithMe<T extends { isMe: boolean }>(sorted: T[]): (T & { place: number })[] {
+/**
+ * Lignes envoyées : les `BOARD_SIZE` premiers du général et ceux de la semaine
+ * (classée sur `weekValue`, parmi les lignes où `inWeek` est vrai, plus la mienne),
+ * ma ligne et celles de mes amis, même plus loin. `place` : place au général.
+ */
+export function boardRows<T extends { isMe: boolean; friend: boolean }>(sorted: T[], weekValue: (r: T) => number, inWeek: (r: T) => boolean): (T & { place: number; weekPlace?: number })[] {
   const rows = sorted.map((r, i) => ({ ...r, place: i + 1 }));
-  const top = rows.slice(0, BOARD_SIZE);
-  const me = rows.find((r) => r.isMe);
-  return me && me.place > BOARD_SIZE ? [...top, me] : top;
+  const week = rows.filter((r) => r.isMe || inWeek(r)).sort((a, b) => weekValue(b) - weekValue(a) || a.place - b.place);
+  const weekPlace = new Map(week.map((r, i) => [r, i + 1]));
+  return rows
+    .filter((r) => r.place <= BOARD_SIZE || (weekPlace.get(r) ?? Infinity) <= BOARD_SIZE || r.isMe || r.friend)
+    .map((r) => (weekPlace.has(r) ? { ...r, weekPlace: weekPlace.get(r)! } : r));
 }
 
 /** Classement général des rangs (avec l'évolution de la semaine). */
@@ -174,11 +205,13 @@ export async function rankBoard(uid: string): Promise<BoardRow[]> {
     })
     .filter((r) => r.games > 0 || r.isMe)
     .sort((a, b) => b.rp - a.rp || b.weekDelta - a.weekDelta);
-  return trimBanners(topWithMe(rows));
+  return trimBanners(boardRows(rows, (r) => r.weekDelta, (r) => r.weekDelta !== 0));
 }
 
 export interface XpRow extends RowLook {
   id: string;
+  /** Place au classement de la semaine (lignes qui y figurent). */
+  weekPlace?: number;
   pseudo: string;
   avatar: string;
   photoThumb?: string;
@@ -211,28 +244,10 @@ export async function xpBoard(uid: string): Promise<XpRow[]> {
       friend: friends.has(id),
     }))
     .sort((a, b) => b.xp - a.xp);
-  return trimBanners(topWithMe(rows));
+  return trimBanners(boardRows(rows, (r) => r.weeklyXp, (r) => r.weeklyXp > 0));
 }
 
 // ─────────────────────────── File d'attente ───────────────────────────
-
-/** Petit verrou (Redis SET NX) pour former les parties sans doublon. */
-async function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
-  const store = getStore();
-  for (let i = 0; i < 40; i++) {
-    if (await store.create(key, Date.now())) {
-      try {
-        return await fn();
-      } finally {
-        await store.del(key);
-      }
-    }
-    const at = await store.get<number>(key);
-    if (at !== null && Date.now() - at > 5000) await store.del(key); // verrou abandonné
-    await sleep(80);
-  }
-  throw new Error("File d'attente occupée, réessaie.");
-}
 
 /** Une file par matière, par niveau (les chapitres en dépendent) et par format de partie. */
 const sizeTag = (n: number) => (n === MATCH_PLAYERS ? "" : `:${n}`);
@@ -240,6 +255,8 @@ const queueKey = (s: SubjectId, l: Level, n: number = MATCH_PLAYERS) => `mmq:${s
 const queueLock = (s: SubjectId, l: Level, n: number = MATCH_PLAYERS) => `mml:${s}:${l}${sizeTag(n)}`;
 const sizeOf = (t: Pick<Ticket, "size">) => t.size ?? MATCH_PLAYERS;
 const ticketKey = (id: string) => `mmt:${id}`;
+/** Dernière recherche lancée par le joueur : une seule à la fois, toutes files confondues. */
+const userTicketKey = (uid: string) => `mmu:${uid}`;
 const matchKey = (id: string) => `match:${id}`;
 
 /**
@@ -297,26 +314,47 @@ export async function getMatch(id: string): Promise<Match | null> {
 }
 const saveMatch = (m: Match) => getStore().set(matchKey(m.id), m);
 
+/** Recherches encore valables d'une file : récentes, sans partie, et pas remplacées par une autre recherche du même joueur. */
 async function freshQueue(subject: SubjectId, level: Level, size: number, now: number): Promise<Ticket[]> {
-  const q = (await getStore().get<Ticket[]>(queueKey(subject, level, size))) ?? [];
-  return q.filter((t) => !t.matchId && now - t.at < TICKET_TTL_MS);
+  const store = getStore();
+  const q = ((await store.get<Ticket[]>(queueKey(subject, level, size))) ?? []).filter((t) => !t.matchId && now - t.at < TICKET_TTL_MS);
+  const current = await store.mget<string>(q.map((t) => userTicketKey(t.uid)));
+  return q.filter((t, i) => current[i] === t.id);
+}
+
+/** Partie pas encore terminée du joueur, s'il en a une. */
+async function ongoingMatch(uid: string, pseudo: string): Promise<string | null> {
+  const rank = await getRank(uid, pseudo);
+  if (!rank.active) return null;
+  const m = await getMatch(rank.active);
+  return m && phaseAt(m, Date.now()).phase !== "done" ? m.id : null;
 }
 
 /** Entrer en file : une partie se forme dès qu'il y a assez de joueurs ; sinon on attend (3 s max, puis bots). */
 export async function joinQueue(uid: string, pseudo: string, subject: SubjectId, size: MatchSize = MATCH_PLAYERS): Promise<{ ticket?: string; matchId?: string }> {
   await resetRanksIfNeeded();
-  const rank = await getRank(uid, pseudo);
+  let rank = await getRank(uid, pseudo);
   if (rank.active) {
     const m = await getMatch(rank.active);
-    if (m && phaseAt(m, Date.now()).phase !== "done") return { matchId: m.id };
+    if (m) {
+      // Partie précédente finie mais pas encore comptée : on la compte d'abord (points, repos de la matière).
+      await advance(m);
+      if (phaseAt(m, Date.now()).phase !== "done") return { matchId: m.id };
+      rank = await getRank(uid, pseudo);
+    }
   }
   const save = await getSave(uid);
+  const level = save?.save.profile?.level ?? "seconde";
+  // Matière hors programme du niveau : pas de chapitre à proposer.
+  if (!subjectsForLevel(level).some((s) => s.id === subject)) throw new RankedError(`${subjectMeta(subject).name} n'est pas au programme de ton niveau.`, 400);
   const until = subjectRestUntil(rank.history, subject);
   if (until > 0) {
     const min = Math.max(1, Math.ceil((until - Date.now()) / 60_000));
-    throw new Error(`Tu as joué tes 3 dernières parties en ${subjectMeta(subject).name} : fais une partie dans une autre matière, ou reviens dans ${min} min.`);
+    throw new RankedError(`Tu as joué tes 3 dernières parties en ${subjectMeta(subject).name} : fais une partie dans une autre matière, ou reviens dans ${min} min.`, 409);
   }
-  const ticket: Ticket = { id: newId(), uid, pseudo, subject, level: save?.save.profile?.level ?? "seconde", rp: rank.rp, at: Date.now(), size };
+  const ticket: Ticket = { id: newId(), uid, pseudo, subject, level, rp: rank.rp, at: Date.now(), size };
+  // Cette recherche remplace les précédentes (autre matière, autre format) : pas plusieurs parties en même temps.
+  await getStore().set(userTicketKey(uid), ticket.id);
   return withLock(queueLock(subject, ticket.level, size), async () => {
     const store = getStore();
     const queue = (await freshQueue(subject, ticket.level, size, ticket.at)).filter((t) => t.uid !== uid);
@@ -337,7 +375,7 @@ export async function joinQueue(uid: string, pseudo: string, subject: SubjectId,
 export async function pollQueue(uid: string, ticketId: string): Promise<{ matchId?: string; elapsedMs: number }> {
   const store = getStore();
   const t = await store.get<Ticket>(ticketKey(ticketId));
-  if (!t || t.uid !== uid) throw new Error("Recherche introuvable.");
+  if (!t || t.uid !== uid) throw new RankedError("Recherche introuvable.", 404);
   if (t.matchId) return { matchId: t.matchId, elapsedMs: Date.now() - t.at };
   const elapsedMs = Date.now() - t.at;
   if (elapsedMs < QUEUE_WAIT_MS) return { elapsedMs };
@@ -345,6 +383,11 @@ export async function pollQueue(uid: string, ticketId: string): Promise<{ matchI
   return withLock(queueLock(t.subject, t.level, size), async () => {
     const again = await store.get<Ticket>(ticketKey(ticketId));
     if (again?.matchId) return { matchId: again.matchId, elapsedMs };
+    // Recherche annulée ou remplacée par une nouvelle (ici ou dans une autre file) : elle ne doit pas lancer de partie.
+    const stored = (await store.get<Ticket[]>(queueKey(t.subject, t.level, size))) ?? [];
+    if (!again || !stored.some((x) => x.id === t.id) || (await store.get<string>(userTicketKey(uid))) !== t.id) throw new RankedError("Recherche introuvable.", 404);
+    // Déjà en partie (lancée depuis une autre recherche) : pas une deuxième en même temps.
+    if (await ongoingMatch(uid, t.pseudo)) throw new RankedError("Recherche introuvable.", 404);
     const queue = (await freshQueue(t.subject, t.level, size, Date.now())).filter((x) => x.id !== t.id && x.uid !== uid);
     const mates = queue.slice(0, size - 1);
     const m = await createMatch([t, ...mates], size);
@@ -415,8 +458,7 @@ async function createMatch(tickets: Ticket[], size: number = MATCH_PLAYERS): Pro
   m.votes = botVotes(m);
   await saveMatch(m);
   for (const h of humans) {
-    const p = await getRank(h.id, h.pseudo);
-    await putRank(h.id, { ...p, active: id, offered: [...(p.offered ?? []).filter((c) => !m.chapters.includes(c)), ...m.chapters].slice(-OFFERED_KEPT) });
+    await updateRank(h.id, h.pseudo, (p) => ({ ...p, active: id, offered: [...(p.offered ?? []).filter((c) => !m.chapters.includes(c)), ...m.chapters].slice(-OFFERED_KEPT) }));
   }
   return m;
 }
@@ -444,16 +486,15 @@ export async function advance(m: Match, now = Date.now()): Promise<Match> {
   return m;
 }
 
-/** Points de rang de fin de partie, pour chaque joueur humain. */
 /** Matière du jour pour un niveau. */
 export const dailySubject = (level: Level, now = new Date()) => subjectOfDay(subjectsForLevel(level).map((s) => s.id), now) as SubjectId;
 
-/** Pour chaque matière : heure de fin de repos (0 = jouable) et bonus de fraîcheur. */
+/** Pour chaque matière : heure de fin de repos (0 = jouable). */
 export function subjectLocks(rank: RankProfile, level: Level): Record<string, number> {
   return Object.fromEntries(subjectsForLevel(level).map((s) => [s.id, subjectRestUntil(rank.history, s.id)]));
 }
 
-
+/** Points de rang de fin de partie, pour chaque joueur (bonus du jour et jauge de variété compris). */
 export function deltas(m: Match): Record<string, number> {
   const s = standings(m);
   return Object.fromEntries(
@@ -476,16 +517,20 @@ async function settle(m: Match) {
   for (const row of s) {
     const p = m.players.find((x) => x.id === row.playerId)!;
     if (p.bot) continue;
-    const prof = await getRank(p.id, p.pseudo);
-    const next = applyResult(prof, { at: Date.now(), subject: m.subject, place: row.place, correct: row.correct, delta: d[p.id], ...(m.players.length !== MATCH_PLAYERS ? { size: m.players.length } : {}) }, week);
     const facts = m.questions.map(factKey);
-    await putRank(p.id, { ...next, seen: [...(prof.seen ?? []).filter((k) => !facts.includes(k)), ...facts].slice(-SEEN_KEPT) });
+    await updateRank(p.id, p.pseudo, (prof) => {
+      const next = applyResult(prof, { at: Date.now(), subject: m.subject, place: row.place, correct: row.correct, delta: d[p.id], ...(m.players.length !== MATCH_PLAYERS ? { size: m.players.length } : {}) }, week);
+      // Une partie lancée entre-temps reste la partie en cours.
+      return { ...next, active: prof.active === m.id ? undefined : prof.active, seen: [...(prof.seen ?? []).filter((k) => !facts.includes(k)), ...facts].slice(-SEEN_KEPT) };
+    });
   }
 }
 
 export async function vote(m: Match, uid: string, chapter: string) {
-  if (m.chapterId || !m.chapters.includes(chapter) || m.votes[uid]) return false;
-  const v: Vote = { chapter, at: Date.now() };
+  const now = Date.now();
+  // Vote fermé (même si personne n'a encore fait avancer la partie) : il ne compte plus.
+  if (m.chapterId || now >= m.createdAt + VOTE_MS || !m.chapters.includes(chapter) || m.votes[uid]) return false;
+  const v: Vote = { chapter, at: now };
   if (!(await getStore().hcreate(actsKey(m.id), voteField(uid), v))) return false;
   m.votes[uid] = v;
   return true;
@@ -558,7 +603,8 @@ export function viewFor(m: Match, uid: string, now = Date.now()) {
     startsAt: index >= 0 ? m.starts[index] ?? null : null,
     endsAt: q && index >= 0 && m.starts[index] !== undefined ? m.starts[index] + questionMs(q) : null,
     nextAt: phase === "reveal" ? m.starts[index + 1] ?? m.finishedAt : phase === "intro" ? m.starts[0] : null,
-    question: q ? (phase === "question" && !mine ? publicQuestion(q) : q) : null,
+    // Pendant le compte à rebours, rien de la 1re question ; pendant la question, sans la réponse (sauf si j'ai répondu).
+    question: q && phase !== "intro" ? (phase === "question" && !mine ? publicQuestion(q) : q) : null,
     mine,
     away: q ? !!m.away[uid]?.includes(index) : false,
     bonus: !!m.bonus,

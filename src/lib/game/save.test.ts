@@ -54,6 +54,15 @@ describe("migration des sauvegardes", () => {
     expect(Object.keys(toGameData({ ...d, extra: 1 } as never))).not.toContain("extra");
   });
 
+  it("écarte un boost illisible qui rendrait l'XP gagnée NaN", () => {
+    const boost = { mult: 2, until: now.getTime() + 60_000, source: "boss" };
+    expect(migrateSave({ ...createInitialData(now), boost })!.boost).toEqual(boost);
+    for (const bad of [{ ...boost, mult: "2" }, { ...boost, mult: 50 }, { ...boost, until: null }, { ...boost, source: "triche" }, 3]) {
+      expect(migrateSave({ ...createInitialData(now), boost: bad })!.boost).toBeNull();
+    }
+    expect(migrateSave({ ...createInitialData(now), missionPlays: "x" })!.missionPlays).toEqual({ day: "", counts: {} });
+  });
+
   it("range la photo à part de l'emoji et retire les photos invalides", () => {
     const jpeg = "data:image/jpeg;base64,/9j/4AAQSkZJRg==";
     const old = migrateSave({ ...createInitialData(now), profile: { pseudo: "Lina", avatar: jpeg, level: "premiere", createdAt: 1 } })!;

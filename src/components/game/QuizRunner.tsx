@@ -43,6 +43,8 @@ export function QuizRunner({
   const questionStart = useRef(Date.now());
   /** Dernière question déjà répondue (ou expirée) : évite un double enregistrement. */
   const answeredIndex = useRef(-1);
+  /** Dernière question quittée : un double clic n'en saute pas une, ni ne termine deux fois la partie. */
+  const advancedFrom = useRef(-1);
   const lastTick = useRef(0);
   const [timedOut, setTimedOut] = useState(false);
   /** Nombre de réponses données : force le rendu des pastilles de progression. */
@@ -53,7 +55,7 @@ export function QuizRunner({
   const correctCount = answers.current.filter((a) => a.correct).length;
 
   useEffect(() => {
-    if (!secondsPerQuestion) return;
+    if (!secondsPerQuestion || !questions[index]) return;
     setTimedOut(false);
     setRemaining(secondsPerQuestion);
     const limit = secondsPerQuestion * 1000;
@@ -100,6 +102,9 @@ export function QuizRunner({
   };
 
   const onNext = () => {
+    // Double clic sur « Question suivante » : on n'avance que d'une question, et jamais avant d'avoir répondu.
+    if (answeredIndex.current !== index || advancedFrom.current === index) return;
+    advancedFrom.current = index;
     if (index + 1 >= questions.length) {
       const result: QuizResult = {
         correct: answers.current.filter((a) => a.correct).length,
@@ -114,6 +119,16 @@ export function QuizRunner({
     setIndex((i) => i + 1);
     questionStart.current = Date.now();
   };
+
+  // Aucune question disponible (chapitre sans contenu) : rien à jouer.
+  if (!q) {
+    return (
+      <div className="mx-auto max-w-md space-y-4 py-10 text-center">
+        <p className="text-slate-300">Pas encore de questions pour cette mission.</p>
+        <Link href={exitHref} className="text-violet-300 underline">Retour</Link>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">

@@ -1,6 +1,9 @@
 /** Générateurs de questions — Espagnol (programmes de lycée 2025 : axes culturels + grammaire). */
 import { chrono } from "./histoire";
-import { type Generator, type Pair, claims, int, mcq, pairs, pick, tf } from "./kit";
+import { type Generator, type Pair, claims, int, mcq, pairs, pick, sample, tf } from "./kit";
+
+/** « de » élidé devant une initiale vocalique (d'Isabel Allende, d'*El laberinto…*), y compris derrière l'italique. */
+const dn = (x: string) => (/^\*?[AEIOUÁÉÍÓÚaeiouáéíóú]/.test(x) ? `d'${x}` : `de ${x}`);
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -71,13 +74,40 @@ const IRREG: Array<[string, string, string, string, string, string]> = [
   ["conocer", "connaître", "conozco", "conoce", "conocí", "conoció"], ["jugar", "jouer", "juego", "juega", "jugué", "jugó"], ["volver", "revenir", "vuelvo", "vuelve", "volví", "volvió"],
 ];
 
+/** Leurres plausibles pour ser et ir, qui n'ont pas de radical régulier exploitable (imparfait, subjonctif, autres personnes). */
+const SUPPLETIVE: Record<string, string[]> = { ser: ["era", "eres", "sea", "fuera", "estoy", "está"], ir: ["iba", "vas", "vaya", "fuera", "voy", "va"] };
+
 const irregular = (past: boolean): Generator => (r) => {
   const [inf, fr, py, pe, iy, ie] = pick(r, IRREG);
   const third = r() < 0.5;
   const ans = past ? (third ? ie : iy) : third ? pe : py;
+  const stem = inf.slice(0, -2), ar = inf.endsWith("ar");
+  /** Forme qu'aurait un verbe régulier (ser et ir n'en ont pas). */
+  const regularOf = (pst: boolean, thd: boolean) => (SUPPLETIVE[inf] ? "" : stem + (thd ? (pst ? (ar ? "ó" : "ió") : ar ? "a" : "e") : pst ? (ar ? (stem.endsWith("g") ? "ué" : "é") : "í") : "o"));
+  const regular = regularOf(past, third);
+  const otherPerson = past ? (third ? iy : ie) : third ? py : pe;
+  const otherTense = past ? (third ? pe : py) : third ? ie : iy;
+  const who = third ? "él" : "yo", otherWho = third ? "yo" : "él";
+  /** Formes du présent qui s'écartent vraiment du modèle régulier. */
+  const irregularPresent = [["yo", py, regularOf(false, false)], ["él", pe, regularOf(false, true)]].filter(([, f, reg]) => f !== reg).map(([w, f]) => `${w} ${f}`);
+  let explanation: string;
+  if (ans === "jugué") {
+    explanation = "Jugar : yo jugué, forme régulière avec un changement orthographique (g → gu devant e, pour garder le son [g]). Jugar n'est irrégulier qu'au présent (yo juego, él juega).";
+  } else if (ans === regular) {
+    explanation = otherPerson !== regularOf(past, !third)
+      ? `${cap(inf)} : ${who} ${ans}. À cette personne, la forme est régulière, mais pas à l'autre : ${otherWho} ${otherPerson}.`
+      : past
+        ? `${cap(inf)} : ${who} ${ans}. Au pretérito indefinido, ${inf} est régulier ; il n'est irrégulier qu'au présent (${irregularPresent.join(", ")}).`
+        : `${cap(inf)} : ${who} ${ans} (forme régulière).`;
+  } else if (SUPPLETIVE[inf] && past) {
+    explanation = `${cap(inf)} est irrégulier : ${who} ${ans}. Au pretérito indefinido, ser et ir ont les mêmes formes (fui, fue) : c'est le contexte qui les distingue.`;
+  } else {
+    explanation = `${cap(inf)} est irrégulier : ${who} ${ans}${regular && regular !== "pedo" ? ` (et non « ${regular} »)` : ""}.`;
+  }
   const others = IRREG.filter(([v]) => v !== inf).map((x) => (past ? (third ? x[5] : x[4]) : third ? x[3] : x[2]));
-  const regular = third ? (past ? inf.slice(0, -2) + (inf.endsWith("ar") ? "ó" : "ió") : inf.slice(0, -2) + (inf.endsWith("ar") ? "a" : "e")) : past ? inf.slice(0, -2) + (inf.endsWith("ar") ? "é" : "í") : inf.slice(0, -2) + "o";
-  return mcq(r, `**${cap(inf)}** (${fr}) au ${past ? "pretérito indefinido" : "présent"}, personne « ${third ? "él / ella" : "yo"} » ?`, ans, [regular === "pedo" ? "pidó" : regular, past ? (third ? iy : ie) : third ? py : pe, ...others.slice(0, 1)], `${cap(inf)} est irrégulier : ${third ? "él" : "yo"} ${ans}.`, () => pick(r, others));
+  // « pedo » existe en espagnol (grossier) : on ne le propose pas.
+  return mcq(r, `**${cap(inf)}** (${fr}) au ${past ? "pretérito indefinido" : "présent"}, personne « ${third ? "él / ella" : "yo"} » ?`, ans,
+    [regular === "pedo" ? "" : regular, otherPerson, otherTense, ...(SUPPLETIVE[inf] ?? []), ...(ans === "jugué" ? ["jugé"] : [])].filter(Boolean), explanation, () => pick(r, others));
 };
 
 // ───────────── Ser / estar, gustar, por / para ─────────────
@@ -99,7 +129,7 @@ const GUSTAR_THINGS: Array<[string, boolean]> = [["el chocolate", false], ["los 
 
 const POR_PARA: Array<[string, string, string]> = [
   ["Este regalo es ___ ti.", "para", "Destinataire → para."], ["Paseamos ___ el parque.", "por", "Lieu traversé → por."], ["Estudio ___ aprobar el examen.", "para", "But → para."],
-  ["Gracias ___ tu ayuda.", "por", "Cause → por."], ["Salimos ___ Madrid mañana.", "para", "Destination → para."], ["Te llamo ___ teléfono.", "por", "Moyen → por."],
+  ["Gracias ___ tu ayuda.", "por", "Cause → por."], ["Mañana salgo ___ Madrid: tengo una reunión allí.", "para", "Destination → para (salir para : partir pour)."], ["Te llamo ___ teléfono.", "por", "Moyen → por."],
   ["Lo compré ___ diez euros.", "por", "Échange, prix → por."], ["___ mí, es la mejor película.", "Para", "Point de vue → para."], ["Trabajo ___ la mañana.", "por", "Moment de la journée → por."],
   ["El trabajo es ___ el lunes.", "para", "Échéance → para."],
 ];
@@ -133,21 +163,30 @@ const presente: Generator[] = [
 
 // ───────────── Vocabulaire ─────────────
 
-const VOCAB: Pair[] = [
+/** Noms, verbes et mots invariables : chaque famille fournit ses propres leurres. */
+const VOCAB_NOUNS: Pair[] = [
   ["la casa", "la maison"], ["el coche", "la voiture"], ["la ciudad", "la ville"], ["el pueblo", "le village"], ["la playa", "la plage"], ["el trabajo", "le travail"],
   ["el dinero", "l'argent"], ["la semana", "la semaine"], ["el año", "l'année"], ["la gente", "les gens"], ["el mundo", "le monde"], ["la vida", "la vie"],
   ["el hermano", "le frère"], ["la abuela", "la grand-mère"], ["el sueño", "le rêve"], ["la calle", "la rue"], ["el árbol", "l'arbre"], ["la comida", "le repas"],
   ["el desayuno", "le petit-déjeuner"], ["la cena", "le dîner"], ["el ordenador", "l'ordinateur"], ["el móvil", "le téléphone portable"], ["la empresa", "l'entreprise"],
   ["el paro", "le chômage"], ["la vivienda", "le logement"], ["el medio ambiente", "l'environnement"], ["la sequía", "la sécheresse"], ["el esfuerzo", "l'effort"],
-  ["la libertad", "la liberté"], ["la lucha", "la lutte"], ["despertarse", "se réveiller"], ["acostarse", "se coucher"], ["llegar", "arriver"], ["buscar", "chercher"],
-  ["encontrar", "trouver"], ["empezar", "commencer"], ["olvidar", "oublier"], ["ganar", "gagner"], ["perder", "perdre"], ["llevar", "porter, emmener"],
-  ["sin embargo", "cependant"], ["todavía", "encore, toujours"], ["ya", "déjà"], ["nunca", "jamais"], ["siempre", "toujours"], ["pronto", "bientôt, tôt"],
+  ["la libertad", "la liberté"], ["la lucha", "la lutte"], ["la huelga", "la grève"], ["el desarrollo", "le développement"], ["la desigualdad", "l'inégalité"], ["el reto", "le défi"],
 ];
+const VOCAB_VERBS: Pair[] = [
+  ["despertarse", "se réveiller"], ["acostarse", "se coucher"], ["llegar", "arriver"], ["buscar", "chercher"], ["encontrar", "trouver"], ["empezar", "commencer"],
+  ["olvidar", "oublier"], ["ganar", "gagner"], ["perder", "perdre"], ["llevar", "porter, emmener"], ["soler", "avoir l'habitude de"], ["lograr", "réussir à, obtenir"],
+  ["darse cuenta de", "se rendre compte de"], ["echar de menos", "regretter (l'absence de), manquer à"], ["quedarse", "rester"], ["hacerse", "devenir (par un effort)"],
+];
+const VOCAB_WORDS: Pair[] = [
+  ["sin embargo", "cependant"], ["todavía", "encore (todavía no : pas encore)"], ["ya", "déjà"], ["nunca", "jamais"], ["siempre", "toujours"], ["pronto", "bientôt, tôt"],
+  ["a menudo", "souvent"], ["en seguida", "tout de suite"], ["a pesar de", "malgré"], ["sobre todo", "surtout"],
+];
+// Exclus : « exquisito », « presumir » et « firma » ont aussi le sens du mot français (pas de vrai piège).
 const FALSE_FRIENDS: Array<[string, string, string]> = [
   ["embarazada", "enceinte", "embarrassée"], ["constipado", "enrhumé", "constipé"], ["el éxito", "le succès", "la sortie"], ["salir", "sortir", "salir"],
-  ["largo", "long", "large"], ["la carpeta", "le classeur, la chemise", "la carpette"], ["exquisito", "délicieux", "exquis (raffiné)"], ["contestar", "répondre", "contester"],
-  ["presumir", "se vanter", "présumer"], ["la firma", "la signature", "la firme"], ["el suceso", "le fait divers", "le succès"], ["la ropa", "les vêtements", "la robe"],
-  ["discutir", "se disputer, débattre", "discuter calmement"], ["el polvo", "la poussière", "le poulpe"], ["la oficina", "le bureau", "l'officine"], ["el vaso", "le verre", "le vase"],
+  ["largo", "long", "large"], ["la carpeta", "le classeur, la chemise", "la carpette"], ["contestar", "répondre", "contester"], ["el suceso", "le fait divers", "le succès"],
+  ["la ropa", "les vêtements", "la robe"], ["discutir", "se disputer, débattre", "discuter calmement"], ["el polvo", "la poussière", "le poulpe"], ["la oficina", "le bureau", "l'officine"],
+  ["el vaso", "le verre", "le vase"], ["quitar", "enlever, retirer", "quitter"], ["la jubilación", "la retraite", "la jubilation"], ["subir", "monter", "subir (endurer)"],
 ];
 const DAYS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
 const DAYS_FR = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
@@ -159,6 +198,20 @@ const UNITS = ["cero", "uno", "dos", "tres", "cuatro", "cinco", "seis", "siete",
 const TENS = ["", "", "", "treinta", "cuarenta", "cincuenta", "sesenta", "setenta", "ochenta", "noventa"];
 const HUNDREDS = ["", "ciento", "doscientos", "trescientos", "cuatrocientos", "quinientos", "seiscientos", "setecientos", "ochocientos", "novecientos"];
 
+/** Fautes d'orthographe typiques sur les nombres (centaines irrégulières, « cien » / « ciento »…). */
+function numberTraps(n: number): string[] {
+  const h = Math.floor(n / 100), rest = n % 100, restText = rest ? numberEs(rest) : "";
+  const traps: string[] = [];
+  const wrongHundreds: Record<number, string> = { 5: "cincocientos", 7: "sietecientos", 9: "nuevecientos" };
+  if (wrongHundreds[h]) traps.push([wrongHundreds[h], restText].filter(Boolean).join(" "));
+  if (h === 1 && rest) traps.push(`cien ${restText}`);
+  if (h === 1 && !rest) traps.push("ciento");
+  // « veinte y ocho » n'est que vieilli (RAE : desusada) : le leurre est la soudure fautive « veinteocho ».
+  if (rest > 20 && rest < 30) traps.push([HUNDREDS[h], `veinte${UNITS[rest - 20]}`].filter(Boolean).join(" "));
+  if (rest > 30 && rest % 10) traps.push([HUNDREDS[h], `${TENS[Math.floor(rest / 10)]}${UNITS[rest % 10]}`].filter(Boolean).join(" "));
+  return traps;
+}
+
 /** Nombre en toutes lettres (0 à 999). */
 export function numberEs(n: number): string {
   if (n === 100) return "cien";
@@ -167,24 +220,30 @@ export function numberEs(n: number): string {
   return [HUNDREDS[h], restText].filter(Boolean).join(" ");
 }
 
+const vocabOptions = { ask: (a: string) => `Que veut dire **${a}** ?`, reverse: (b: string) => `Comment dit-on **${b}** en espagnol ?`, claim: (a: string, b: string) => `**${a}** signifie « ${b} ».`, explain: (a: string, b: string) => `*${a}* = ${b}.` };
+
 const vocabulaire: Generator[] = [
-  ...pairs(VOCAB, { ask: (a) => `Que veut dire **${a}** ?`, reverse: (b) => `Comment dit-on **${b}** en espagnol ?`, claim: (a, b) => `**${a}** signifie « ${b} ».`, explain: (a, b) => `*${a}* = ${b}.` }),
+  ...pairs(VOCAB_NOUNS, vocabOptions),
+  ...pairs(VOCAB_VERBS, vocabOptions),
+  ...pairs(VOCAB_WORDS, vocabOptions),
   (r) => {
     const [es, right, trap] = pick(r, FALSE_FRIENDS);
-    return r() < 0.5
-      ? mcq(r, `Faux ami ! Que veut dire **${es}** ?`, right, [trap, ...FALSE_FRIENDS.filter(([e]) => e !== es).map(([, x]) => x)].slice(0, 3), `*${es}* = ${right} (et non « ${trap} »).`)
-      : tf(`**${es}** veut dire « ${trap} ».`, trap === right, `*${es}* = ${right}.`);
+    return pick(r, [
+      () => mcq(r, `Faux ami ! Que veut dire **${es}** ?`, right, [trap, ...sample(r, FALSE_FRIENDS.filter(([e]) => e !== es), 2).map(([, x]) => x)], `*${es}* = ${right} (et non « ${trap} »).`, () => pick(r, FALSE_FRIENDS)[1]),
+      () => tf(`**${es}** veut dire « ${trap} ».`, false, `Faux ami : *${es}* = ${right}.`),
+      () => tf(`**${es}** veut dire « ${right} ».`, true, `Attention au faux ami : *${es}* ne veut pas dire « ${trap} ».`),
+    ])();
   },
   (r) => {
-    const n = pick(r, [int(r, 11, 29), int(r, 31, 99), int(r, 101, 999), 100, int(r, 2, 9) * 100]);
+    const n = pick(r, [int(r, 21, 29), int(r, 31, 99), int(r, 101, 199), int(r, 501, 599), int(r, 701, 799), int(r, 901, 999), 100, pick(r, [500, 700, 900])]);
     const right = numberEs(n);
-    return mcq(r, `Comment s'écrit **${n}** en espagnol ?`, right, [numberEs(n + 1), numberEs(Math.max(0, n - 10)), numberEs(n + 100 > 999 ? n - 100 : n + 100)], `${n} = ${right}.`);
+    return mcq(r, `Comment s'écrit **${n}** en espagnol ?`, right, numberTraps(n), `${n} = ${right}.`, () => numberEs(pick(r, [n + 1, n - 1, n + 10, n - 10, n + 100, n - 100].filter((m) => m >= 1 && m <= 999 && m !== n))));
   },
   (r) => {
     const i = int(r, 0, 6), j = int(r, 0, 11);
     return r() < 0.5
       ? mcq(r, `Comment dit-on « ${DAYS_FR[i]} » ?`, DAYS[i], DAYS.filter((_, k) => k !== i), `${DAYS_FR[i]} = ${DAYS[i]} (sans majuscule en espagnol).`)
-      : mcq(r, `Quel mois vient après **${MONTHS[j]}** ?`, MONTHS[(j + 1) % 12], MONTHS.filter((_, k) => k !== (j + 1) % 12), `${MONTHS[j]} → ${MONTHS[(j + 1) % 12]} (${MONTHS_FR[(j + 1) % 12]}).`);
+      : mcq(r, `Quel mois vient après **${MONTHS[j]}** ?`, MONTHS[(j + 1) % 12], MONTHS.filter((_, k) => k !== (j + 1) % 12 && k !== j), `${MONTHS[j]} → ${MONTHS[(j + 1) % 12]} (${MONTHS_FR[(j + 1) % 12]}).`);
   },
 ];
 
@@ -193,19 +252,23 @@ const vocabulaire: Generator[] = [
 const cliches: Generator[] = [
   ...pairs(
     [["Cataluña", "Barcelona"], ["Andalucía", "Sevilla"], ["el País Vasco", "Vitoria-Gasteiz"], ["Galicia", "Santiago de Compostela"], ["la Comunidad Valenciana", "Valencia"], ["Castilla y León", "Valladolid"], ["Aragón", "Zaragoza"], ["Asturias", "Oviedo"], ["Navarra", "Pamplona"], ["Extremadura", "Mérida"]],
-    { ask: (a) => `Capitale de la communauté autonome : ${a} ?`, reverse: (b) => `${b} est la capitale de quelle communauté autonome ?`, claim: (a, b) => `${b} est la capitale de ${a}.`, explain: (a, b) => `${cap(a)} : ${b}.` },
+    { ask: (a) => `Capitale de la communauté autonome : ${a} ?`, reverse: (b) => `${b} est la capitale de quelle communauté autonome ?`, claim: (a, b) => `${b} est la capitale de la communauté autonome : ${a}.`, explain: (a, b) => `${cap(a)} : ${b}.` },
   ),
   ...pairs(
-    [["las Fallas", "Valencia"], ["San Fermín", "Pamplona"], ["la Tomatina", "Buñol"], ["la Feria de Abril", "Sevilla"], ["la Mercè", "Barcelona"], ["el Carnaval", "Santa Cruz de Tenerife"]],
-    { ask: (a) => `Où se déroule la fête de ${a} ?`, reverse: (b) => `Quelle fête célèbre a lieu à ${b} ?`, claim: (a, b) => `${cap(a)} se fête à ${b}.`, explain: (a, b) => `${cap(a)} : ${b}.` },
+    [["las Fallas", "Valencia"], ["San Fermín", "Pamplona"], ["la Tomatina", "Buñol"], ["la Feria de Abril", "Sevilla"], ["la Mercè", "Barcelona"], ["los Patios", "Córdoba"]],
+    { ask: (a) => `Où se déroule la fête de ${a} ?`, reverse: (b) => `Quelle fête célèbre a lieu à ${b} ?`, claim: (a, b) => `La fête de ${a} a lieu à ${b}.`, explain: (a, b) => `La fête de ${a} : ${b}.` },
   ),
   ...pairs(
     [["Picasso", "Guernica"], ["Velázquez", "Las Meninas"], ["Goya", "El tres de mayo de 1808"], ["Dalí", "La persistencia de la memoria"], ["Gaudí", "la Sagrada Familia"], ["Cervantes", "Don Quijote de la Mancha"], ["Federico García Lorca", "La casa de Bernarda Alba"], ["Pedro Almodóvar", "Todo sobre mi madre"], ["Rosalía", "El mal querer"], ["Joan Miró", "El carnaval de Arlequín"]],
-    { ask: (a) => `Œuvre célèbre de ${a} ?`, reverse: (b) => `Qui est l'auteur de *${b}* ?`, claim: (a, b) => `*${b}* est une œuvre de ${a}.`, explain: (a, b) => `${a} : *${b}*.` },
+    { ask: (a) => `Œuvre célèbre ${dn(a)} ?`, reverse: (b) => `Qui est l'auteur ${dn(`*${b}*`)} ?`, claim: (a, b) => `*${b}* est une œuvre ${dn(a)}.`, explain: (a, b) => `${a} : *${b}*.` },
   ),
   ...pairs(
-    [["la paella", "Valence"], ["le gazpacho", "l'Andalousie"], ["le pulpo a la gallega", "la Galice"], ["les pintxos", "le Pays basque"], ["la fabada", "les Asturies"], ["le cocido madrileño", "Madrid"]],
-    { ask: (a) => `De quelle région est originaire ${a} ?`, claim: (a, b) => `${cap(a)} est une spécialité de ${b}.`, explain: (a, b) => `${cap(a)} : ${b}.` },
+    [["la paella", "la région de Valence"], ["le gazpacho", "l'Andalousie"], ["le pulpo a la gallega", "la Galice"], ["les pintxos", "le Pays basque"], ["la fabada", "les Asturies"], ["le cocido madrileño", "Madrid"]],
+    {
+      ask: (a) => (a.startsWith("les ") ? `De quelle région sont originaires ${a} ?` : `De quelle région est originaire ${a} ?`),
+      claim: (a, b) => `${cap(a)} ${a.startsWith("les ") ? "sont une spécialité" : "est une spécialité"} de ${b}.`,
+      explain: (a, b) => `${cap(a)} : ${b}.`,
+    },
   ),
   claims([
     ["En Espagne, le catalan, le basque (euskera) et le galicien sont co-officiels dans leurs régions.", true, "Le castillan est la langue officielle de tout l'État."],
@@ -220,20 +283,32 @@ const cliches: Generator[] = [
 
 // ───────────── Le passé ─────────────
 
-const MARKERS: Array<[string, Tense]> = [
-  ["Ayer", "indefinido"], ["El año pasado", "indefinido"], ["En 1992", "indefinido"], ["Anoche", "indefinido"], ["Hace dos días", "indefinido"],
-  ["Cuando era niño, siempre", "imperfecto"], ["Antes, todos los días", "imperfecto"], ["De pequeña, a menudo", "imperfecto"], ["En aquella época, normalmente", "imperfecto"],
-];
+/**
+ * Phrases au passé : [marqueur, verbe régulier, complément]. Chaque marqueur indefinido
+ * date une action unique et achevée, avec un verbe et un complément qui s'y prêtent :
+ * l'imperfecto (description, habitude) n'y est pas possible.
+ */
+const MARKERS: Record<"indefinido" | "imperfecto", Array<[string, string, string]>> = {
+  indefinido: [
+    ["Ayer, por primera vez", "viajar", "en avión"], ["Un día, de repente", "decidir", "dejarlo todo"], ["El sábado pasado", "comprar", "dos libros"],
+    ["Hace dos días, por primera vez", "recibir", "una carta de Ana"], ["Anoche, de repente", "llamar", "a la policía"], ["En 2015, al final", "vender", "la casa del pueblo"],
+    ["El domingo pasado, por fin", "terminar", "la novela"], ["Ayer por la tarde, en una hora", "escribir", "tres correos"], ["El verano pasado, por primera vez", "visitar", "Madrid"],
+  ],
+  imperfecto: [
+    ["Antes, todos los días", "correr", "en el parque"], ["Durante mi infancia, a menudo", "subir", "a los árboles"], ["En aquella época, normalmente", "trabajar", "por la noche"],
+    ["Cada verano, en los años noventa", "viajar", "a la costa"], ["Antes, todos los domingos", "comer", "en casa de los abuelos"], ["En el colegio, cada mañana", "escuchar", "música en el autobús"],
+  ],
+};
 
 const passe: Generator[] = [
   conjugate(["indefinido", "imperfecto"]),
   irregular(true),
   whichTense(["presente", "indefinido", "imperfecto", "futuro"]),
   (r) => {
-    const [marker, tense] = pick(r, MARKERS), [verb] = pick(r, VERBS), p = pick(r, [0, 2, 5]);
+    const tense = pick(r, ["indefinido", "imperfecto"] as const), [marker, verb, rest] = pick(r, MARKERS[tense]), p = pick(r, [0, 2, 5]);
     const ans = conj(verb, tense, p), other = conj(verb, tense === "indefinido" ? "imperfecto" : "indefinido", p);
-    return mcq(r, `« ${marker}, ${PERSONS[p].split(" / ")[0]} ___ (${verb}). »`, ans, [other, conj(verb, "presente", p), conj(verb, "futuro", p)],
-      tense === "indefinido" ? "Action ponctuelle et datée → pretérito indefinido." : "Habitude ou description dans le passé → imperfecto.");
+    return mcq(r, `« ${marker}, ${PERSONS[p].split(" / ")[0]} ___ (${verb}) ${rest}. »`, ans, [other, conj(verb, "presente", p), conj(verb, "futuro", p)],
+      tense === "indefinido" ? `« ${marker} » : action unique et achevée → pretérito indefinido (${ans}).` : `« ${marker} » : habitude dans le passé → imperfecto (${ans}).`);
   },
   claims([
     ["Le pretérito indefinido exprime une action achevée et datée.", true, "Ayer comí paella."],
@@ -246,12 +321,14 @@ const passe: Generator[] = [
 // ───────────── Subjonctif et conditionnel ─────────────
 
 const TRIGGERS = ["Es importante que", "Quiero que", "Espero que", "Es necesario que", "Ojalá", "No creo que", "Es posible que", "Me alegra que"];
+/** Déclencheurs à la 1re personne : avec le même sujet, l'espagnol emploie l'infinitif (« Quiero hablar »). */
+const FIRST_PERSON = new Set(["Quiero que", "Espero que", "Me alegra que", "No creo que"]);
 
 const subjonctif: Generator[] = [
   (r) => {
-    const t = pick(r, TRIGGERS), [verb] = pick(r, VERBS), p = int(r, 0, 5);
+    const t = pick(r, TRIGGERS), [verb] = pick(r, VERBS), p = pick(r, FIRST_PERSON.has(t) ? [1, 2, 4, 5] : [0, 1, 2, 3, 4, 5]);
     const subject = PERSONS[p].split(" / ")[0];
-    return mcq(r, `« ${t} ${subject} ___ (${verb}). »`, conj(verb, "subjuntivo", p), [conj(verb, "presente", p), conj(verb, "futuro", p), conj(verb, "indefinido", p)],
+    return mcq(r, `« ${t} ${subject} ___ (${verb}). »`, conj(verb, "subjuntivo", p), (["presente", "futuro", "indefinido", "imperfecto", "condicional"] as Tense[]).map((t2) => conj(verb, t2, p)),
       `« ${t} » entraîne le subjonctif : ${conj(verb, "subjuntivo", p)}.`);
   },
   conjugate(["subjuntivo", "condicional", "futuro"]),
@@ -265,9 +342,11 @@ const subjonctif: Generator[] = [
     ])();
   },
   (r) => {
-    const [verb, fr] = pick(r, VERBS), p = int(r, 0, 5);
-    return mcq(r, `« Si tuviera dinero, ${PERSONS[p].split(" / ")[0]} ___ (${verb}) más. »`, conj(verb, "condicional", p), [conj(verb, "futuro", p), conj(verb, "imperfecto", p), conj(verb, "subjuntivo", p)],
-      `Si + subjonctif imparfait → conditionnel : ${conj(verb, "condicional", p)} (${fr}).`);
+    // Phrase complète et cohérente : le verbe de la subordonnée s'accorde avec le sujet.
+    const [verb, fr, rest] = pick(r, [["viajar", "voyager", "por todo el mundo"], ["comprar", "acheter", "una casa en la playa"], ["ayudar", "aider", "a los demás"], ["vivir", "vivre", "cerca del mar"], ["estudiar", "étudier", "en el extranjero"], ["aprender", "apprendre", "a tocar el piano"]] as const);
+    const p = int(r, 0, 5), tener = ["tuviera", "tuvieras", "tuviera", "tuviéramos", "tuvierais", "tuvieran"][p];
+    return mcq(r, `« Si ${PERSONS[p].split(" / ")[0]} ${tener} dinero, ___ (${verb}) ${rest}. »`, conj(verb, "condicional", p), [conj(verb, "futuro", p), conj(verb, "imperfecto", p), conj(verb, "subjuntivo", p), conj(verb, "presente", p)],
+      `Si + subjonctif imparfait → conditionnel : ${conj(verb, "condicional", p)} (${fr}).`, undefined, 2);
   },
   claims([
     ["« Cuando » + futur exige le subjonctif en espagnol : « Cuando llegues, llámame ».", true, "Contrairement au français (quand tu arriveras)."],
@@ -281,14 +360,14 @@ const subjonctif: Generator[] = [
 const monde: Generator[] = [
   ...pairs(
     [["México", "Ciudad de México"], ["Argentina", "Buenos Aires"], ["Colombia", "Bogotá"], ["Perú", "Lima"], ["Chile", "Santiago"], ["Venezuela", "Caracas"], ["Cuba", "La Habana"], ["Ecuador", "Quito"], ["Uruguay", "Montevideo"], ["Paraguay", "Asunción"], ["Costa Rica", "San José"], ["Honduras", "Tegucigalpa"], ["Nicaragua", "Managua"], ["República Dominicana", "Santo Domingo"], ["Guatemala", "Ciudad de Guatemala"]],
-    { ask: (a) => `Capitale : ${a} ?`, reverse: (b) => `${b} est la capitale de quel pays ?`, claim: (a, b) => `La capitale de ${a} est ${b}.`, explain: (a, b) => `${a} : ${b}.` },
+    { ask: (a) => `Capitale : ${a} ?`, reverse: (b) => `${b} est la capitale de quel pays ?`, claim: (a, b) => `${a} : sa capitale est ${b}.`, explain: (a, b) => `${a} : ${b}.` },
   ),
   ...pairs(
     [["Gabriel García Márquez", "Cien años de soledad"], ["Pablo Neruda", "Canto general"], ["Jorge Luis Borges", "Ficciones"], ["Isabel Allende", "La casa de los espíritus"], ["Frida Kahlo", "Las dos Fridas"], ["Diego Rivera", "les grandes fresques murales mexicaines"], ["Mario Vargas Llosa", "La ciudad y los perros"], ["Julio Cortázar", "Rayuela"], ["Octavio Paz", "El laberinto de la soledad"], ["Gabriela Mistral", "Desolación"]],
-    { ask: (a) => `Œuvre célèbre de ${a} ?`, reverse: (b) => `Qui est l'auteur de ${b.startsWith("les ") ? b : `*${b}*`} ?`, claim: (a, b) => `${b.startsWith("les ") ? cap(b) + " sont" : `*${b}* est`} une œuvre de ${a}.`, explain: (a, b) => `${a} : ${b}.` },
+    { ask: (a) => `Œuvre célèbre ${dn(a)} ?`, reverse: (b) => `Qui est l'auteur ${b.startsWith("les ") ? `des ${b.slice(4)}` : dn(`*${b}*`)} ?`, claim: (a, b) => `${b.startsWith("les ") ? cap(b) + " sont" : `*${b}* est`} une œuvre ${dn(a)}.`, explain: (a, b) => `${a} : ${b}.` },
   ),
   ...pairs(
-    [["el Machu Picchu", "Perú"], ["el lago Titicaca", "Perú y Bolivia"], ["el desierto de Atacama", "Chile"], ["las cataratas del Iguazú", "Argentina y Brasil"], ["Chichén Itzá", "México"], ["las islas Galápagos", "Ecuador"], ["la Patagonia", "Argentina y Chile"]],
+    [["el Machu Picchu", "Perú"], ["el desierto de Atacama", "Chile"], ["Chichén Itzá", "México"], ["las islas Galápagos", "Ecuador"], ["el salar de Uyuni", "Bolivia"], ["el glaciar Perito Moreno", "Argentina"], ["las ruinas mayas de Tikal", "Guatemala"]],
     { ask: (a) => `Où se trouve ${a} ?`, reverse: (b) => `Quel site célèbre se trouve en ${b} ?`, claim: (a, b) => `On trouve ${a} en ${b}.`, explain: (a, b) => `${cap(a)} : ${b}.` },
   ),
   claims([
@@ -326,14 +405,16 @@ const argumenter: Generator[] = [
     { ask: (a) => `Que veut dire le connecteur **${a}** ?`, reverse: (b) => `Comment dit-on « ${b} » en espagnol ?`, claim: (a, b) => `**${a}** signifie « ${b} ».`, explain: (a, b) => `*${a}* = ${b}.` },
   ),
   ...pairs(
-    [["Creo que…", "je crois que…"], ["En mi opinión…", "à mon avis…"], ["Estoy de acuerdo con…", "je suis d'accord avec…"], ["Me parece que…", "il me semble que…"], ["No estoy seguro de que…", "je ne suis pas sûr que…"], ["Hay que…", "il faut…"], ["Vale la pena…", "cela vaut la peine…"]],
+    [["Creo que…", "je crois que…"], ["En mi opinión…", "à mon avis…"], ["Estoy de\u00A0acuerdo con…", "je suis d'accord avec…"], ["Me parece que…", "il me semble que…"], ["No estoy seguro de que…", "je ne suis pas sûr que…"], ["Hay que…", "il faut…"], ["Vale la pena…", "cela vaut la peine…"]],
     { ask: (a) => `Que veut dire « ${a} » ?`, reverse: (b) => `Comment dire « ${b} » en espagnol ?`, explain: (a, b) => `${a} = ${b}.` },
   ),
   conjugate(["futuro", "condicional"]),
   claims([
     ["« Hay que » + infinitif exprime une obligation impersonnelle.", true, "Hay que proteger el planeta."],
     ["« Tener que » + infinitif exprime une obligation personnelle.", true, "Tengo que estudiar."],
-    ["Dans un essai, « para concluir » introduit l'introduction.", false, "Il introduit la conclusion."],
+    ["« No creo que » est suivi du subjonctif.", true, "Verbe d'opinion à la forme négative : no creo que sea verdad."],
+    ["« Aunque » + subjonctif présente une hypothèse ; « aunque » + indicatif, un fait réel.", true, "Aunque llueva (même s'il pleut) / aunque llueve (bien qu'il pleuve)."],
+    ["« A pesar de » est suivi d'un verbe conjugué.", false, "A pesar de + nom ou infinitif ; a pesar de que + verbe conjugué."],
   ]),
 ];
 

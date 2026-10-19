@@ -34,7 +34,11 @@ export function PendingInvite() {
         );
         router.replace("/amis");
       })
-      .catch((e) => push({ emoji: "⚠️", title: "Invitation impossible", body: e instanceof Error ? e.message : undefined, tone: "rose" }));
+      .catch((e) => {
+        push({ emoji: "⚠️", title: "Invitation impossible", body: e instanceof Error ? e.message : undefined, tone: "rose" });
+        // Sinon la page d'invitation affiche « Ajout de l'ami… » indéfiniment.
+        router.replace("/amis");
+      });
   }, [user, router]);
 
   return null;

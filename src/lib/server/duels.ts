@@ -4,6 +4,7 @@ import { DUEL_TTL_MS, type DuelOutcome, type DuelPlay, type DuelStatus, duelQues
 import type { PublicProfile } from "@/lib/game/save";
 import type { Question, SubjectId } from "@/lib/types";
 import { publicPlayerId } from "./auth";
+import { withLock } from "./lock";
 import { getStore } from "./store";
 
 /**
@@ -73,14 +74,24 @@ export async function createDuel(from: { uid: string; pseudo: string }, to: { ui
   const store = getStore();
   await store.set(`duel:${id}`, duel);
   for (const uid of [from.uid, to.uid]) {
-    const ids = (await store.get<string[]>(`duels:${uid}`)) ?? [];
-    await store.set(`duels:${uid}`, [id, ...ids].slice(0, MAX_LISTED));
+    // Sous verrou : deux défis lancés en même temps au même joueur restent tous les deux dans sa liste.
+    await withLock(`duels:lock:${uid}`, async () => {
+      const ids = (await store.get<string[]>(`duels:${uid}`)) ?? [];
+      await store.set(`duels:${uid}`, [id, ...ids].slice(0, MAX_LISTED));
+    });
   }
   return duel;
 }
 
 export const getDuel = (id: string) => getStore().get<StoredDuel>(`duel:${id}`);
 export const saveDuel = (duel: StoredDuel) => getStore().set(`duel:${duel.id}`, duel);
+
+/**
+ * Lit puis modifie un duel sous verrou : les deux joueurs qui jouent en même temps
+ * ne s'effacent pas leur tour, et une récompense ne se réclame qu'une fois.
+ */
+export const withDuel = <T>(id: string, fn: (duel: StoredDuel | null) => Promise<T>): Promise<T> =>
+  withLock(`duel:lock:${id}`, async () => fn(await getDuel(id)));
 
 /** Index du joueur dans le duel, ou -1 s'il n'y participe pas. */
 export const sideOf = (duel: StoredDuel, uid: string) => duel.sides.findIndex((s) => s.uid === uid);

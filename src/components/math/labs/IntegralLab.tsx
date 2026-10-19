@@ -4,8 +4,8 @@ import { useMemo, useState } from "react";
 import { Area, COLORS, Graph, MovablePoint, Plot, Polygon, Rect, Segment } from "@/components/math/Graph";
 import { Slider } from "@/components/ui/Slider";
 import { Tex } from "@/components/ui/Tex";
-import { fmt, integrate, tryCompile } from "@/lib/math/parser";
-import { Chips, LabShell, Panel, Readout, Toggle } from "./common";
+import { fmt, integrate } from "@/lib/math/parser";
+import { Chips, LabShell, Panel, Readout, Toggle, compileX } from "./common";
 
 const PRESETS = {
   carre: { label: "x²/2", expr: "x^2/2" },
@@ -27,7 +27,7 @@ export default function IntegralLab() {
   const [showMean, setShowMean] = useState(false);
 
   const source = preset === "perso" ? custom : PRESETS[preset].expr;
-  const compiled = useMemo(() => tryCompile(source), [source]);
+  const compiled = useMemo(() => compileX(source), [source]);
   const f = useMemo(() => (compiled.ok ? (x: number) => compiled.expr.evaluate({ x }) : () => NaN), [compiled]);
 
   const lo = Math.min(a, b);

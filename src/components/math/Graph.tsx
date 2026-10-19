@@ -91,8 +91,11 @@ function piLabel(k: number): string {
 export interface GraphProps {
   initial: ViewBox;
   height?: number;
-  /** Même échelle sur les deux axes (cercles ronds). */
-  equalAspect?: boolean;
+  /**
+   * Même échelle sur les deux axes (cercles ronds). Par défaut, la largeur de la fenêtre est gardée et la hauteur
+   * s'adapte (elle peut être rognée) ; avec « contain », toute la fenêtre reste visible et c'est l'autre axe qui s'élargit.
+   */
+  equalAspect?: boolean | "contain";
   /** Graduations en multiples de π/2 sur l'axe des abscisses. */
   piTicks?: boolean;
   showGrid?: boolean;
@@ -132,6 +135,11 @@ export function Graph({
   const view = useMemo<ViewBox>(() => {
     if (!equalAspect || !width) return rawView;
     const yr = ((rawView.xMax - rawView.xMin) * height) / width;
+    if (equalAspect === "contain" && yr < rawView.yMax - rawView.yMin) {
+      const xr = ((rawView.yMax - rawView.yMin) * width) / height;
+      const cx = (rawView.xMin + rawView.xMax) / 2;
+      return { ...rawView, xMin: cx - xr / 2, xMax: cx + xr / 2 };
+    }
     const cy = (rawView.yMin + rawView.yMax) / 2;
     return { ...rawView, yMin: cy - yr / 2, yMax: cy + yr / 2 };
   }, [rawView, equalAspect, width, height]);
@@ -420,6 +428,8 @@ export function MovablePoint({
       py = Math.round(py / snap) * snap;
     }
     if (constrain) [px, py] = constrain(px, py);
+    // Hors du domaine (ex. ln d'un négatif) : le point reste à sa dernière position valide au lieu de disparaître.
+    if (!Number.isFinite(px) || !Number.isFinite(py)) return;
     onMove(px, py);
   };
 
@@ -520,7 +530,7 @@ export function Vector({ x1, y1, x2, y2, color = COLORS.cyan, width = 3, label }
   const { sx, sy } = useGraph();
   const ax = sx(x1), ay = sy(y1), bx = sx(x2), by = sy(y2);
   const len = Math.hypot(bx - ax, by - ay);
-  if (len < 1) return null;
+  if (!Number.isFinite(len) || len < 1) return null;
   const ux = (bx - ax) / len, uy = (by - ay) / len;
   const head = Math.min(14, len * 0.4);
   const p1 = `${bx},${by}`;
@@ -558,6 +568,7 @@ export function Polygon({ points, fill = COLORS.violet, opacity = 0.2, stroke, s
 /** Rectangle en coordonnées du repère (h peut être négatif). */
 export function Rect({ x, y, w, h, fill = COLORS.violet, opacity = 0.35, stroke }: { x: number; y: number; w: number; h: number; fill?: string; opacity?: number; stroke?: string }) {
   const { sx, sy } = useGraph();
+  if (![x, y, w, h].every(Number.isFinite)) return null;
   const px = Math.min(sx(x), sx(x + w));
   const py = Math.min(sy(y), sy(y + h));
   return (

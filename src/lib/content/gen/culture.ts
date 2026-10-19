@@ -16,10 +16,14 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 /** « de » élidé devant un nom propre à initiale vocalique ou h muet : d'Éros, d'Héra. */
 const dn = (x: string) => (/^[aeiouyhàâéèêëîïôûœ]/i.test(x) ? `d'${x}` : `de ${x}`);
 
-/** « de » contracté devant l'article : du Japon, des États-Unis, de la France, de l'Inde, du Mans. */
+/**
+ * « de » contracté devant l'article (du Japon, des États-Unis, de la France, de l'Inde, du Mans)
+ * et élidé devant une voyelle ou un h muet sans article (d'Oman, d'Israël, d'Haïti, d'Uranus).
+ */
 export function de(x: string): string {
   if (/^le /i.test(x)) return `du ${x.slice(3)}`;
   if (/^les /i.test(x)) return `des ${x.slice(4)}`;
+  if (/^[aeiouyàâéèêëîïôûœ]/i.test(x) || /^H[aeiouyàâéèêëîïôû]/.test(x)) return `d'${x}`;
   return `de ${x}`;
 }
 
@@ -82,7 +86,7 @@ const PIEGES_CAPITALES: Tiers<Claim> = {
     ["La capitale du Myanmar est Rangoun.", false, "C'est Naypyidaw depuis 2005."],
     ["La capitale officielle du Bénin est Porto-Novo.", true, "Cotonou est le siège du gouvernement."],
     ["La capitale du Pakistan est Karachi.", false, "C'est Islamabad, ville construite dans les années 1960."],
-    ["La capitale de la Bolivie est Montevideo.", false, "Montevideo est la capitale de l'Uruguay ; la Bolivie a Sucre (constitutionnelle) et La Paz (gouvernement)."],
+    ["La Bolivie a deux capitales : Sucre, capitale constitutionnelle, et La Paz, siège du gouvernement.", true, "Sucre abrite le pouvoir judiciaire ; La Paz, le gouvernement et le Parlement."],
     ["La capitale du Kirghizistan est Bichkek.", true, "Elle s'est appelée Frounzé à l'époque soviétique."],
   ],
 };
@@ -229,7 +233,7 @@ const DATES: Tiers<Pair> = {
   2: [
     ["le couronnement de Charlemagne comme empereur", "800"], ["la bataille d'Hastings", "1066"], ["la création de l'ONU", "1945"], ["la révolution d'Octobre en Russie", "1917"],
     ["la déclaration d'indépendance des États-Unis", "1776"], ["la bataille de Waterloo", "1815"], ["le sacre de Napoléon Ier", "1804"], ["l'abolition définitive de l'esclavage en France", "1848"],
-    ["la prise de Constantinople par les Ottomans", "1453"], ["la bataille de Marignan", "1515"], ["la naissance de la Ve République", "1958"], ["Mai 68", "1968"],
+    ["la prise de Constantinople par les Ottomans", "1453"], ["la bataille de Marignan", "1515"], ["la naissance de la Ve République", "1958"], ["la révolte étudiante et la grève générale de mai", "1968"],
     ["l'indépendance de l'Algérie", "1962"], ["la mort de Jeanne d'Arc", "1431"], ["le krach boursier de Wall Street", "1929"], ["la loi de séparation des Églises et de l'État", "1905"],
     ["l'abolition de la peine de mort en France", "1981"], ["l'élection de Nelson Mandela", "1994"], ["la réunification de l'Allemagne", "1990"], ["la fin de l'URSS", "1991"],
     ["la construction du mur de Berlin", "1961"], ["l'assassinat de John F. Kennedy", "1963"], ["le naufrage du Titanic", "1912"], ["le droit de vote des femmes en France", "1944"],
@@ -307,7 +311,7 @@ const OEUVRES_ART: Tiers<Pair> = {
     ["Bal du moulin de la Galette", "Auguste Renoir"],
   ],
   3: [
-    ["Les Glaneuses", "Jean-François Millet"], ["La Ronde de nuit", "Rembrandt"], ["Les Ménines", "Diego Vélasquez"], ["Le Tres de Mayo", "Francisco de Goya"], ["American Gothic", "Grant Wood"],
+    ["Les Glaneuses", "Jean-François Millet"], ["La Ronde de nuit", "Rembrandt"], ["Les Ménines", "Diego Vélasquez"], ["Tres de mayo (Le 3 mai 1808)", "Francisco de Goya"], ["American Gothic", "Grant Wood"],
     ["Les Joueurs de cartes", "Paul Cézanne"], ["Le Jardin des délices", "Jérôme Bosch"], ["Les Époux Arnolfini", "Jan van Eyck"], ["Un dimanche après-midi à l'île de la Grande Jatte", "Georges Seurat"],
     ["Composition en rouge, jaune et bleu", "Piet Mondrian"], ["Fontaine (l'urinoir)", "Marcel Duchamp"], ["Nighthawks", "Edward Hopper"], ["Le Baiser (tableau doré, 1908)", "Gustav Klimt"],
     ["Le Fils de l'homme (la pomme devant le visage)", "René Magritte"], ["Le Bain turc", "Jean-Auguste-Dominique Ingres"], ["Le Serment des Horaces", "Jacques-Louis David"],
@@ -319,7 +323,7 @@ const MONUMENTS: Tiers<Pair> = {
   1: [["la tour Eiffel", "Paris"], ["le Colisée", "Rome"], ["la statue de la Liberté", "New York"], ["Big Ben", "Londres"], ["la tour penchée", "Pise"], ["le Christ Rédempteur", "Rio de Janeiro"]],
   2: [
     ["le Taj Mahal", "Agra"], ["le Parthénon", "Athènes"], ["la Sagrada Família", "Barcelone"], ["le Kremlin", "Moscou"], ["l'Opéra aux voiles blanches", "Sydney"], ["le Burj Khalifa", "Dubaï"],
-    ["la Cité interdite", "Pékin"], ["la porte de Brandebourg", "Berlin"], ["la basilique Saint-Pierre", "le Vatican"], ["le Golden Gate Bridge", "San Francisco"], ["l'Alhambra", "Grenade"],
+    ["la Cité interdite", "Pékin"], ["la porte de Brandebourg", "Berlin"], ["le musée de l'Ermitage", "Saint-Pétersbourg"], ["le Golden Gate Bridge", "San Francisco"], ["l'Alhambra", "Grenade"],
   ],
   3: [
     ["Sainte-Sophie", "Istanbul"], ["l'Atomium", "Bruxelles"], ["la Petite Sirène", "Copenhague"], ["le pont Charles", "Prague"], ["la Giralda", "Séville"],
@@ -442,11 +446,11 @@ const CLASSIQUE: Tiers<Pair> = {
 const CHANSONS: Tiers<Pair> = {
   1: [
     ["Thriller", "Michael Jackson"], ["Imagine", "John Lennon"], ["Bohemian Rhapsody", "Queen"], ["La Vie en rose", "Édith Piaf"], ["Shape of You", "Ed Sheeran"],
-    ["Alors on danse", "Stromae"], ["Get Lucky", "Daft Punk"], ["Djadja", "Aya Nakamura"], ["Hey Jude", "The Beatles"],
+    ["Alors on danse", "Stromae"], ["Get Lucky", "Daft Punk"], ["Djadja", "Aya Nakamura"], ["Hey Jude", "les Beatles"],
   ],
   2: [
     ["Ne me quitte pas", "Jacques Brel"], ["Comme d'habitude", "Claude François"], ["La Bohème", "Charles Aznavour"], ["Les Champs-Élysées", "Joe Dassin"], ["Smells Like Teen Spirit", "Nirvana"],
-    ["(I Can't Get No) Satisfaction", "The Rolling Stones"], ["Rolling in the Deep", "Adele"], ["Hotel California", "Eagles"], ["Purple Rain", "Prince"], ["L'Aventurier", "Indochine"],
+    ["(I Can't Get No) Satisfaction", "les Rolling Stones"], ["Rolling in the Deep", "Adele"], ["Hotel California", "les Eagles"], ["Purple Rain", "Prince"], ["L'Aventurier", "Indochine"],
     ["Je te promets", "Johnny Hallyday"], ["Les Lacs du Connemara", "Michel Sardou"],
   ],
   3: [
@@ -481,7 +485,7 @@ const MUSIQUE_CARDS: Tiers<Card> = {
     ["Nuance qui signifie « très fort » ?", "fortissimo (ff)", ["pianissimo (pp)", "mezzo forte (mf)", "crescendo"], "Pianissimo signifie très doux."],
     ["Compositeur polonais surnommé « le poète du piano » ?", "Frédéric Chopin", ["Franz Liszt", "Robert Schumann", "Sergueï Rachmaninov"], "Il a vécu à Paris de 1831 à sa mort en 1849."],
     ["Instrument de Django Reinhardt, roi du jazz manouche ?", "la guitare", ["le violon", "le piano", "la contrebasse"], "Il jouait avec seulement deux doigts valides à la main gauche."],
-    ["Festival mythique de 1969, près de New York ?", "Woodstock", ["Coachella", "Glastonbury", "les Vieilles Charrues"], "Jimi Hendrix y a joué l'hymne américain à la guitare."],
+    ["Festival mythique de 1969, dans l'État de New York ?", "Woodstock", ["Coachella", "Glastonbury", "les Vieilles Charrues"], "Jimi Hendrix y a joué l'hymne américain à la guitare."],
   ],
 };
 
@@ -673,7 +677,7 @@ const ESPACE_CARDS: Tiers<Card> = {
     ["Planète naine ex-neuvième planète ?", "Pluton", ["Cérès", "Éris", "Titan"], "Reclassée en 2006."],
     ["Plus grand volcan connu du Système solaire ?", "Olympus Mons", ["l'Etna", "le Mauna Kea", "le Vésuve"], "Sur Mars, environ 22 km de haut."],
     ["Télescope spatial lancé en 2021, successeur de Hubble ?", "James Webb", ["Kepler", "Gaia", "Spitzer"], "Il observe dans l'infrarouge."],
-    ["Comète qui revient environ tous les 76 ans ?", "la comète de Halley", ["la comète Hale-Bopp", "la comète de Encke", "la comète Shoemaker-Levy"], "Prochain passage vers 2061."],
+    ["Comète qui revient environ tous les 76 ans ?", "la comète de Halley", ["la comète Hale-Bopp", "la comète d'Encke", "la comète Shoemaker-Levy"], "Prochain passage vers 2061."],
     ["Plus gros satellite naturel du Système solaire ?", "Ganymède", ["la Lune", "Titan", "Europe"], "Satellite de Jupiter."],
     ["Étoile qui indique le nord ?", "l'étoile Polaire", ["Sirius", "Bételgeuse", "Vega"], "Dans la constellation de la Petite Ourse."],
   ],
@@ -746,10 +750,14 @@ const PETITS: Tiers<Pair> = {
   3: [["l'oie", "l'oison"], ["le sanglier", "le marcassin"], ["le lièvre", "le levraut"], ["le pigeon", "le pigeonneau"], ["l'âne", "l'ânon"], ["le dindon", "le dindonneau"], ["la perdrix", "le perdreau"], ["le corbeau", "le corbillat"]],
 };
 
+/**
+ * Cris d'animaux. Aucun verbe de la table ne convient à un autre animal de la table
+ * (le chien hurle et grogne aussi, la chouette hulule, le tigre rugit…), sinon le vrai/faux serait faux.
+ */
 const CRIS: Tiers<Pair> = {
-  1: [["le chien", "aboie"], ["le chat", "miaule"], ["la vache", "meugle"], ["le cheval", "hennit"], ["le mouton", "bêle"], ["le lion", "rugit"], ["le loup", "hurle"], ["le serpent", "siffle"]],
-  2: [["le corbeau", "croasse"], ["la grenouille", "coasse"], ["l'éléphant", "barrit"], ["l'âne", "brait"], ["le cochon", "grogne"], ["la poule", "caquette"], ["le pigeon", "roucoule"], ["le hibou", "hulule"], ["le cerf", "brame"], ["l'abeille", "bourdonne"]],
-  3: [["le chameau", "blatère"], ["la pie", "jacasse"], ["le canard", "cancane"], ["le tigre", "feule"], ["le crocodile", "vagit"], ["la cigogne", "craquette"], ["la chouette", "chuinte"], ["le renard", "glapit"]],
+  1: [["le chien", "aboie"], ["le chat", "miaule"], ["la vache", "meugle"], ["le cheval", "hennit"], ["le mouton", "bêle"], ["le lion", "rugit"], ["le serpent", "siffle"], ["l'âne", "brait"]],
+  2: [["le corbeau", "croasse"], ["la grenouille", "coasse"], ["l'éléphant", "barrit"], ["la poule", "caquette"], ["le pigeon", "roucoule"], ["le hibou", "hulule"], ["le cerf", "brame"], ["l'abeille", "bourdonne"], ["la pie", "jacasse"], ["le dindon", "glougloute"]],
+  3: [["le chameau", "blatère"], ["le canard", "cancane"], ["le crocodile", "vagit"], ["la cigogne", "craquette"], ["le paon", "braille"], ["le geai", "cajole"], ["la huppe", "pupule"], ["le lapin", "clapit"], ["la souris", "chicote"]],
 };
 
 const NATURE_CARDS: Tiers<Card> = {
@@ -794,8 +802,8 @@ const DIEUX: Tiers<Pair> = {
 };
 
 const DOMAINES: Tiers<Pair> = {
-  1: [["Zeus", "le ciel et la foudre"], ["Poséidon", "les mers et les océans"], ["Hadès", "les Enfers"], ["Aphrodite", "l'amour et la beauté"], ["Arès", "la guerre"]],
-  2: [["Athéna", "la sagesse et la stratégie"], ["Hermès", "les messages, le commerce et les voyageurs"], ["Dionysos", "le vin et la fête"], ["Héphaïstos", "le feu et la forge"], ["Artémis", "la chasse"], ["Apollon", "la lumière, la musique et la poésie"]],
+  1: [["Zeus", "le ciel et la foudre"], ["Poséidon", "les mers et les océans"], ["Hadès", "les Enfers"], ["Aphrodite", "l'amour et la beauté"], ["Arès", "la guerre brutale et violente"]],
+  2: [["Athéna", "la sagesse, les arts et la guerre stratégique"], ["Hermès", "les messages, le commerce et les voyageurs"], ["Dionysos", "le vin et la fête"], ["Héphaïstos", "le feu et la forge"], ["Artémis", "la chasse"], ["Apollon", "la lumière, la musique et la poésie"]],
   3: [["Déméter", "l'agriculture et les moissons"], ["Hestia", "le foyer"], ["Héra", "le mariage"], ["Nyx", "la nuit"], ["Hypnos", "le sommeil"], ["Némésis", "la vengeance divine"], ["Hécate", "la magie et les carrefours"], ["Éole", "les vents"]],
 };
 
@@ -870,7 +878,7 @@ const LANGUE_CARDS: Tiers<Card> = {
     ["Pluriel de « œil » ?", "yeux", ["œils", "œuils", "yeuxs"], "« Œils » existe seulement dans des mots composés (œils-de-bœuf)."],
     ["Synonyme de « rapide » ?", "véloce", ["lent", "lourd", "paisible"], "Du latin velox."],
     ["Un palindrome, c'est…", "un mot qui se lit dans les deux sens", ["un mot très long", "un mot d'origine grecque", "un mot qui rime avec lui-même"], "Exemples : kayak, radar, été."],
-    ["Un anagramme de « chien » ?", "niche", ["chêne", "chaîne", "chine"], "Mêmes lettres dans un autre ordre."],
+    ["Une anagramme de « chien » ?", "niche", ["chêne", "chaîne", "chenil"], "Mêmes lettres dans un autre ordre (« chine » en est une autre)."],
   ],
   2: [
     ["Pluriel de « festival » ?", "festivals", ["festivaux", "festivaus", "festivales"], "Exception au pluriel en -aux."],
@@ -922,7 +930,7 @@ const INSTITUTIONS: Tiers<Card> = {
     ["Hymne national français ?", "La Marseillaise", ["Le Chant des partisans", "L'Internationale", "La Madelon"], "Composée par Rouget de Lisle en 1792."],
     ["Résidence officielle du président de la République ?", "le palais de l'Élysée", ["l'hôtel Matignon", "le palais Bourbon", "le palais du Luxembourg"], "Matignon est celle du Premier ministre."],
     ["Âge de la majorité et du droit de vote en France ?", "18 ans", ["16 ans", "20 ans", "21 ans"], "Depuis 1974 (21 ans avant)."],
-    ["Monnaie de la zone euro depuis 2002 (pièces et billets) ?", "l'euro", ["l'écu", "le franc", "le mark"], "Utilisé par 20 pays de l'UE."],
+    ["Monnaie de la zone euro depuis 2002 (pièces et billets) ?", "l'euro", ["l'écu", "le franc", "le mark"], "Utilisé par 21 pays de l'UE depuis l'entrée de la Bulgarie, le 1er janvier 2026."],
     ["Durée du mandat du président de la République ?", "5 ans", ["4 ans", "6 ans", "7 ans"], "Le quinquennat depuis 2002 (septennat avant)."],
   ],
   2: [
@@ -1029,7 +1037,7 @@ const THEMES: Record<string, (t: Tier) => Generator[]> = {
     ...claimsAt(HISTOIRE_CLAIMS, t),
   ],
   "cg-arts": (t) => [
-    ...knows(OEUVRES_ART, t, (a) => `Qui a réalisé « ${a} » ?`, (b) => `Quelle œuvre est de ${b} ?`, (a, b) => `« ${a} » est une œuvre de ${b}.`, (a, b) => `« ${a} » : ${b}.`),
+    ...knows(OEUVRES_ART, t, (a) => `Qui a réalisé « ${a} » ?`, (b) => `Quelle œuvre est ${de(b)} ?`, (a, b) => `« ${a} » est une œuvre ${de(b)}.`, (a, b) => `« ${a} » : ${b}.`),
     ...knows(MONUMENTS, t, (a) => `Dans quelle ville se trouve ${a} ?`, (b) => `Quel monument se trouve à ${b} ?`, (a, b) => `${cap(a)} se trouve à ${b}.`, (a, b) => `${cap(a)} : ${b}.`),
     ...knows(ARCHITECTES, t, (a) => `Qui a conçu ${a} ?`, (b) => `Quelle réalisation doit-on à ${b} ?`, (a, b) => `${cap(a)} a été conçu(e) par ${b}.`, (a, b) => `${cap(a)} : ${b}.`),
     ...cardsAt(ARTS_CARDS, t),
@@ -1041,7 +1049,7 @@ const THEMES: Record<string, (t: Tier) => Generator[]> = {
   ],
   "cg-musique": (t) => [
     ...knows(CLASSIQUE, t, (a) => `Qui a composé ${title(a)} ?`, (b) => `Quelle œuvre a composée ${b} ?`, (a, b) => `${b} a composé ${title(a)}.`, (a, b) => `${cap(a)} : ${b}.`),
-    ...knows(CHANSONS, t, (a) => `Qui interprète « ${a} » ?`, (b) => `Quelle chanson est interprétée par ${b} ?`, (a, b) => `« ${a} » est une chanson de ${b}.`, (a, b) => `« ${a} » : ${b}.`),
+    ...knows(CHANSONS, t, (a) => `Qui interprète « ${a} » ?`, (b) => `Quelle chanson est interprétée par ${b} ?`, (a, b) => `« ${a} » est une chanson ${de(b)}.`, (a, b) => `« ${a} » : ${b}.`),
     ...cardsAt(MUSIQUE_CARDS, t),
   ],
   "cg-cinema": (t) => [
@@ -1062,8 +1070,8 @@ const THEMES: Record<string, (t: Tier) => Generator[]> = {
   "cg-espace": (t) => [
     ...cardsAt(ESPACE_CARDS, t),
     ...claimsAt(ESPACE_CLAIMS, t),
-    ...knows(ORDRE_PLANETES, t, (a) => `Rang de ${a} en partant du Soleil ?`, (b) => `Quelle planète est la ${b} en partant du Soleil ?`, (a, b) => `${cap(a)} est la ${b} planète en partant du Soleil.`, (a, b) => `${cap(a)} : ${b} planète depuis le Soleil.`),
-    ...knows(SATELLITES, t, (a) => `Autour de quel astre tourne ${a} ?`, (b) => `Quel satellite tourne autour de ${b} ?`, (a, b) => `${cap(a)} est un satellite de ${b}.`, (a, b) => `${cap(a)} tourne autour de ${b}.`),
+    ...knows(ORDRE_PLANETES, t, (a) => `Rang ${de(a)} en partant du Soleil ?`, (b) => `Quelle planète est la ${b} en partant du Soleil ?`, (a, b) => `${cap(a)} est la ${b} planète en partant du Soleil.`, (a, b) => `${cap(a)} : ${b} planète depuis le Soleil.`),
+    ...knows(SATELLITES, t, (a) => `Autour de quel astre tourne ${a} ?`, (b) => `Quel satellite tourne autour ${de(b)} ?`, (a, b) => `${cap(a)} est un satellite ${de(b)}.`, (a, b) => `${cap(a)} tourne autour ${de(b)}.`),
     ...knows(MISSIONS, t, (a) => `Quel pays ou agence a réalisé ${a} ?`, (b) => `Quelle réussite spatiale doit-on à ${b} ?`, (a, b) => `${cap(a)} : ${b}.`, (a, b) => `${cap(a)} : ${b}.`),
   ],
   "cg-nature": (t) => [

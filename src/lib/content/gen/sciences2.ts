@@ -1,5 +1,5 @@
 /** SVT et Physique-Chimie — thèmes complémentaires des programmes de lycée (2019). */
-import { type Generator, type Pair, claims, int, mcq, numeric, pairs, pick, tex } from "./kit";
+import { type Generator, type Pair, claims, int, mcq, numeric, pairs, pick, tex, tf, withFact } from "./kit";
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const terms = (items: readonly Pair[]) =>
@@ -15,8 +15,12 @@ const paysages: Generator[] = [
     ["bassin versant", "le territoire dont les eaux s'écoulent vers un même cours d'eau"], ["delta", "l'accumulation de sédiments à l'embouchure d'un fleuve"], ["glacier", "une masse de glace qui érode et transporte des roches"],
   ]),
   ...pairs(
-    [["le granite", "magmatique (plutonique)"], ["le basalte", "magmatique (volcanique)"], ["le calcaire", "sédimentaire"], ["le grès", "sédimentaire (sable cimenté)"], ["l'argile", "sédimentaire (particules très fines)"], ["le marbre", "métamorphique"]],
-    { ask: (a) => `Type de roche : ${a} ?`, claim: (a, b) => `${cap(a)} est une roche ${b}.`, explain: (a, b) => `${cap(a)} : roche ${b}.` },
+    // Catégories exclusives (« sédimentaire » et « sédimentaire (sable cimenté) » étaient à la fois juste et leurre).
+    [["le granite", "magmatique plutonique"], ["le basalte", "magmatique volcanique"], ["le calcaire", "sédimentaire"], ["le grès", "sédimentaire"], ["l'argile", "sédimentaire"], ["le marbre", "métamorphique"], ["le gneiss", "métamorphique"]],
+    {
+      ask: (a) => `Type de roche : ${a} ?`, claim: (a, b) => `${cap(a)} est une roche ${b}.`,
+      explain: (a, b) => `${cap(a)} : roche ${b}${({ "le granite": " (refroidissement lent d'un magma en profondeur, cristaux visibles)", "le basalte": " (refroidissement rapide d'une lave en surface)", "le calcaire": " (carbonate de calcium)", "le grès": " (grains de sable cimentés)", "l'argile": " (particules très fines)", "le marbre": " (calcaire transformé à l'état solide)", "le gneiss": " (transformée à l'état solide sous forte pression et température)" } as Record<string, string>)[a] ?? ""}.`,
+    },
   ),
   (r) => {
     const mm = pick(r, [0.1, 0.2, 0.5, 1, 2]), m = pick(r, [1, 2, 5, 10, 50]);
@@ -38,13 +42,14 @@ const microbes: Generator[] = [
     ["IST", "une infection sexuellement transmissible"], ["vaccination", "l'injection d'un antigène inoffensif pour créer une mémoire immunitaire"], ["asepsie", "l'ensemble des mesures empêchant l'introduction de microbes"],
   ]),
   ...pairs(
-    [["la grippe", "un virus"], ["la tuberculose", "une bactérie"], ["le sida", "un virus (VIH)"], ["la chlamydiose", "une bactérie"], ["le paludisme", "un parasite (Plasmodium)"], ["la mycose", "un champignon"], ["le Covid-19", "un virus (SARS-CoV-2)"], ["la syphilis", "une bactérie"]],
-    { ask: (a) => `Agent responsable de ${a} ?`, claim: (a, b) => `${cap(a)} est causé(e) par ${b}.`, explain: (a, b) => `${cap(a)} : ${b}.` },
+    // Catégories exclusives : « un virus (VIH) » comme leurre rendait « un virus » faux pour le sida.
+    [["la grippe", "un virus"], ["la tuberculose", "une bactérie"], ["le sida", "un virus"], ["la chlamydiose", "une bactérie"], ["le paludisme", "un parasite unicellulaire (Plasmodium)"], ["la mycose", "un champignon"], ["le Covid-19", "un virus"], ["la syphilis", "une bactérie"]],
+    { ask: (a) => `Agent responsable de ${a} ?`, claim: (a, b) => `L'agent responsable de ${a} est ${b}.`, explain: (a, b) => `${cap(a)} : ${b}${a === "le sida" ? " (le VIH)" : a === "le Covid-19" ? " (le SARS-CoV-2)" : ""}.` },
   ),
   (r) => {
     const n0 = pick(r, [1, 10, 100]), t = pick(r, [20, 30]), h = pick(r, [1, 2, 3]);
     const gen = (h * 60) / t;
-    return numeric(`Une bactérie se divise toutes les $${t}$ min. Partant de $${n0}$ bactérie(s), combien après $${h}$ h ?`, n0 * 2 ** gen, `$${(h * 60) / t}$ divisions : $${n0} \\times 2^{${gen}}$.`);
+    return numeric(`Une bactérie se divise toutes les $${t}$ min. Partant de $${n0}$ bactérie${n0 > 1 ? "s" : ""}, combien après $${h}$ h ?`, n0 * 2 ** gen, `$${(h * 60) / t}$ divisions : $${n0} \\times 2^{${gen}}$.`);
   },
   claims([
     ["Les antibiotiques sont efficaces contre les virus.", false, "Ils n'agissent que sur les bactéries."],
@@ -86,14 +91,20 @@ const muscle: Generator[] = [
     ["glycogène", "la réserve de glucose stockée dans le muscle et le foie"], ["jonction neuromusculaire", "la synapse entre motoneurone et fibre musculaire"],
   ]),
   (r) => {
-    const atpResp = 36, atpFerm = 2, n = int(r, 1, 40);
-    return r() < 0.5
-      ? numeric(`Respiration : environ $${atpResp}$ ATP par glucose. Combien d'ATP pour $${n}$ glucoses ?`, atpResp * n, `$${atpResp} \\times ${n}$.`)
-      : numeric(`Combien de fois plus d'ATP produit la respiration (≈ ${atpResp}) que la fermentation (${atpFerm}) par glucose ?`, atpResp / atpFerm, `$${atpResp} / ${atpFerm}$.`);
+    // Rendement énergétique : respiration ≈ 36 ATP par glucose, fermentation lactique 2 ATP.
+    const n = pick(r, [2, 5, 10, 20]), atp = n * 36;
+    return pick(r, [
+      () => numeric(`Pour produire autant d'ATP que la respiration de $${n}$ glucoses (≈ 36 ATP par glucose), combien de glucoses la fermentation lactique (2 ATP par glucose) doit-elle consommer ?`, atp / 2, `$${n} \\times 36 = ${atp}$ ATP, soit $\\dfrac{${atp}}{2} = ${atp / 2}$ glucoses : la fermentation épuise vite les réserves.`),
+      () => numeric(`Un muscle doit régénérer $${atp}$ ATP uniquement par respiration (≈ 36 ATP par glucose). Combien de molécules de dioxygène consomme-t-il ? (respiration : $\\mathrm{C_6H_{12}O_6 + 6\\,O_2 \\rightarrow 6\\,CO_2 + 6\\,H_2O}$)`, n * 6, `$\\dfrac{${atp}}{36} = ${n}$ glucoses, et 6 $\\mathrm{O_2}$ par glucose : $${n * 6}$ molécules.`),
+    ])();
   },
   ...pairs(
-    [["un sprint de 100 m", "la phosphocréatine et la fermentation lactique"], ["un marathon", "la respiration cellulaire (glucose et lipides)"], ["un 400 m", "surtout la fermentation lactique"], ["une marche lente", "la respiration cellulaire"]],
-    { ask: (a) => `Voie principale de production d'ATP pour ${a} ?`, claim: (a, b) => `Pour ${a}, l'ATP vient surtout de ${b}.`, explain: (a, b) => `${cap(a)} : ${b}.` },
+    [
+      ["un saut en hauteur (quelques secondes)", "la phosphocréatine"], ["un sprint de 100 m", "la phosphocréatine"], ["un 400 m", "la fermentation lactique"],
+      ["un marathon", "la respiration cellulaire"], ["une marche lente", "la respiration cellulaire"], ["une heure de vélo à allure modérée", "la respiration cellulaire"],
+    ],
+    { ask: (a) => `Voie principale de production d'ATP pour ${a} ?`, claim: (a, b) => `Pour ${a}, l'ATP vient surtout de ${b}.`,
+      explain: (a, b) => `${cap(a)} : ${b}${b === "la phosphocréatine" ? " (effort de quelques secondes, sans dioxygène)" : b === "la fermentation lactique" ? " (effort intense de quelques dizaines de secondes, sans dioxygène)" : " (effort prolongé, utilisant le dioxygène)"}.` },
   ),
   claims([
     ["La contraction musculaire consomme de l'ATP.", true, "Pour le cycle actine-myosine."],
@@ -107,16 +118,32 @@ const muscle: Generator[] = [
 const stress: Generator[] = [
   ...pairs(
     [["l'adrénaline", "la médullosurrénale"], ["le cortisol", "la corticosurrénale"], ["la CRH", "l'hypothalamus"], ["l'ACTH", "l'hypophyse"]],
-    { ask: (a) => `Où est produit(e) ${a} ?`, reverse: (b) => `Quelle hormone de stress est produite par ${b} ?`, claim: (a, b) => `${cap(a)} est produit(e) par ${b}.`, explain: (a, b) => `${cap(a)} : ${b}.` },
+    { ask: (a) => `Quel organe sécrète ${a} ?`, reverse: (b) => `Quelle hormone de stress est produite par ${b} ?`, claim: (a, b) => `${cap(b)} sécrète ${a}.`, explain: (a, b) => `${cap(a)} : ${b}.` },
   ),
   ...terms([
     ["stress aigu", "une réponse brève et adaptative face à un danger"], ["stress chronique", "un stress prolongé qui dérègle l'organisme"], ["axe corticotrope", "l'axe hypothalamus-hypophyse-glandes surrénales"],
     ["rétrocontrôle négatif", "la régulation par laquelle le cortisol freine sa propre production"], ["résilience", "la capacité à surmonter un stress"], ["plasticité cérébrale", "la capacité du cerveau à se remodeler"], ["glandes surrénales", "les glandes situées au-dessus des reins qui produisent adrénaline et cortisol"], ["anxiolytique", "un médicament qui diminue l'anxiété"], ["agent stresseur", "une situation qui déclenche la réponse de stress"],
   ]),
-  ...pairs(
-    [["le rythme cardiaque", "augmente"], ["les bronches", "se dilatent"], ["les pupilles", "se dilatent"], ["la glycémie", "augmente"], ["la digestion", "ralentit"], ["la vigilance", "augmente"]],
-    { ask: (a) => `Effet de l'adrénaline sur ${a} ?`, claim: (a, b) => `Sous l'effet de l'adrénaline, ${a} ${b}.`, explain: (a, b) => `Adrénaline : ${a} ${b}.` },
-  ),
+  // Effets de l'adrénaline : chaque grandeur augmente ou diminue (les leurres sont l'effet inverse ou l'absence d'effet).
+  (() => {
+    const effects: ReadonlyArray<readonly [string, boolean]> = [
+      ["la fréquence cardiaque", true], ["le diamètre des bronches", true], ["le diamètre des pupilles", true], ["la glycémie", true],
+      ["l'activité digestive", false], ["la fréquence respiratoire", true], ["la vigilance", true], ["le débit sanguin dans les muscles squelettiques", true],
+    ];
+    const verb = (up: boolean) => (up ? "augmente" : "diminue");
+    const why = (what: string, up: boolean) => `Adrénaline (stress aigu) : ${what} ${verb(up)}, ce qui prépare l'organisme à l'action.`;
+    const g: Generator = (r) => {
+      const [what, up] = pick(r, effects);
+      const truth = r() < 0.5;
+      return withFact(
+        r() < 0.5
+          ? mcq(r, `Sous l'effet de l'adrénaline, ${what}…`, verb(up), [verb(!up), "ne change pas"], why(what, up))
+          : tf(`Sous l'effet de l'adrénaline, ${what} ${verb(truth ? up : !up)}.`, truth, why(what, up)),
+        "adrenaline", what,
+      );
+    };
+    return Object.assign(g, { memo: effects.map(([what, up]) => ({ front: `Sous l'effet de l'adrénaline, ${what}…`, back: verb(up) })) });
+  })(),
   claims([
     ["L'adrénaline augmente le rythme cardiaque.", true, "Elle prépare l'organisme à l'action."],
     ["Le cortisol augmente la glycémie.", true, "Il mobilise les réserves d'énergie."],
@@ -159,15 +186,17 @@ const ORGANIC: Array<[string, string, string]> = [
   ["acide carboxylique", "carboxyle", "$-\\mathrm{COOH}$"], ["ester", "ester", "$-\\mathrm{COO}-$"], ["amine", "amine", "$-\\mathrm{NH_2}$"],
 ];
 const formula = (c: number, h: number) => `$\\mathrm{C${c === 1 ? "" : `_{${c}}`}H_{${h}}}$`;
+/** Article défini élidé devant voyelle ou h muet : « l'éthane », « l'hexane », « le propane » ; avec « de » : « de l'éthane », « du propane ». */
+const the = (noun: string, de = "") => (/^[aeiouyéèh]/.test(noun) ? `${de ? `${de} ` : ""}l'${noun}` : `${de ? "du" : "le"} ${noun}`);
 const ALKANES = ["méthane", "éthane", "propane", "butane", "pentane", "hexane", "heptane", "octane", "nonane", "décane"];
 
 const organique: Generator[] = [
-  ...pairs(ORGANIC.map(([f, , g]) => [f, g] as const), { ask: (a) => `Groupe caractéristique d'un(e) ${a} ?`, reverse: (b) => `Quelle famille possède le groupe ${b} ?`, claim: (a, b) => `La famille ${a} possède le groupe ${b}.`, explain: (a, b) => `${cap(a)} : ${b}.` }),
+  ...pairs(ORGANIC.map(([f, , g]) => [f, g] as const), { ask: (a) => `Groupe caractéristique de la famille « ${a} » ?`, reverse: (b) => `Quelle famille possède le groupe ${b} ?`, claim: (a, b) => `La famille ${a} possède le groupe ${b}.`, explain: (a, b) => `${cap(a)} : ${b}.` }),
   (r) => {
     const n = int(r, 1, 10);
     return r() < 0.5
-      ? mcq(r, `Formule brute du ${ALKANES[n - 1]} ?`, formula(n, 2 * n + 2), [formula(n, 2 * n), formula(n, 2 * n + 1), formula(n + 1, 2 * n + 2)], `Alcane : $\\mathrm{C_nH_{2n+2}}$.`)
-      : mcq(r, `Combien d'atomes de carbone dans le ${ALKANES[n - 1]} ?`, String(n), ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"].filter((x) => x !== String(n)), `Préfixes : méth (1), éth (2), prop (3), but (4), pent (5), hex (6), hept (7), oct (8), non (9), déc (10).`);
+      ? mcq(r, `Formule brute ${the(ALKANES[n - 1], "de")} ?`, formula(n, 2 * n + 2), [formula(n, 2 * n), formula(n, 2 * n + 1), formula(n + 1, 2 * n + 2)], `Alcane : $\\mathrm{C_nH_{2n+2}}$.`)
+      : mcq(r, `Combien d'atomes de carbone dans ${the(ALKANES[n - 1])} ?`, String(n), ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"].filter((x) => x !== String(n)), `Préfixes : méth (1), éth (2), prop (3), but (4), pent (5), hex (6), hept (7), oct (8), non (9), déc (10).`);
   },
   (r) => {
     const [stem, n] = pick(r, [["méthan", 1], ["éthan", 2], ["propan", 3], ["butan", 4], ["pentan", 5]] as const);
@@ -196,7 +225,7 @@ const spectro: Generator[] = [
   },
   ...pairs(
     [["rouge", "cyan"], ["vert", "magenta"], ["bleu", "jaune"], ["cyan", "rouge"], ["magenta", "vert"], ["jaune", "bleu"]],
-    { ask: (a) => `Une solution qui absorbe le ${a} paraît de quelle couleur ?`, claim: (a, b) => `Une solution qui absorbe le ${a} paraît ${b}.`, explain: (a, b) => `Couleur perçue = couleur complémentaire de celle absorbée : ${a} → ${b}.` },
+    { ask: (a) => `Une solution qui absorbe le ${a} paraît de quelle couleur ?`, claim: (a, b) => `Une solution qui absorbe le ${a} paraît de couleur ${b}.`, explain: (a, b) => `Couleur perçue = couleur complémentaire de celle absorbée : ${a} → ${b}.` },
   ),
   claims([
     ["Pour un dosage par étalonnage, on trace la droite A = f(C) avec des solutions de concentration connue.", true, "On lit ensuite la concentration inconnue."],
@@ -212,7 +241,8 @@ const photon: Generator[] = [
     return numeric(`Énergie d'un photon de longueur d'onde $${lam}$ nm, en eV (au centième) ? ($E = \\dfrac{hc}{\\lambda}$, $hc \\approx 1240$ eV·nm)`, Math.round((1240 / lam) * 100) / 100, `$E = \\dfrac{1240}{${lam}} \\approx ${tex(1240 / lam, 2)}$ eV.`, "eV", 0.02);
   },
   (r) => {
-    const lam = int(r, 38, 82) * 10;
+    // On évite les valeurs proches des limites (400 et 800 nm), qui varient selon les ouvrages (380-780 nm).
+    const lam = pick(r, [int(r, 20, 36) * 10, int(r, 42, 78) * 10, int(r, 84, 150) * 10]);
     const zone = lam < 400 ? "ultraviolet" : lam > 800 ? "infrarouge" : "visible";
     return mcq(r, `Une radiation de $${lam}$ nm appartient au domaine…`, zone, ["ultraviolet", "visible", "infrarouge", "rayons X"], `Le visible s'étend d'environ 400 à 800 nm.`);
   },
@@ -255,9 +285,31 @@ const fluides: Generator[] = [
 // Terminale — Sens d'évolution, piles
 const equilibre: Generator[] = [
   (r) => {
-    const K = pick(r, [1e-5, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 1e4, 1e6]), Q = pick(r, [1e-4, 0.002, 0.05, 0.5, 2, 5, 50, 500, 5000, 1e5]);
+    // Valeurs en écriture scientifique (tex arrondit au millième : 10^-5 s'afficherait « 0 »).
+    const [kM, kE] = pick(r, [[1, -5], [3.2, -3], [1, -2], [6.3, -1], [1, 0], [1.8, 1], [1, 3], [4.5, 4], [1, 6]] as const);
+    const [qM, qE] = pick(r, [[2, -4], [5, -3], [2.5, -2], [5, -1], [2, 0], [5, 1], [7, 2], [5, 3], [1, 5]] as const);
+    const K = kM * 10 ** kE, Q = qM * 10 ** qE;
+    const show = (m: number, e: number) => (e === 0 ? tex(m) : `${m === 1 ? "" : `${tex(m)} \\times `}10^{${e}}`);
     const sens = Q < K ? "dans le sens direct" : Q > K ? "dans le sens inverse" : "n'évolue pas";
-    return mcq(r, `$Q_r = ${tex(Q)}$ et $K = ${tex(K)}$. Le système évolue…`, sens, ["dans le sens direct", "dans le sens inverse", "n'évolue pas"], `On compare $Q_r$ à $K$ : ${Q < K ? "Q < K" : Q > K ? "Q > K" : "Q = K"}.`);
+    return mcq(r, `$Q_r = ${show(qM, qE)}$ et $K = ${show(kM, kE)}$. Le système évolue…`, sens, ["dans le sens direct", "dans le sens inverse", "n'évolue pas"], `On compare $Q_r$ à $K$ : ${Q < K ? "$Q_r < K$, le système évolue dans le sens direct (formation des produits)" : "$Q_r > K$, le système évolue dans le sens inverse"}.`);
+  },
+  (r) => {
+    // Calcul de Q_r à partir des concentrations, puis comparaison à K.
+    const [eq, K, Ktex, num, den] = pick(r, [
+      ["\\mathrm{CH_3COOH_{(aq)}} + \\mathrm{HCOO^-_{(aq)}} \\rightleftharpoons \\mathrm{CH_3COO^-_{(aq)}} + \\mathrm{HCOOH_{(aq)}}", 0.1, "0{,}10", ["CH_3COO^-", "HCOOH"], ["CH_3COOH", "HCOO^-"]],
+      ["\\mathrm{Fe^{3+}_{(aq)}} + \\mathrm{SCN^-_{(aq)}} \\rightleftharpoons \\mathrm{FeSCN^{2+}_{(aq)}}", 100, "1{,}0 \\times 10^{2}", ["FeSCN^{2+}"], ["Fe^{3+}", "SCN^-"]],
+      ["\\mathrm{Cu^{2+}_{(aq)}} + \\mathrm{Zn_{(s)}} \\rightleftharpoons \\mathrm{Cu_{(s)}} + \\mathrm{Zn^{2+}_{(aq)}}", 1e37, "10^{37}", ["Zn^{2+}"], ["Cu^{2+}"]],
+    ] as const);
+    const vals = new Map<string, number>([...num, ...den].map((sp) => [sp, pick(r, [0.01, 0.02, 0.05, 0.1, 0.2])]));
+    const prod = (sps: readonly string[]) => sps.reduce((p, sp) => p * vals.get(sp)!, 1);
+    const Q = Number((prod(num) / prod(den)).toPrecision(3));
+    const list = [...vals].map(([sp, v]) => `$[\\mathrm{${sp}}] = ${tex(v)}$ mol/L`).join(", ");
+    const frac = (sps: readonly string[]) => sps.map((sp) => `[\\mathrm{${sp}}]`).join("");
+    const sens = Q < K ? "dans le sens direct" : Q > K ? "dans le sens inverse" : "n'évolue pas";
+    const why = `$Q_r = \\dfrac{${frac(num)}}{${frac(den)}} = ${tex(Q, 6)}$ (les solides et le solvant n'interviennent pas).`;
+    return r() < 0.5
+      ? numeric(`$${eq}$. État initial : ${list}. Valeur de $Q_{r,i}$ ?`, Q, why, undefined, Math.abs(Q) * 0.01, 2)
+      : mcq(r, `$${eq}$, de constante $K = ${Ktex}$. État initial : ${list}. Le système évolue…`, sens, ["dans le sens direct", "dans le sens inverse", "n'évolue pas"], `${why} ${Q < K ? "$Q_{r,i} < K$ : évolution dans le sens direct." : Q > K ? "$Q_{r,i} > K$ : évolution dans le sens inverse." : "$Q_{r,i} = K$ : équilibre."}`, undefined, 2);
   },
   ...terms([
     ["pile", "un dispositif qui convertit de l'énergie chimique en énergie électrique"], ["anode", "l'électrode où se produit l'oxydation"], ["cathode", "l'électrode où se produit la réduction"],

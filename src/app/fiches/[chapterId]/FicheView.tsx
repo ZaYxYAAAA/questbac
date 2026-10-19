@@ -66,7 +66,7 @@ export function FicheView({ chapter }: { chapter: Chapter }) {
 
   return (
     <div className="mx-auto max-w-2xl space-y-5">
-      <Link href={`/fiches?matiere=${chapter.subject}`} className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-white">
+      <Link href={`/fiches?matiere=${chapter.subject}${meta.extra ? "" : `&niveau=${chapter.level}`}`} className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-white">
         <ChevronLeft size={16} /> Fiches
       </Link>
 

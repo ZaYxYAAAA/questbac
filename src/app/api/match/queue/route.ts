@@ -1,7 +1,7 @@
 import { SUBJECTS } from "@/lib/content/curriculum";
 import { currentSession, jsonError, readJson, storageDown } from "@/lib/server/accounts";
 import { MATCH_PLAYERS, isMatchSize } from "@/lib/game/match";
-import { cancelQueue, joinQueue, pollQueue } from "@/lib/server/match";
+import { RankedError, cancelQueue, joinQueue, pollQueue } from "@/lib/server/match";
 import type { SubjectId } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   try {
     return Response.json(await joinQueue(session.uid, session.pseudo, subject as SubjectId, size), { headers: NO_STORE });
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("Tu as joué")) return jsonError(error.message, 409);
+    if (error instanceof RankedError) return jsonError(error.message, error.status);
     return storageDown(error);
   }
 }
@@ -36,7 +36,7 @@ export async function GET(req: Request) {
   try {
     return Response.json(await pollQueue(session.uid, ticket), { headers: NO_STORE });
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("Recherche")) return jsonError(error.message, 404);
+    if (error instanceof RankedError) return jsonError(error.message, error.status);
     return storageDown(error);
   }
 }

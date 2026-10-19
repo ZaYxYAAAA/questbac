@@ -94,6 +94,8 @@ export function QuestionCard({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.tagName === "INPUT") return;
+      // Ctrl+F, Cmd+C, Ctrl+A… sont des raccourcis du navigateur, pas une réponse.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       // Labo ou calculatrice ouverts par-dessus : les touches leur appartiennent.
       if (document.querySelector('[role="dialog"]')) return;
       if (status !== "answering") return;

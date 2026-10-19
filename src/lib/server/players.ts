@@ -11,24 +11,32 @@ import { getStore } from "./store";
 
 /**
  * Fiche publique d'un joueur (ouverte depuis le classement ou les amis).
- * Index `pubids` : identifiant public → id de compte, rempli à chaque sauvegarde.
+ * Index `pubids` : identifiant public → id de compte, rempli à chaque sauvegarde
+ * et à chaque mise à jour du profil de rang (match.ts, updateRank).
  */
 
 export const indexPublicId = (accountId: string) => getStore().hset("pubids", publicPlayerId(accountId), accountId);
 
-/** Retrouve le compte d'un identifiant public (index, sinon parcours des joueurs connus). */
-export async function accountForPublicId(publicId: string): Promise<string | null> {
+/** Parcours complet des joueurs connus : au plus un par minute (un identifiant inventé ne relit pas toute la base). */
+const SCAN_EVERY_MS = 60_000;
+let lastScan = 0;
+
+/** Retrouve le compte d'un identifiant public (index, sinon parcours des joueurs connus, qui complète l'index). */
+export async function accountForPublicId(publicId: string, now = Date.now()): Promise<string | null> {
   const store = getStore();
   const [hit] = await store.hmget<string>("pubids", [publicId]);
   if (hit) return hit;
-  const known = new Set([...Object.keys(await store.hgetall("players")), ...Object.keys(await store.hgetall(`rank${RANK_EPOCH}`))]);
-  for (const id of known) {
-    if (publicPlayerId(id) === publicId) {
-      await store.hset("pubids", publicId, id);
-      return id;
-    }
+  if (now - lastScan < SCAN_EVERY_MS) return null;
+  lastScan = now;
+  const [players, ranks, indexed] = await Promise.all([store.hgetall("players"), store.hgetall(`rank${RANK_EPOCH}`), store.hgetall<string>("pubids")]);
+  const known = new Set(Object.values(indexed));
+  let found: string | null = null;
+  for (const id of new Set([...Object.keys(players), ...Object.keys(ranks)])) {
+    const pid = publicPlayerId(id);
+    if (!known.has(id)) await store.hset("pubids", pid, id);
+    if (pid === publicId) found = id;
   }
-  return null;
+  return found;
 }
 
 export interface PlayerCard {

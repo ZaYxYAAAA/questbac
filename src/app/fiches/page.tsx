@@ -19,9 +19,14 @@ export default function FichesPage() {
   const subjects = subjectsForLevel(level);
   const [subject, setSubject] = useState<SubjectId>(subjects[0].id);
 
+  // Retour depuis une fiche : on rouvre sa matière et son niveau (qui peut différer de celui du profil).
   useEffect(() => {
-    const asked = new URLSearchParams(window.location.search).get("matiere") as SubjectId | null;
-    if (asked && subjects.some((s) => s.id === asked)) setSubject(asked);
+    const query = new URLSearchParams(window.location.search);
+    const askedLevel = query.get("niveau") as Level | null;
+    const lvl = askedLevel && LEVELS.some((l) => l.id === askedLevel) ? askedLevel : level;
+    if (lvl !== level) setLevel(lvl);
+    const asked = query.get("matiere") as SubjectId | null;
+    if (asked && subjectsForLevel(lvl).some((s) => s.id === asked)) setSubject(asked);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const current = subjects.some((s) => s.id === subject) ? subject : subjects[0].id;

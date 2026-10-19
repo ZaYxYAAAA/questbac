@@ -17,7 +17,7 @@ const bonheur: Generator[] = [
     ["« Malheur à qui n'a plus rien à désirer ! »", "Rousseau"], ["la vie oscille « comme un pendule » entre la souffrance et l'ennui", "Schopenhauer"],
   ]),
   ...terms([["ataraxie", "l'absence de trouble de l'âme"], ["hédonisme", "la doctrine qui fait du plaisir le souverain bien"], ["eudémonisme", "une morale qui vise le bonheur"], ["désir", "la tendance vers ce que l'on se représente comme source de satisfaction"], ["besoin", "une nécessité vitale"], ["divertissement", "selon Pascal, ce qui nous détourne de penser à notre condition"]]),
-  claims([["Pour Épicure, il faut satisfaire tous ses désirs pour être heureux.", false, "Seulement les désirs naturels et nécessaires."], ["Le stoïcisme invite à accepter ce qui ne dépend pas de nous.", true, "Épictète, Marc Aurèle, Sénèque."]]),
+  claims([["Pour Épicure, le bonheur suppose de satisfaire aussi les désirs naturels non nécessaires (mets raffinés, luxe).", false, "Seuls les désirs naturels et nécessaires doivent être satisfaits ; les autres peuvent être goûtés à l'occasion, sans en dépendre."], ["Le stoïcisme invite à accepter ce qui ne dépend pas de nous.", true, "Épictète, Marc Aurèle, Sénèque."]]),
 ];
 
 const etatJustice: Generator[] = [
@@ -27,7 +27,7 @@ const etatJustice: Generator[] = [
     ["la justice comme équité : les principes choisis sous un « voile d'ignorance »", "John Rawls"], ["l'homme est par nature un « animal politique »", "Aristote"],
   ]),
   ...terms([["légitimité", "la conformité d'un pouvoir à ce qui est jugé juste"], ["légalité", "la conformité à la loi en vigueur"], ["droit naturel", "les droits que l'homme possède du seul fait d'être homme"], ["droit positif", "l'ensemble des lois effectivement en vigueur"], ["équité", "la justice adaptée aux cas particuliers"], ["souveraineté", "le pouvoir suprême de faire les lois"], ["anarchisme", "la doctrine qui rejette toute forme d'État"]]),
-  claims([["Ce qui est légal est forcément juste.", false, "Une loi peut être injuste (lois raciales, esclavage…)."], ["Pour Rousseau, obéir à la loi qu'on s'est prescrite est liberté.", true, "Du contrat social."]]),
+  claims([["Pour Hobbes, les sujets peuvent renverser le souverain qui gouverne mal.", false, "Le pacte est irrévocable : le sujet garde seulement le droit de défendre sa propre vie."], ["Pour Rousseau, obéir à la loi qu'on s'est prescrite est liberté.", true, "Du contrat social."]]),
 ];
 
 const art: Generator[] = [
@@ -36,7 +36,7 @@ const art: Generator[] = [
     ["l'art révèle ce que la perception ordinaire nous cache", "Bergson"], ["la catharsis : purgation des passions par la tragédie", "Aristote"], ["l'œuvre d'art à l'époque de sa reproductibilité technique perd son « aura »", "Walter Benjamin"], ["« La nature imite l'art »", "Oscar Wilde"], ["« L'art est une manifestation sensible de l'Idée »", "Hegel"],
   ]),
   ...terms([["œuvre d'art", "une production humaine destinée à être contemplée"], ["artisan", "celui qui produit selon des règles pour un usage"], ["goût", "la faculté de juger du beau"], ["sublime", "ce qui dépasse toute mesure et provoque un sentiment de grandeur"], ["mimèsis", "l'imitation de la nature"], ["inspiration", "la création attribuée à une force extérieure"]]),
-  claims([["Pour Kant, le jugement de goût est purement subjectif et n'a aucune prétention universelle.", false, "Il prétend à l'universalité, sans concept."], ["L'art contemporain a souvent remis en cause la recherche du beau.", true, "Exemple : les ready-made de Duchamp."]]),
+  claims([["Pour Kant, « à chacun son goût » vaut aussi pour le beau.", false, "Cela vaut pour l'agréable ; le jugement sur le beau prétend à l'universalité, sans concept."], ["L'art contemporain a souvent remis en cause la recherche du beau.", true, "Exemple : les ready-made de Duchamp."]]),
 ];
 
 const techniqueTravail: Generator[] = [
@@ -45,7 +45,7 @@ const techniqueTravail: Generator[] = [
     ["le principe responsabilité face aux pouvoirs de la technique", "Hans Jonas"], ["la distinction entre travail, œuvre et action", "Hannah Arendt"], ["l'homme, être inachevé, compense par la technique (mythe de Prométhée)", "Platon"], ["la main est « l'outil des outils »", "Aristote"], ["l'homme est un « homo faber » qui fabrique des outils", "Bergson"],
   ]),
   ...terms([["technique", "l'ensemble des procédés pour produire un résultat"], ["aliénation", "la perte de soi dans une activité qui nous rend étrangers à nous-mêmes"], ["division du travail", "la répartition des tâches entre travailleurs spécialisés"], ["outil", "un objet prolongeant le corps pour agir sur la matière"], ["machine", "un dispositif qui transforme l'énergie et accomplit une tâche"], ["loisir", "le temps libéré du travail"]]),
-  claims([["Pour Marx, le travail est toujours aliénant par nature.", false, "C'est le travail dans le capitalisme qui aliène ; le travail peut réaliser l'homme."], ["Hans Jonas invite à anticiper les conséquences lointaines de la technique.", true, "Le Principe responsabilité (1979)."]]),
+  claims([["Pour Marx, le travail aliène l'homme par nature, quelle que soit son organisation.", false, "C'est le travail salarié dans le capitalisme qui aliène ; le travail peut aussi réaliser l'homme."], ["Hans Jonas invite à anticiper les conséquences lointaines de la technique.", true, "Le Principe responsabilité (1979)."]]),
 ];
 
 const scienceRaison: Generator[] = [
@@ -54,7 +54,7 @@ const scienceRaison: Generator[] = [
     ["la causalité vient de l'habitude, non de la raison", "Hume"], ["« Le cœur a ses raisons que la raison ne connaît point »", "Pascal"], ["les règles de la méthode : évidence, analyse, synthèse, dénombrement", "Descartes"], ["« Rien n'est sans raison » : le principe de raison suffisante", "Leibniz"], ["la méthode expérimentale en médecine", "Claude Bernard"],
   ]),
   ...terms([["induction", "le raisonnement qui va du particulier au général"], ["déduction", "le raisonnement qui tire une conclusion nécessaire de prémisses"], ["expérimentation", "la vérification d'une hypothèse par une expérience contrôlée"], ["empirisme", "la doctrine selon laquelle toute connaissance vient de l'expérience"], ["rationalisme", "la doctrine qui fonde la connaissance sur la raison"], ["paradigme", "le cadre théorique partagé par une communauté scientifique"]]),
-  claims([["Pour Popper, une théorie irréfutable est plus scientifique.", false, "Elle n'est justement pas scientifique."], ["La raison peut connaître ses propres limites (Kant).", true, "C'est le projet de la Critique de la raison pure."]]),
+  claims([["Pour Popper, la psychanalyse est un modèle de théorie scientifique.", false, "Elle est pour lui irréfutable (elle explique tout), donc non scientifique."], ["La raison peut connaître ses propres limites (Kant).", true, "C'est le projet de la Critique de la raison pure."]]),
 ];
 
 const langageTemps: Generator[] = [
@@ -68,10 +68,10 @@ const langageTemps: Generator[] = [
 
 const auteursPhilo: Generator[] = [
   ...chrono([
-    ["Naissance de Platon", -428], ["Naissance d'Aristote", -384], ["Naissance d'Épicure", -341], ["Naissance de saint Augustin", 354], ["Naissance de Machiavel", 1469],
+    ["Mort de Socrate", -399], ["Naissance d'Aristote", -384], ["Naissance de saint Augustin", 354], ["Naissance de Machiavel", 1469], ["Naissance de Hobbes", 1588],
     ["Naissance de Montaigne", 1533], ["Naissance de Descartes", 1596], ["Naissance de Pascal", 1623], ["Naissance de Spinoza", 1632], ["Naissance de Rousseau", 1712],
-    ["Naissance de Kant", 1724], ["Naissance de Hegel", 1770], ["Naissance de Marx", 1818], ["Naissance de Nietzsche", 1844], ["Naissance de Freud", 1856],
-    ["Naissance de Bergson", 1859], ["Naissance de Hannah Arendt", 1906], ["Naissance de Simone de Beauvoir", 1908],
+    ["Naissance de Hume", 1711], ["Naissance de Kant", 1724], ["Naissance de Hegel", 1770], ["Naissance de Marx", 1818], ["Naissance de Nietzsche", 1844], ["Naissance de Freud", 1856],
+    ["Naissance de Bergson", 1859], ["Naissance de Sartre", 1905], ["Naissance de Hannah Arendt", 1906], ["Naissance de Simone de Beauvoir", 1908],
   ]),
   ...pairs(
     [["Platon", "La République"], ["Aristote", "Éthique à Nicomaque"], ["Descartes", "Discours de la méthode"], ["Pascal", "Pensées"], ["Spinoza", "Éthique"], ["Rousseau", "Discours sur l'origine de l'inégalité"], ["Kant", "Fondements de la métaphysique des mœurs"], ["Nietzsche", "Le Gai Savoir"], ["Simone de Beauvoir", "Le Deuxième Sexe"], ["Hannah Arendt", "Condition de l'homme moderne"], ["Sartre", "L'existentialisme est un humanisme"], ["Bergson", "L'Évolution créatrice"]],
@@ -87,7 +87,7 @@ const diplome: Generator[] = [
     const s1 = int(r, 14, 22) * 100, s2 = s1 + int(r, 2, 15) * 100;
     return numeric(`Salaire médian sans diplôme : $${s1}$ € ; avec un diplôme du supérieur : $${s2}$ €. Écart en % (au dixième) ?`, Math.round(((s2 - s1) / s1) * 1000) / 10, `$\\dfrac{${s2} - ${s1}}{${s1}} \\times 100$.`, "%", 0.11);
   },
-  claims([["Le taux de chômage des non-diplômés est plus élevé que celui des diplômés du supérieur.", true, "Le diplôme protège du chômage."], ["Le diplôme garantit toujours un emploi correspondant à sa qualification.", false, "Le déclassement existe."], ["La poursuite d'études est un investissement en capital humain.", true, "Théorie de Gary Becker."]]),
+  claims([["Le taux de chômage des non-diplômés est plus élevé que celui des diplômés du supérieur.", true, "Le diplôme protège du chômage."], ["À diplôme égal, les femmes gagnent en moyenne autant que les hommes en France.", false, "L'écart de salaire persiste à diplôme égal (métiers, temps partiel, plafond de verre)."], ["La poursuite d'études est un investissement en capital humain.", true, "Théorie de Gary Becker."]]),
 ];
 
 const politique: Generator[] = [
@@ -109,7 +109,7 @@ const opinionVote: Generator[] = [
     const marge = Math.round((1 / Math.sqrt(n)) * 1000) / 10;
     return numeric(`Sondage auprès de $${n}$ personnes : marge d'erreur approximative $\\dfrac{1}{\\sqrt{n}}$ (en points de %, au dixième) ?`, marge, `$\\dfrac{1}{\\sqrt{${n}}} \\approx ${tex(1 / Math.sqrt(n), 3)}$.`, "pts", 0.11);
   },
-  claims([["Un sondage mesure parfaitement l'opinion de toute la population.", false, "Il existe une marge d'erreur et des biais."], ["Les jeunes votent en moyenne moins que les plus âgés.", true, "L'abstention est plus forte chez les jeunes."], ["La participation électorale augmente avec le niveau de diplôme.", true, "Variable sociologique majeure."]]),
+  claims([["La méthode des quotas consiste à tirer au sort les personnes interrogées.", false, "C'est la méthode aléatoire ; les quotas reproduisent la structure de la population (âge, sexe, PCS…)."], ["Les jeunes votent en moyenne moins que les plus âgés.", true, "L'abstention est plus forte chez les jeunes."], ["La participation électorale augmente avec le niveau de diplôme.", true, "Variable sociologique majeure."]]),
 ];
 
 const risques: Generator[] = [
@@ -134,7 +134,7 @@ const commerce: Generator[] = [
     const x = int(r, 400, 800), m = int(r, 400, 800);
     return numeric(`Exportations $${x}$, importations $${m}$. Taux de couverture (%, au dixième) ?`, Math.round((x / m) * 1000) / 10, `$\\dfrac{X}{M} \\times 100$.`, "%", 0.11);
   },
-  claims([["Selon Ricardo, un pays a intérêt à échanger même s'il est moins productif partout.", true, "Grâce aux avantages comparatifs."], ["L'OMC a pour mission de favoriser le libre-échange.", true, "Organisation mondiale du commerce, créée en 1995."], ["Le protectionnisme ne présente que des avantages.", false, "Il peut provoquer des représailles et augmenter les prix."]]),
+  claims([["Selon Ricardo, un pays a intérêt à échanger même s'il est moins productif partout.", true, "Grâce aux avantages comparatifs."], ["L'OMC a pour mission de favoriser le libre-échange.", true, "Organisation mondiale du commerce, créée en 1995."], ["Selon Ricardo, un pays doit se spécialiser là où il a un avantage absolu sur ses partenaires.", false, "L'avantage absolu est l'idée d'Adam Smith ; Ricardo montre qu'un avantage comparatif suffit."]]),
 ];
 
 const mobilite: Generator[] = [
@@ -143,7 +143,7 @@ const mobilite: Generator[] = [
     const tot = pick(r, [200, 400, 500, 1000]), same = Math.round(tot * pick(r, [0.2, 0.3, 0.35, 0.4, 0.5]));
     return numeric(`Sur $${tot}$ fils d'ouvriers, $${same}$ sont ouvriers. Part de l'immobilité (%) ?`, Math.round((same / tot) * 1000) / 10, `$\\dfrac{${same}}{${tot}} \\times 100$ (lecture d'une table de destinée).`, "%", 0.11);
   },
-  claims([["La mobilité sociale ascendante signifie occuper une position supérieure à celle de ses parents.", true, "Par opposition au déclassement."], ["En France, l'origine sociale n'influence plus la réussite scolaire.", false, "Elle reste fortement déterminante."]]),
+  claims([["La mobilité sociale ascendante signifie occuper une position supérieure à celle de ses parents.", true, "Par opposition au déclassement."], ["Une table de destinée indique l'origine sociale des membres d'une catégorie.", false, "C'est une table de recrutement ; la table de destinée indique ce que deviennent les enfants d'une origine donnée."]]),
 ];
 
 // ═════════════ Français ═════════════
@@ -178,7 +178,7 @@ const oeuvresBac: Generator[] = [
 ];
 
 const litteratureIdees: Generator[] = [
-  ...terms([["essai", "un texte argumentatif en prose où l'auteur expose sa réflexion"], ["apologue", "un récit qui illustre une leçon morale (fable, conte philosophique)"], ["pamphlet", "un texte court et violent qui attaque une personne ou une institution"], ["éditorial", "l'article qui exprime la position du journal"], ["tribune", "un article d'opinion signé par une personnalité extérieure"], ["fait divers", "un événement de la vie quotidienne rapporté par la presse"], ["argument", "une idée qui soutient une thèse"], ["thèse", "la position défendue"], ["réquisitoire", "un discours qui accuse"], ["plaidoyer", "un discours qui défend"]]),
+  ...terms([["essai", "un texte argumentatif en prose où l'auteur expose sa réflexion"], ["apologue", "un récit qui illustre une leçon morale (fable, conte philosophique)"], ["pamphlet", "un texte court et violent qui attaque une personne ou une institution"], ["éditorial", "l'article qui exprime la position du journal"], ["tribune", "un article d'opinion signé par une personnalité extérieure"], ["fait divers", "un événement de la vie quotidienne rapporté par la presse"], ["argument", "une idée qui soutient une thèse"], ["thèse", "la position défendue"], ["réquisitoire", "à l'origine, le discours du procureur ; par extension, une accusation méthodique"], ["plaidoyer", "à l'origine, le discours de l'avocat ; par extension, la défense argumentée d'une cause"]]),
   ...pairs(
     [["« J'accuse… ! »", "Zola"], ["Discours sur la misère", "Victor Hugo"], ["Les Châtiments", "Victor Hugo"], ["Réflexions sur la question juive", "Sartre"], ["Le Deuxième Sexe", "Simone de Beauvoir"], ["Indignez-vous !", "Stéphane Hessel"], ["Lettres persanes", "Montesquieu"], ["Traité sur la tolérance", "Voltaire"]],
     { ask: (a) => `Auteur de ${a.startsWith("«") ? a : `*${a}*`} ?`, reverse: (b) => `Quel texte engagé a été écrit par ${b} ?`, explain: (a, b) => `${a} : ${b}.` },
@@ -194,7 +194,7 @@ const civilisation: Generator[] = [
     { ask: (a) => `Que désigne **${a}** ?`, reverse: (b) => `Comment s'appelle ${b} ?`, claim: (a, b) => `**${a}** désigne ${b}.`, explain: (a, b) => `${a} : ${b}.` },
   ),
   ...chrono([
-    ["Magna Carta", 1215], ["Declaration of Independence", 1776], ["End of the American Civil War", 1865], ["Women's suffrage in the US (19th Amendment)", 1920],
+    ["Magna Carta", 1215], ["Declaration of Independence", 1776], ["Lee's surrender at Appomattox (end of the Civil War)", 1865], ["Ratification of the 19th Amendment (women's suffrage in the US)", 1920],
     ["Martin Luther King's « I Have a Dream » speech", 1963], ["Civil Rights Act", 1964], ["Election of Barack Obama", 2008], ["Brexit referendum", 2016], ["Death of Queen Elizabeth II", 2022],
   ]),
   ...pairs(
@@ -231,13 +231,14 @@ const grammar: Generator[] = [
   },
   (r) => {
     const [noun, count] = pick(r, [["water", false], ["books", true], ["money", false], ["friends", true], ["time", false], ["people", true], ["information", false], ["cars", true], ["advice", false], ["students", true], ["homework", false], ["apples", true]] as const);
-    const q = pick(r, ["How ___ ?", "There isn't ___ left.", "She has too ___."]);
+    const q = pick(r, ["How ___ ?", count ? "There aren't ___ left." : "There isn't ___ left.", "She has too ___."]);
     const ans = count ? "many" : "much";
-    return mcq(r, `${q.replace("___", `___ ${noun}`)}`, ans, [count ? "much" : "many", "a lot", "few"], `*${noun}* est ${count ? "dénombrable → many" : "indénombrable → much"}.`);
+    // Pas de « few » ni « little » : « too few friends » ou « too little water » seraient corrects.
+    return mcq(r, `${q.replace("___", `___ ${noun}`)}`, ans, [count ? "much" : "many", "a lot", count ? "a little" : "a few"], `*${noun}* est ${count ? "dénombrable → many" : "indénombrable → much"}.`);
   },
   (r) => {
     const [subj, verb, obj] = [pick(r, ["She", "He", "My sister", "Tom", "The teacher"]), pick(r, [["play", "plays"], ["watch", "watches"], ["study", "studies"], ["go", "goes"], ["have", "has"], ["do", "does"], ["fly", "flies"], ["fix", "fixes"]] as const), pick(r, ["every day", "on Sundays", "after school", "every morning"])];
-    return mcq(r, `${subj} ___ (${verb[0]}) ${obj}.`, verb[1], [verb[0], `${verb[0]}s`.replace(/ys$/, "ies") === verb[1] ? `${verb[0]}es` : `${verb[0]}s`, `is ${verb[0]}ing`].filter((x) => x !== verb[1]), `3e personne du singulier au présent simple : *${verb[1]}*.`);
+    return mcq(r, `${subj} ___ (${verb[0]}) ${obj}.`, verb[1], [verb[0], verb[1] === `${verb[0]}s` ? `${verb[0]}es` : `${verb[0]}s`, `is ${verb[0].replace(/e$/, "")}ing`], `3e personne du singulier au présent simple : *${verb[1]}*.`);
   },
   claims([["« Much » s'emploie avec les indénombrables, « many » avec les dénombrables.", true, "much water, many books."], ["On dit « the most tall ».", false, "On dit « the tallest » (adjectif court)."], ["« Whose » exprime la possession.", true, "The boy whose bike was stolen…"]]),
 ];

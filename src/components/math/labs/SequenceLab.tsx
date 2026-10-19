@@ -4,8 +4,8 @@ import { useMemo, useState } from "react";
 import { COLORS, Graph, Plot, Point, Segment } from "@/components/math/Graph";
 import { Slider } from "@/components/ui/Slider";
 import { Tex } from "@/components/ui/Tex";
-import { fmt, tryCompile } from "@/lib/math/parser";
-import { Chips, LabShell, Panel, Readout, texNum } from "./common";
+import { fmt } from "@/lib/math/parser";
+import { Chips, LabShell, Panel, Readout, compileX, texNum } from "./common";
 
 type Mode = "arith" | "geo" | "recur";
 
@@ -17,7 +17,7 @@ export default function SequenceLab() {
   const [expr, setExpr] = useState("0.5x + 2");
   const [count, setCount] = useState(15);
 
-  const compiled = useMemo(() => tryCompile(expr), [expr]);
+  const compiled = useMemo(() => compileX(expr), [expr]);
   const f = useMemo(
     () => (compiled.ok ? (x: number) => compiled.expr.evaluate({ x }) : () => NaN),
     [compiled],
@@ -37,20 +37,35 @@ export default function SequenceLab() {
   const before = terms[terms.length - 2];
   const converging = Number.isFinite(last) && Math.abs(last - before) < 1e-3;
   const finite = terms.filter(Number.isFinite);
-  const yMax = Math.min(60, Math.max(4, ...finite.map((t) => Math.abs(t))) * 1.2);
+  // Fenêtre du graphe des termes : elle suit le signe des termes (une suite qui descend vers −100 doit rester visible).
+  const hi = Math.min(60, Math.max(0, ...finite));
+  const lo = Math.max(-60, Math.min(0, ...finite));
+  const pad = Math.max(4, hi - lo) * 0.15;
+  const yTop = Math.max(hi + pad, 2);
+  const yBottom = Math.min(lo - pad, -1);
+  // Fenêtre de la toile d'araignée : chaque terme sert d'abscisse puis d'image, donc une seule plage pour les deux axes
+  // (fenêtre carrée, pour la diagonale y = x), qui contient u₀ et les termes finis, bornée à ±60.
+  const cobHi = Math.min(60, Math.max(...finite));
+  const cobLo = Math.max(-60, Math.min(...finite));
+  const cobPad = Math.max(2, cobHi - cobLo) * 0.15;
+  const cobMax = Math.min(60, Math.max(cobHi + cobPad, 6));
+  const cobMin = Math.max(-60, Math.min(cobLo - cobPad, -1));
 
+  // u_n = u0 + nr (« − 0,5n » plutôt que « + −0,5n ») et u_n = u0 × q^n (raison négative entre parenthèses).
+  const arithTex = texNum(Math.abs(r)) === "0" ? texNum(u0) : `${texNum(u0)} ${r < 0 ? "-" : "+"} ${texNum(Math.abs(r)) === "1" ? "" : texNum(Math.abs(r))}n`;
+  const qTex = q < 0 ? `\\left(${texNum(q)}\\right)` : texNum(q);
   const formula =
     mode === "arith"
-      ? `u_n = ${texNum(u0)} + ${texNum(r)}n`
+      ? `u_n = ${arithTex}`
       : mode === "geo"
-        ? `u_n = ${texNum(u0)} \\times ${texNum(q)}^n`
+        ? `u_n = ${texNum(u0)} \\times ${qTex}^n`
         : `u_{n+1} = f(u_n),\\ u_0 = ${texNum(u0)}`;
 
   return (
     <LabShell
       graph={
         <>
-          <Graph key={`${mode}-${count}-${Math.round(yMax)}`} initial={{ xMin: -1, xMax: count + 1, yMin: -yMax * 0.35, yMax }} height={mode === "recur" ? 300 : 460} xLabel="n" yLabel="uₙ">
+          <Graph key={`${mode}-${count}-${Math.round(yBottom)}-${Math.round(yTop)}`} initial={{ xMin: -1, xMax: count + 1, yMin: yBottom, yMax: yTop }} height={mode === "recur" ? 300 : 460} xLabel="n" yLabel="uₙ">
             {terms.map((t, n) =>
               Number.isFinite(t) ? (
                 <g key={n}>
@@ -62,7 +77,7 @@ export default function SequenceLab() {
             {converging && <Segment x1={-100} y1={last} x2={1000} y2={last} color={COLORS.emerald} dashed />}
           </Graph>
           {mode === "recur" && (
-            <Graph key={`cob-${Math.round(yMax)}`} initial={{ xMin: -1, xMax: Math.max(6, yMax * 0.9), yMin: -1, yMax: Math.max(6, yMax * 0.9) }} height={340} equalAspect yLabel="y">
+            <Graph key={`cob-${Math.round(cobMin)}-${Math.round(cobMax)}`} initial={{ xMin: cobMin, xMax: cobMax, yMin: cobMin, yMax: cobMax }} height={340} equalAspect="contain" yLabel="y">
               <Plot f={(x) => x} color={COLORS.muted} dashed />
               <Plot f={f} color={COLORS.cyan} width={3} />
               {terms.slice(0, -1).map((t, n) => {

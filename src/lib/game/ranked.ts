@@ -1,5 +1,5 @@
 /**
- * Mode classé : profil de rang (points de rang gagnés en parties à 3),
+ * Mode classé : profil de rang (points de rang gagnés en parties à 3, 5 ou 7),
  * calendrier (semaines à l'heure de Paris) et utilitaires partagés client / serveur.
  */
 import type { Question } from "@/lib/types";
@@ -40,6 +40,9 @@ export interface RankProfile {
   /** Derniers thèmes proposés au vote (du plus ancien au plus récent). */
   offered?: string[];
 }
+
+/** Nombre de lignes de chaque classement (général et semaine), hors ma ligne et celles de mes amis. */
+export const BOARD_SIZE = 200;
 
 /** Nombre de thèmes proposés récemment dont on se souvient, par joueur. */
 export const OFFERED_KEPT = 24;
@@ -107,11 +110,15 @@ export const rankedWeek = (now = new Date()) => weekKey(parisDate(now));
 
 // ─────────────────────────── Questions ───────────────────────────
 
-/** Question telle que le client la reçoit avant d'avoir répondu : sans réponse ni explication. */
+/**
+ * Question telle que le client la reçoit avant d'avoir répondu : sans réponse ni
+ * explication, ni aucun autre champ (empreinte d'information, tolérance…).
+ */
 export function publicQuestion(q: Question): Question {
-  if (q.type === "mcq") return { ...q, answer: -1, explanation: "" };
-  if (q.type === "truefalse") return { ...q, answer: false, explanation: "" };
-  return { id: q.id, type: "numeric", prompt: q.prompt, unit: q.unit, difficulty: q.difficulty, answer: 0, explanation: "", ...(q.calc ? { calc: true } : {}) };
+  const base = { id: q.id, prompt: q.prompt, explanation: "", ...(q.difficulty !== undefined ? { difficulty: q.difficulty } : {}), ...(q.calc ? { calc: true } : {}) };
+  if (q.type === "mcq") return { ...base, type: "mcq", choices: q.choices, answer: -1 };
+  if (q.type === "truefalse") return { ...base, type: "truefalse", answer: false };
+  return { ...base, type: "numeric", answer: 0, ...(q.unit !== undefined ? { unit: q.unit } : {}) };
 }
 
 // ─────────────────────────── Variété des matières ───────────────────────────

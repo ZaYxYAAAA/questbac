@@ -5,6 +5,7 @@ import clsx from "clsx";
 import { Check } from "lucide-react";
 import { celebrate } from "@/components/game/RewardScreen";
 import { Button } from "@/components/ui/Button";
+import { activeBoost } from "@/lib/game/boost";
 import { type DailyReward, dailyCalendar } from "@/lib/game/daily";
 import { formatCountdown } from "@/lib/game/league";
 import { dayKey } from "@/lib/game/progression";
@@ -22,10 +23,12 @@ function untilMidnight(now: number) {
 /** Coffre de connexion quotidienne et son calendrier de 7 jours. */
 export function DailyChest() {
   const daily = useGame((s) => s.daily);
+  const boost = useGame((s) => s.boost);
   const claim = useGame((s) => s.claimDaily);
   const [now, setNow] = useState(() => Date.now());
   const [opening, setOpening] = useState(false);
-  const [won, setWon] = useState<DailyReward | null>(null);
+  /** Coffre ouvert et XP réellement gagnée (dimanche ×2 et boosts compris). */
+  const [won, setWon] = useState<{ reward: DailyReward; xp: number } | null>(null);
   const cal = dailyCalendar(daily, dayKey(new Date(now)));
 
   useEffect(() => {
@@ -41,7 +44,7 @@ export function DailyChest() {
       const result = claim();
       setOpening(false);
       if (!result) return;
-      setWon(result.reward);
+      setWon({ reward: result.reward, xp: result.summary.xpGained });
       play("coin");
       announce(result.summary);
       if (!reducedMotion()) void celebrate(result.reward.day === 7 ? "big" : "small");
@@ -49,6 +52,9 @@ export function DailyChest() {
   };
 
   const today = cal.days[cal.todayIndex];
+  // Même calcul que la récompense : le dimanche (XP ×2) ou un boost en cours s'appliquent au coffre.
+  const mult = activeBoost(boost, new Date(now))?.mult ?? 1;
+  const todayXp = today.xp + Math.round(today.xp * (mult - 1));
 
   return (
     <div className="flex items-center gap-3 rounded-3xl border border-white/10 bg-slate-900/70 p-3">
@@ -62,11 +68,11 @@ export function DailyChest() {
           🎁
         </button>
       ) : (
-        <span className="qb-pop grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-slate-800/70 text-3xl">{won ? won.emoji : "📦"}</span>
+        <span className="qb-pop grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-slate-800/70 text-3xl">{won ? won.reward.emoji : "📦"}</span>
       )}
       <div className="min-w-0 flex-1">
         <p className="text-sm font-bold text-white">
-          {cal.canClaim ? <>Coffre du jour · <span className="text-amber-200">+{today.xp} XP</span></> : won ? <span className="text-amber-200">+{won.xp} XP récupérés !</span> : "Coffre ouvert"}
+          {cal.canClaim ? <>Coffre du jour · <span className="text-amber-200">+{todayXp} XP</span></> : won ? <span className="text-amber-200">+{won.xp} XP récupérés !</span> : "Coffre ouvert"}
         </p>
         <ol className="mt-1.5 flex gap-1" aria-label={`Calendrier des 7 jours, jour ${today.day}`}>
           {cal.days.map((d) => (

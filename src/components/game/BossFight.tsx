@@ -31,6 +31,13 @@ export function BossFight({ boss, pool, onComplete }: { boss: Boss; pool: Questi
   const [hurt, setHurt] = useState(0);
   const [taunt, setTaunt] = useState(boss.intro);
 
+  /** Le boss enrageait au début de la question : fixe son chrono jusqu'à la suivante. */
+  const [rageTimer, setRageTimer] = useState(false);
+  /** Numéro de l'attaque : remonte la carte même si le paquet remélangé repose la même question. */
+  const [turn, setTurn] = useState(0);
+  /** Question déjà résolue (réponse ou temps écoulé dans le même instant) : une seule prise en compte. */
+  const resolved = useRef(false);
+  const finished = useRef(false);
   const maxCombo = useRef(0);
   const answers = useRef<QuizResult["answers"]>([]);
   const startedAt = useRef(Date.now());
@@ -38,8 +45,9 @@ export function BossFight({ boss, pool, onComplete }: { boss: Boss; pool: Questi
 
   const enraged = hp <= boss.hp / 2;
   const q = deck[index];
-  // Temps adapté à la question, plus ou moins serré selon le boss (et réduit quand il enrage).
-  const limit = Math.round(questionTimeMs(q) * (boss.secondsPerQuestion / 25) * (enraged ? 0.75 : 1));
+  // Temps adapté à la question, plus ou moins serré selon le boss (et réduit quand il enrage,
+  // à partir de la question suivante : le chrono ne change pas pendant la correction).
+  const limit = Math.round(questionTimeMs(q) * (boss.secondsPerQuestion / 25) * (rageTimer ? 0.75 : 1));
 
   // Chronomètre
   useEffect(() => {
@@ -59,7 +67,8 @@ export function BossFight({ boss, pool, onComplete }: { boss: Boss; pool: Questi
   }, [phase, index, limit]);
 
   function resolve(correct: boolean) {
-    if (phase !== "answering") return;
+    if (phase !== "answering" || resolved.current) return;
+    resolved.current = true;
     setPhase("feedback");
     const timeMs = Date.now() - questionStart.current;
     answers.current.push({ questionId: q.id, correct, timeMs });
@@ -80,6 +89,8 @@ export function BossFight({ boss, pool, onComplete }: { boss: Boss; pool: Questi
   }
 
   const finish = (won: boolean) => {
+    if (finished.current) return;
+    finished.current = true;
     const list = answers.current;
     onComplete({
       won,
@@ -95,6 +106,8 @@ export function BossFight({ boss, pool, onComplete }: { boss: Boss; pool: Questi
   };
 
   const next = () => {
+    // Double clic sur « Attaque suivante » : une seule question passée.
+    if (!resolved.current) return;
     if (hp <= 0) return finish(true);
     if (hearts <= 0) return finish(false);
     if (index + 1 >= deck.length) {
@@ -105,6 +118,9 @@ export function BossFight({ boss, pool, onComplete }: { boss: Boss; pool: Questi
     }
     setTimedOut(false);
     setElapsed(0);
+    setRageTimer(enraged);
+    setTurn((t) => t + 1);
+    resolved.current = false;
     setPhase("answering");
     questionStart.current = Date.now();
   };
@@ -176,7 +192,7 @@ export function BossFight({ boss, pool, onComplete }: { boss: Boss; pool: Questi
 
       <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-5 sm:p-7">
         <QuestionCard
-          key={`${q.id}-${index}-${deck.length}`}
+          key={`${q.id}-${turn}`}
           question={q}
           timedOut={timedOut}
           onAnswered={resolve}

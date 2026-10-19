@@ -60,8 +60,10 @@ export default function FreePlotter() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [animated]);
 
+  // Un paramètre tapé par l'élève (« m*x ») vaut 1, comme son curseur, tant qu'on ne l'a pas réglé.
+  const values = Object.fromEntries(paramNames.map((name) => [name, params[name] ?? 1]));
   const fns = compiled.map(({ result }) =>
-    result.ok ? (x: number) => result.expr.evaluate({ ...params, x }) : null,
+    result.ok ? (x: number) => result.expr.evaluate({ ...values, x }) : null,
   );
   const first = fns.find((f): f is (x: number) => number => f !== null) ?? null;
   const traceY = first ? first(traceX) : NaN;
@@ -103,8 +105,10 @@ export default function FreePlotter() {
               <button
                 key={p.expr}
                 type="button"
-                onClick={() => setCurves((cs) => [...cs.slice(0, 5), { id: nextId++, expr: p.expr, showDerivative: false }])}
-                className="rounded-lg border border-white/10 bg-slate-800 px-2.5 py-1 font-mono text-xs text-slate-300 hover:border-violet-400 hover:text-white"
+                // 6 courbes au plus : on n'écrase pas en silence une fonction déjà tapée.
+                disabled={curves.length >= 6}
+                onClick={() => setCurves((cs) => (cs.length >= 6 ? cs : [...cs, { id: nextId++, expr: p.expr, showDerivative: false }]))}
+                className="rounded-lg border border-white/10 bg-slate-800 px-2.5 py-1 font-mono text-xs text-slate-300 hover:border-violet-400 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
               >
                 + {p.label}
               </button>

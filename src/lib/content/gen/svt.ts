@@ -1,7 +1,12 @@
 /** Générateurs de questions — SVT (Seconde, Première, Terminale). */
-import { type Generator, claims, int, mcq, numeric, pairs, pick, tex, tf } from "./kit";
+import { type Generator, cards, claims, int, mcq, numeric, pairs, pick, sample, tex, tf } from "./kit";
+import { shuffle } from "@/lib/game/quests";
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+/** « que » élidé devant une voyelle : « qu'un engrais », « que l'humus ». */
+const que = (s: string) => (/^[aeiouyéèêâîôh]/i.test(s) ? `qu'${s}` : `que ${s}`);
+/** Accord du verbe avec un libellé au pluriel (« les décomposeurs désignent… »). */
+const agree = (a: string, singular: string, plural: string) => (/^(les|des) /i.test(a) ? plural : singular);
 const COMPLEMENT: Record<string, string> = { A: "T", T: "A", G: "C", C: "G" };
 const strand = (r: () => number, n: number) => Array.from({ length: n }, () => pick(r, ["A", "T", "G", "C"])).join("");
 
@@ -12,7 +17,7 @@ const cellule: Generator[] = [
     [
       ["le noyau", "contient l'ADN (l'information génétique)"], ["la mitochondrie", "réalise la respiration cellulaire"], ["le chloroplaste", "réalise la photosynthèse"],
       ["la membrane plasmique", "délimite la cellule et contrôle les échanges"], ["la paroi", "rigidifie la cellule végétale"], ["la vacuole", "stocke l'eau et des réserves"],
-      ["le ribosome", "fabrique les protéines"], ["l'appareil de Golgi", "modifie et exporte les protéines"], ["le cytosquelette", "maintient la forme de la cellule"],
+      ["le ribosome", "fabrique les protéines"], ["l'appareil de Golgi", "modifie et exporte les protéines"], ["le cytosquelette", "organise l'intérieur de la cellule grâce à un réseau de filaments protéiques"],
       ["le flagelle", "permet au spermatozoïde de se déplacer"], ["le réticulum endoplasmique", "transporte les protéines en cours de fabrication"],
     ],
     { ask: (a) => `Rôle principal de ${a} ?`, reverse: (b) => `Quelle structure ${b} ?`, claim: (a, b) => `${cap(a)} ${b}.`, explain: (a, b) => `${cap(a)} ${b}.` },
@@ -89,7 +94,12 @@ const metabolisme: Generator[] = [
   },
   (r) => {
     const t = pick(r, [5, 10, 15, 20]), d = pick(r, [10, 20, 30, 40, 60, 90]);
-    return numeric(`Une plante éclairée dégage $${d}$ µmol de $\\mathrm{O_2}$ en $${t}$ min. Vitesse moyenne de production (µmol/min) ?`, d / t, `$v = \\dfrac{${d}}{${t}}$.`, "µmol/min", 0.01);
+    const net = pick(r, [1.5, 2, 2.5, 3, 4]), resp = pick(r, [0.5, 0.8, 1, 1.2]);
+    return pick(r, [
+      () => numeric(`Une plante éclairée dégage $${d}$ µmol de $\\mathrm{O_2}$ en $${t}$ min. Vitesse moyenne de production (µmol/min) ?`, d / t, `$v = \\dfrac{${d}}{${t}}$.`, "µmol/min", 0.01),
+      () => numeric(`À la lumière, une suspension d'algues rejette $${tex(net)}$ µmol de $\\mathrm{O_2}$ par minute ; à l'obscurité, elle en consomme $${tex(resp)}$ µmol par minute. Production réelle de $\\mathrm{O_2}$ par la photosynthèse à la lumière (µmol/min) ?`, net + resp,
+        `À la lumière, la respiration continue : le dégagement mesuré est la différence photosynthèse − respiration. Photosynthèse $= ${tex(net)} + ${tex(resp)} = ${tex(net + resp)}$ µmol/min.`, "µmol/min", 0.01, 2),
+    ])();
   },
   ...pairs(
     [["la photosynthèse", "dioxyde de carbone + eau + lumière → glucose + dioxygène"], ["la respiration", "glucose + dioxygène → dioxyde de carbone + eau + énergie"], ["la fermentation alcoolique", "glucose → éthanol + dioxyde de carbone + un peu d'énergie"]],
@@ -114,15 +124,21 @@ const sols: Generator[] = [
       ["les décomposeurs", "les êtres vivants qui recyclent la matière organique"], ["un agrosystème", "un écosystème géré par l'humain pour produire"], ["l'érosion", "l'arrachement et le transport des particules du sol"],
       ["le complexe argilo-humique", "l'association argile + humus qui retient les ions minéraux"], ["un engrais", "un apport d'éléments minéraux (N, P, K) aux cultures"],
     ],
-    { ask: (a) => `Qu'est-ce que ${a} ?`, reverse: (b) => `Comment appelle-t-on ${b} ?`, claim: (a, b) => `${cap(a)} désigne ${b}.`, explain: (a, b) => `${cap(a)} : ${b}.` },
+    { ask: (a) => `Qu'est-ce ${que(a)} ?`, reverse: (b) => `Comment appelle-t-on ${b} ?`, claim: (a, b) => `${cap(a)} ${agree(a, "désigne", "désignent")} ${b}.`, explain: (a, b) => `${cap(a)} : ${b}.` },
   ),
   ...pairs(
     [["l'argile", "moins de 2 µm"], ["le limon", "entre 2 et 50 µm"], ["le sable", "entre 50 µm et 2 mm"], ["les graviers", "plus de 2 mm"]],
     { ask: (a) => `Taille des particules de ${a} ?`, reverse: (b) => `Quelles particules mesurent ${b} ?`, claim: (a, b) => `Les particules de ${a.replace(/^l'|^le |^les /, "")} mesurent ${b}.`, explain: (a, b) => `${cap(a)} : ${b}.` },
   ),
   (r) => {
-    const t = pick(r, [100, 200, 500, 1000]), cm = pick(r, [1, 2, 3, 5, 10]);
-    return numeric(`Un sol se forme à environ $${cm}$ cm par ${t === 100 ? "siècle" : `${t} ans`}. Combien d'années pour former $${cm * 3}$ cm ?`, 3 * t, `$3 \\times ${t}$ ans : le sol est une ressource très lente à se reconstituer.`, "ans");
+    // Vitesses réalistes de formation d'un sol : de l'ordre de 1 cm par siècle à 1 cm par millénaire.
+    const [cm, t] = pick(r, [[1, 100], [1, 250], [1, 500], [1, 1000], [2, 500], [0.5, 100]] as const);
+    const depth = pick(r, [20, 30, 50, 80]), lost = pick(r, [1, 2, 5]);
+    const years = (depth / cm) * t;
+    return pick(r, [
+      () => numeric(`Un sol se forme à raison d'environ $${tex(cm)}$ cm par ${t === 100 ? "siècle" : `$${t}$ ans`}. Combien d'années pour former un sol de $${depth}$ cm d'épaisseur ?`, years, `$\\dfrac{${depth}}{${tex(cm)}} \\times ${t} = ${tex(years)}$ ans : à l'échelle humaine, le sol est une ressource non renouvelable.`, "ans", 1),
+      () => numeric(`Une parcelle laissée à nu perd $${lost}$ cm de sol en un seul orage. Le sol se reforme à raison d'environ $${tex(cm)}$ cm par ${t === 100 ? "siècle" : `$${t}$ ans`}. Combien d'années pour reconstituer cette perte ?`, (lost / cm) * t, `$\\dfrac{${lost}}{${tex(cm)}} \\times ${t} = ${tex((lost / cm) * t)}$ ans : l'érosion est bien plus rapide que la formation du sol.`, "ans", 1),
+    ])();
   },
   claims([
     ["Le sol est une ressource non renouvelable à l'échelle humaine.", true, "Il se forme très lentement."],
@@ -137,8 +153,8 @@ const sols: Generator[] = [
 
 const procreation: Generator[] = [
   ...pairs(
-    [["la testostérone", "les testicules"], ["les œstrogènes", "les ovaires"], ["la progestérone", "le corps jaune de l'ovaire"], ["la FSH et la LH", "l'hypophyse"], ["la GnRH", "l'hypothalamus"]],
-    { ask: (a) => `Lieu de sécrétion de ${a} ?`, reverse: (b) => `Quelle hormone est sécrétée par ${b} ?`, claim: (a, b) => `Lieu de sécrétion de ${a} : ${b}.`, explain: (a, b) => `${cap(a)} : sécrétion par ${b}.` },
+    [["la testostérone", "les testicules"], ["les œstrogènes et la progestérone", "les ovaires"], ["la FSH et la LH", "l'hypophyse"], ["la GnRH", "l'hypothalamus"]],
+    { ask: (a) => `Quel organe sécrète ${a} ?`, reverse: (b) => `Sécrétion hormonale de ${b} ?`, claim: (a, b) => `Organe qui sécrète ${a} : ${b}.`, explain: (a, b) => `${cap(a)} : sécrétion par ${b}.` },
   ),
   ...pairs(
     [
@@ -185,7 +201,7 @@ const replication: Generator[] = [
   },
   (r) => {
     const g = int(r, 1, 5);
-    return numeric(`Expérience de Meselson et Stahl : après $${g}$ générations en milieu léger, pourcentage de molécules d'ADN hybrides ?`, (100 * 2) / 2 ** g, `Réplication semi-conservative : 2 molécules hybrides sur $2^{${g}}$.`, "%", 0.01);
+    return numeric(`Expérience de Meselson et Stahl : après $${g}$ génération${g > 1 ? "s" : ""} en milieu léger, pourcentage de molécules d'ADN hybrides ?`, (100 * 2) / 2 ** g, `Réplication semi-conservative : 2 molécules hybrides sur $2^{${g}}$.`, "%", 0.01);
   },
   claims([
     ["La réplication de l'ADN est semi-conservative.", true, "Chaque nouvelle molécule garde un brin ancien."],
@@ -213,15 +229,44 @@ const expression: Generator[] = [
       return rna.slice(0, i) + pick(r, ["A", "U", "G", "C"].filter((b) => b !== rna[i])) + rna.slice(i + 1);
     });
   },
-  ...pairs(CODONS, { ask: (a) => `Le codon ${a} code…`, reverse: (b) => `Quel codon code ${b} ?`, explain: (a, b) => `Code génétique : ${a} → ${b}.` }),
+  (r) => {
+    // Traduction d'un ARNm à l'aide d'un extrait du code génétique (fourni, comme dans les sujets : il ne s'apprend pas par cœur).
+    const sense = CODONS.filter(([c]) => c !== "AUG" && c !== "UAA");
+    const body = sample(r, sense, int(r, 3, 4));
+    const short = (aa: string) => aa.split(" ")[0];
+    const rna = ["AUG", ...body.map(([c]) => c), "UAA"].join("");
+    const right = ["Met", ...body.map(([, aa]) => short(aa))];
+    const table = [...new Map([CODONS[0], ...body, ...sample(r, sense.filter((x) => !body.includes(x)), 2), CODONS[CODONS.length - 1]]).entries()]
+      .map(([c, aa]) => `${c} = ${short(aa)}`).join(" ; ");
+    const show = (p: string[]) => p.join("-");
+    const wrongs = [
+      show([...right, "STOP"]),
+      show(["Met", ...[...right.slice(1)].reverse()]),
+      show(right.slice(1)),
+      show(right.map((aa, i) => (i === 1 ? short(pick(r, sense.filter(([, x]) => short(x) !== aa))[1]) : aa))),
+    ];
+    return mcq(r, `ARNm : ${rna}. Extrait du code génétique : ${table}. Séquence du peptide obtenu ?`, show(right), wrongs,
+      `On lit l'ARNm codon par codon à partir de AUG (Met) ; le codon STOP (UAA) arrête la traduction sans coder d'acide aminé.`, undefined, 2);
+  },
+  (r) => {
+    // Mutation non-sens : un codon devient STOP, la protéine est tronquée.
+    const n = int(r, 120, 480), k = int(r, 20, n - 10);
+    const [from, to] = pick(r, [["UGG (Trp)", "UAG"], ["UAU (Tyr)", "UAA"], ["CAA (Gln)", "UAA"], ["UGG (Trp)", "UGA"], ["AAA (Lys)", "UAA"]] as const);
+    return numeric(`Une protéine compte $${n}$ acides aminés. Une substitution transforme le codon n° $${k}$ de l'ARNm, ${from}, en ${to}, un codon STOP. Combien d'acides aminés compte la protéine mutée ?`, k - 1,
+      `La traduction s'arrête au codon n° $${k}$ : seuls les $${k - 1}$ premiers codons sont traduits. C'est une mutation non-sens (protéine tronquée, en général non fonctionnelle).`, undefined, undefined, 2);
+  },
   (r) => {
     const n = int(r, 10, 300);
     return numeric(`Un ARNm a une phase codante de $${3 * n}$ nucléotides (codon STOP compris). Nombre d'acides aminés de la protéine ?`, n - 1, `$${3 * n} / 3 = ${n}$ codons, dont un STOP qui ne code aucun acide aminé.`);
   },
-  ...pairs(
-    [["la transcription", "dans le noyau"], ["la traduction", "dans le cytoplasme, sur les ribosomes"], ["la maturation de l'ARN (épissage)", "dans le noyau, avant l'export"]],
-    { ask: (a) => `Où se déroule ${a} (cellule eucaryote) ?`, explain: (a, b) => `${cap(a)} se déroule ${b}.` },
-  ).slice(0, 1),
+  // Lieux et acteurs de l'expression génétique : leurres tous faux (pas de mitochondrie, qui transcrit et traduit son propre ADN).
+  cards([
+    ["Où se déroule la transcription dans une cellule eucaryote ?", "dans le noyau", ["dans le cytoplasme, sur les ribosomes", "dans l'appareil de Golgi", "dans la vacuole"], "L'ADN ne sort pas du noyau : il y est transcrit en ARN pré-messager."],
+    ["Où se déroule la traduction des ARNm dans une cellule eucaryote ?", "dans le cytoplasme, sur les ribosomes", ["dans le noyau", "dans l'appareil de Golgi", "dans la vacuole"], "L'ARNm quitte le noyau par les pores nucléaires ; il est traduit par les ribosomes du cytoplasme."],
+    ["Où se déroule la maturation (épissage) des ARN pré-messagers ?", "dans le noyau", ["dans le cytoplasme, sur les ribosomes", "dans l'appareil de Golgi", "dans la vacuole"], "L'épissage a lieu dans le noyau, avant l'export de l'ARNm mature vers le cytoplasme."],
+    ["Que fait l'épissage d'un ARN pré-messager ?", "il retire les introns et raccorde les exons", ["il retire les exons et raccorde les introns", "il ajoute le codon STOP en fin d'ARN", "il remplace la thymine par l'uracile"], "Les introns sont éliminés ; l'épissage alternatif (choix des exons conservés) permet plusieurs protéines à partir d'un même gène."],
+    ["Quelle enzyme réalise la transcription ?", "l'ARN polymérase", ["l'ADN polymérase", "le ribosome", "l'ARN de transfert"], "L'ARN polymérase assemble des nucléotides d'ARN complémentaires du brin transcrit de l'ADN ; l'ADN polymérase sert à la réplication."],
+  ]),
   claims([
     ["Le code génétique est redondant : plusieurs codons peuvent coder le même acide aminé.", true, "64 codons pour 20 acides aminés."],
     ["Le code génétique est quasi universel.", true, "Les mêmes codons codent les mêmes acides aminés chez presque tous les êtres vivants."],
@@ -243,8 +288,9 @@ const tectonique: Generator[] = [
     { ask: (a) => `Que se passe-t-il au niveau d'${a} ?`, reverse: (b) => `Quelle structure : ${b} ?`, claim: (a, b) => `Au niveau d'${a}, ${b}.`, explain: (a, b) => `${cap(a)} : ${b}.` },
   ),
   ...pairs(
-    [["l'Himalaya", "une chaîne de collision"], ["l'Islande", "une dorsale émergée"], ["la fosse des Mariannes", "une zone de subduction"], ["Hawaï", "un point chaud"], ["la vallée du Grand Rift (Afrique de l'Est)", "un rift continental"], ["la faille de San Andreas", "une faille transformante"]],
-    { ask: (a) => `${cap(a)} correspond à…`, reverse: (b) => `Quel lieu correspond à ${b} ?`, explain: (a, b) => `${cap(a)} : ${b}.` },
+    // L'Islande (dorsale ET point chaud) rendait « un point chaud » juste comme leurre : remplacée.
+    [["l'Himalaya", "une chaîne de collision"], ["les Alpes", "une chaîne de collision"], ["la fosse des Mariannes", "une zone de subduction"], ["la cordillère des Andes", "une zone de subduction"], ["Hawaï", "un point chaud"], ["l'île de La Réunion", "un point chaud"], ["la vallée du Grand Rift (Afrique de l'Est)", "un rift continental"], ["la faille de San Andreas", "une faille transformante"]],
+    { ask: (a) => `${cap(a)} ${agree(a, "correspond", "correspondent")} à…`, reverse: (b) => `Quel lieu correspond à ${b} ?`, explain: (a, b) => `${cap(a)} : ${b}.` },
   ),
   (r) => {
     const v = pick(r, [1, 2, 2.5, 3, 4, 5, 8, 10]), age = pick(r, [2, 5, 10, 20, 40, 60, 100]);
@@ -254,8 +300,9 @@ const tectonique: Generator[] = [
       : numeric(`Demi-vitesse d'expansion $${tex(v)}$ cm/an. Âge du plancher à $${tex(km)}$ km de la dorsale (Ma) ?`, age, `$t = \\dfrac{d}{v}$ : $\\dfrac{${tex(km)} \\times 10^5}{${tex(v)}}$ ans $= ${age}$ Ma.`, "Ma", 0.01);
   },
   ...pairs(
-    [["la croûte", "l'enveloppe la plus superficielle (océanique ou continentale)"], ["le manteau", "la couche épaisse de péridotite, solide"], ["le noyau externe", "la couche de fer liquide"], ["le noyau interne (graine)", "la partie centrale en fer solide"], ["l'asthénosphère", "le manteau ductile sur lequel glissent les plaques"]],
-    { ask: (a) => `Qu'est-ce que ${a} ?`, reverse: (b) => `Quelle enveloppe : ${b} ?`, explain: (a, b) => `${cap(a)} : ${b}.` },
+    // L'asthénosphère est elle-même du manteau (péridotite solide) : libellés exclusifs pour éviter un leurre juste.
+    [["la croûte", "l'enveloppe la plus superficielle (océanique ou continentale)"], ["le manteau", "la couche de péridotite comprise entre la croûte et le noyau"], ["le noyau externe", "la couche de fer liquide"], ["le noyau interne (graine)", "la partie centrale en fer solide"], ["l'asthénosphère", "la partie ductile du manteau supérieur, sous les plaques lithosphériques"]],
+    { ask: (a) => `Qu'est-ce ${que(a)} ?`, reverse: (b) => `Quelle enveloppe : ${b} ?`, explain: (a, b) => `${cap(a)} : ${b}.` },
   ),
   claims([
     ["La lithosphère océanique vieillit et s'épaissit en s'éloignant de la dorsale.", true, "Elle se refroidit et devient plus dense."],
@@ -271,13 +318,13 @@ const tectonique: Generator[] = [
 const ecosystemes: Generator[] = [
   ...pairs(
     [
-      ["le mutualisme", "les deux espèces tirent un bénéfice"], ["le parasitisme", "une espèce vit aux dépens d'une autre"], ["la compétition", "deux espèces exploitent la même ressource"],
+      ["le mutualisme", "les deux espèces tirent un bénéfice, sans dépendre obligatoirement l'une de l'autre"], ["le parasitisme", "une espèce vit aux dépens d'une autre"], ["la compétition", "deux espèces exploitent la même ressource"],
       ["la prédation", "une espèce en tue une autre pour s'en nourrir"], ["le commensalisme", "une espèce profite d'une autre sans lui nuire"], ["la symbiose", "une association durable et obligatoire à bénéfice réciproque"],
     ],
     { ask: (a) => `Définition de ${a} ?`, reverse: (b) => `Quelle relation : ${b} ?`, claim: (a, b) => `Dans ${a}, ${b}.`, explain: (a, b) => `${cap(a)} : ${b}.` },
   ),
   ...pairs(
-    [["l'abeille et la fleur", "mutualisme"], ["le lichen (algue + champignon)", "symbiose"], ["le tique et le chien", "parasitisme"], ["le renard et le lapin", "prédation"], ["deux arbres voisins pour la lumière", "compétition"], ["le poisson-pilote et le requin", "commensalisme"]],
+    [["l'abeille et la fleur", "mutualisme"], ["l'algue et le champignon d'un lichen", "symbiose"], ["la tique et le chien", "parasitisme"], ["le renard et le lapin", "prédation"], ["deux arbres voisins pour la lumière", "compétition"], ["le poisson-pilote et le requin", "commensalisme"]],
     { ask: (a) => `Relation entre ${a} ?`, reverse: (b) => `Quel exemple illustre une relation de type « ${b} » ?`, claim: (a, b) => `Entre ${a}, la relation est de type « ${b} ».`, explain: (a, b) => `${cap(a)} : ${b}.` },
   ),
   (r) => {
@@ -286,11 +333,15 @@ const ecosystemes: Generator[] = [
   },
   ...pairs(
     [["la pollinisation des cultures", "service de régulation"], ["la production de bois", "service d'approvisionnement"], ["l'épuration de l'eau par les zones humides", "service de régulation"], ["les loisirs en forêt", "service culturel"], ["la pêche", "service d'approvisionnement"], ["la fixation du carbone par les forêts", "service de régulation"]],
-    { ask: (a) => `${cap(a)} est un…`, explain: (a, b) => `${cap(a)} : ${b}.` },
+    { ask: (a) => `Quel type de service écosystémique : ${a} ?`, explain: (a, b) => `${cap(a)} : ${b}.` },
   ).slice(0, 1),
   (r) => {
-    const n = pick(r, [10, 20, 50, 100, 200, 500]), k = pick(r, [2, 4, 5, 10]);
-    return numeric(`Un quadrat de $1$ m² contient $${n}$ plantes d'une espèce. Estimation pour une parcelle de $${k * 100}$ m² ?`, n * k * 100, `On suppose la répartition homogène : $${n} \\times ${k * 100}$.`);
+    // Échantillonnage par quadrats : on estime une densité moyenne, puis l'effectif total.
+    const counts = Array.from({ length: 5 }, () => int(r, 2, 14));
+    const sum = counts.reduce((a, b) => a + b, 0), side = pick(r, [0.5, 1]), area = pick(r, [200, 500, 1000, 2500]);
+    const density = sum / 5 / (side * side);
+    return numeric(`Cinq quadrats de $${tex(side)}$ m × $${tex(side)}$ m contiennent respectivement $${counts.join("$, $")}$ pieds d'une espèce. Estimation de l'effectif sur une prairie de $${area}$ m² ?`, density * area,
+      `Moyenne : $\\dfrac{${sum}}{5} = ${tex(sum / 5)}$ pieds par quadrat de $${tex(side * side)}$ m², soit $${tex(density)}$ pieds/m² ; $${tex(density)} \\times ${area} = ${tex(density * area)}$.`, undefined, 0.5);
   },
   claims([
     ["Un écosystème comprend une biocénose et un biotope.", true, "Les êtres vivants et leur milieu."],
@@ -312,8 +363,9 @@ const immunite: Generator[] = [
     { ask: (a) => `Rôle de ${a} ?`, reverse: (b) => `Quelle cellule ${b} ?`, claim: (a, b) => `${cap(a)} ${b}.`, explain: (a, b) => `${cap(a)} ${b}.` },
   ),
   ...pairs(
-    [["la rougeur", "l'afflux de sang (vasodilatation)"], ["le gonflement", "la sortie de plasma vers les tissus"], ["la chaleur", "l'augmentation locale du flux sanguin"], ["la douleur", "la stimulation des terminaisons nerveuses par des médiateurs"]],
-    { ask: (a) => `Dans la réaction inflammatoire, ${a} est due à…`, claim: (a, b) => `Dans l'inflammation, ${a} est due à ${b}.`, explain: (a, b) => `${cap(a)} : ${b}.` },
+    // Rougeur et chaleur ont la même origine : les séparer rendait l'une juste comme leurre de l'autre.
+    [["la rougeur et la chaleur", "la vasodilatation, qui augmente l'afflux de sang"], ["le gonflement (œdème)", "la sortie de plasma des vaisseaux vers les tissus"], ["la douleur", "la stimulation des terminaisons nerveuses par des médiateurs chimiques"]],
+    { ask: (a) => `Réaction inflammatoire : origine de ${a.replace(" et ", " et de ")} ?`, claim: (a, b) => `Dans l'inflammation, ${a} s'explique${a.includes(" et ") ? "nt" : ""} par ${b}.`, explain: (a, b) => `${cap(a)} : ${b}.` },
   ),
   claims([
     ["L'immunité innée est présente dès la naissance et agit rapidement.", true, "Elle ne nécessite pas d'apprentissage."],
@@ -325,8 +377,13 @@ const immunite: Generator[] = [
     ["La réponse secondaire est plus lente que la réponse primaire.", false, "Elle est plus rapide et plus intense grâce à la mémoire."],
   ]),
   (r) => {
-    const days1 = int(r, 10, 15), days2 = int(r, 2, 5);
-    return numeric(`Réponse primaire : anticorps détectables au bout de $${days1}$ jours ; réponse secondaire au bout de $${days2}$ jours. Combien de jours gagnés ?`, days1 - days2, `La mémoire immunitaire accélère la réponse : $${days1} - ${days2}$.`);
+    // Sélection puis amplification clonale : un lymphocyte activé se divise par mitoses successives.
+    const h = pick(r, [8, 12, 24]), days = pick(r, [2, 3, 4, 5]);
+    const n = (days * 24) / h, mem = int(r, 8, 13);
+    return pick(r, [
+      () => numeric(`Un lymphocyte B sélectionné par un antigène se divise toutes les $${h}$ h pendant $${days}$ jours. Combien de cellules compte alors le clone ?`, 2 ** n, `$${days * 24}$ h / $${h}$ h $= ${n}$ mitoses : $2^{${n}} = ${tex(2 ** n)}$ cellules, qui se différencient en plasmocytes et cellules mémoire.`),
+      () => numeric(`Lors d'un second contact, le clone mémoire compte déjà $${tex(2 ** mem)}$ lymphocytes spécifiques, contre $1$ seul lors du premier contact. Lors du premier contact, combien d'heures faut-il à ce lymphocyte unique, qui se divise toutes les $${h}$ h, pour atteindre cet effectif ?`, mem * h, `$2^{${mem}} = ${tex(2 ** mem)}$ : il faut $${mem}$ divisions, soit $${mem} \\times ${h} = ${mem * h}$ h gagnées lors de la réponse secondaire, qui part d'un effectif déjà amplifié.`, "h", undefined, 2),
+    ])();
   },
 ];
 
@@ -349,8 +406,8 @@ const brassage: Generator[] = [
     { ask: (a) => `${cap(a)}, c'est…`, reverse: (b) => `Comment s'appelle ${b} ?`, claim: (a, b) => `${cap(a)} correspond à ${b}.`, explain: (a, b) => `${cap(a)} : ${b}.` },
   ),
   ...pairs(
-    [["la sélection naturelle", "les individus les mieux adaptés laissent plus de descendants"], ["la dérive génétique", "les fréquences alléliques varient au hasard"], ["la mutation", "elle crée de nouveaux allèles"], ["la migration", "elle apporte des allèles d'autres populations"]],
-    { ask: (a) => `Mécanisme de l'évolution : ${a}…`, reverse: (b) => `Quel mécanisme : ${b} ?`, claim: (a, b) => `Avec ${a}, ${b}.`, explain: (a, b) => `${cap(a)} : ${b}.` },
+    [["la sélection naturelle", "une meilleure reproduction des individus les mieux adaptés au milieu"], ["la dérive génétique", "une variation aléatoire des fréquences alléliques, d'autant plus forte que la population est petite"], ["la mutation", "l'apparition de nouveaux allèles"], ["la migration", "l'apport d'allèles venus d'autres populations"]],
+    { ask: (a) => `En biologie de l'évolution, ${a} se traduit par…`, reverse: (b) => `Quel mécanisme de l'évolution se traduit par ${b} ?`, claim: (a, b) => `${cap(a)} se traduit par ${b}.`, explain: (a, b) => `${cap(a)} : ${b}.` },
   ),
   claims([
     ["La dérive génétique a plus d'effet dans les petites populations.", true, "Le hasard pèse davantage."],
@@ -366,8 +423,8 @@ const datation: Generator[] = [
   (r) => {
     const n = int(r, 1, 6);
     return r() < 0.5
-      ? numeric(`Un fossile contient $${tex(100 / 2 ** n, 4)}\\,\\%$ du carbone 14 initial ($t_{1/2} = 5\\,730$ ans). Âge (ans) ?`, n * 5730, `${n} demi-vie(s) : $${n} \\times 5\\,730$.`, "ans", 1)
-      : numeric(`Après $${tex(n * 5730)}$ ans, quel pourcentage de carbone 14 reste-t-il ?`, 100 / 2 ** n, `$\\dfrac{100}{2^{${n}}}$ %.`, "%", 0.01);
+      ? numeric(`Un fossile contient $${tex(100 / 2 ** n, 4)}\\,\\%$ du carbone 14 initial ($t_{1/2} = 5\\,730$ ans). Âge (ans) ?`, n * 5730, `${n} demi-vie${n > 1 ? "s" : ""} : $${n} \\times 5\\,730$.`, "ans", 1)
+      : numeric(`Après $${tex(n * 5730)}$ ans, quel pourcentage de carbone 14 reste-t-il ($t_{1/2} = 5\\,730$ ans) ?`, 100 / 2 ** n, `$\\dfrac{100}{2^{${n}}}$ %.`, "%", 0.01);
   },
   ...pairs(
     [
@@ -378,19 +435,34 @@ const datation: Generator[] = [
     { ask: (a) => `Que dit ${a} ?`, reverse: (b) => `Quel principe : ${b} ?`, claim: (a, b) => `Selon ${a}, ${b}.`, explain: (a, b) => `${cap(a)} : ${b}.` },
   ),
   ...pairs(
-    [["le carbone 14", "des restes organiques de moins de 50 000 ans"], ["le couple potassium-argon", "des roches volcaniques anciennes"], ["le couple rubidium-strontium", "des roches magmatiques très anciennes (granites)"], ["l'uranium-plomb", "les plus vieux minéraux de la Terre (zircons)"]],
+    [["le carbone 14", "des restes organiques de moins de 50 000 ans"], ["le couple potassium-argon", "des roches volcaniques (l'argon formé s'échappe de la lave à l'éruption)"], ["le couple rubidium-strontium", "des roches magmatiques anciennes, par la méthode de l'isochrone"], ["le couple uranium-plomb", "les plus vieux minéraux de la Terre (zircons de plus de 4 Ga)"]],
     { ask: (a) => `${cap(a)} sert à dater…`, reverse: (b) => `Quel chronomètre pour dater ${b} ?`, claim: (a, b) => `${cap(a)} sert à dater ${b}.`, explain: (a, b) => `${cap(a)} : ${b}.` },
   ),
   (r) => {
-    const layers = ["A", "B", "C", "D", "E", "F"].slice(0, int(r, 4, 6));
-    const order = [...layers].sort(() => r() - 0.5);
-    const oldest = r() < 0.5;
-    return mcq(r, `Couches non déformées, de bas en haut : ${order.join(", ")}. Quelle couche est la plus ${oldest ? "ancienne" : "récente"} ?`, oldest ? order[0] : order[order.length - 1], order, `Principe de superposition : la couche du bas est la plus ancienne.`);
+    // Chronologie relative : superposition + recoupement (une faille ou un filon recoupe certaines couches seulement).
+    const order = shuffle(["A", "B", "C", "D", "E", "F"], r).slice(0, 5); // de bas en haut
+    const k = int(r, 1, 3); // la structure recoupe order[0..k] et est recouverte par order[k + 1]
+    const what = pick(r, ["une faille", "un filon de basalte"]);
+    const answer = `après ${order[k]} et avant ${order[k + 1]}`;
+    const wrongs = [`avant ${order[0]}`, `après ${order[k + 1]}`, `après ${order[k - 1]} et avant ${order[k]}`, `après ${order[4]}`];
+    return mcq(r, `Couches sédimentaires de bas en haut : ${order.join(", ")}. ${cap(what)} recoupe les couches ${order.slice(0, k + 1).join(", ")} mais est recouvert${what === "une faille" ? "e" : ""} par la couche ${order[k + 1]}. Quand s'est-${what === "une faille" ? "elle" : "il"} formé${what === "une faille" ? "e" : ""} ?`, answer, wrongs,
+      `Principe de recoupement : ${what} est plus récent${what === "une faille" ? "e" : ""} que les couches qu'${what === "une faille" ? "elle" : "il"} recoupe (jusqu'à ${order[k]}) ; superposition : plus ancien${what === "une faille" ? "ne" : ""} que ${order[k + 1]} qui ${what === "une faille" ? "la" : "le"} recouvre.`);
   },
   (r) => {
-    const [iso, t12] = pick(r, [["potassium 40", 1.25], ["rubidium 87", 48.8], ["uranium 238", 4.47], ["uranium 235", 0.704]] as const);
-    const n = int(r, 1, 3);
-    return numeric(`Il reste $${tex(100 / 2 ** n)}\\,\\%$ du ${iso} initial ($t_{1/2} = ${tex(t12)}$ Ga). Âge de la roche (Ga) ?`, n * t12, `${n} demi-vie(s) : $${n} \\times ${tex(t12)}$.`, "Ga", 0.01);
+    // Nombre de demi-vies limité pour rester sous l'âge de la Terre (4,6 Ga).
+    const [iso, t12, max] = pick(r, [["du potassium 40", 1.25, 3], ["de l'uranium 235", 0.704, 6], ["de l'uranium 238", 4.47, 1]] as const);
+    const n = int(r, 1, max);
+    return numeric(`Il reste $${tex(100 / 2 ** n, 4)}\\,\\%$ ${iso} initial ($t_{1/2} = ${tex(t12)}$ Ga). Âge du minéral (Ga) ?`, n * t12, `$${tex(100 / 2 ** n, 4)}\\,\\% = \\dfrac{100\\,\\%}{2^{${n}}}$ : ${n} demi-vie${n > 1 ? "s" : ""}, soit $${n} \\times ${tex(t12)} = ${tex(n * t12)}$ Ga.`, "Ga", 0.01);
+  },
+  (r) => {
+    // Cas général : t = (t½ / ln 2) × ln(N0 / N), quand le pourcentage restant n'est pas une puissance de 1/2.
+    const [iso, t12, unit] = pick(r, [["du carbone 14", 5730, "ans"], ["de l'uranium 238", 4.47, "Ga"], ["du potassium 40", 1.25, "Ga"], ["du rubidium 87", 48.8, "Ga"]] as const);
+    const pct = iso.includes("rubidium") ? pick(r, [95, 96, 97, 98]) : iso.includes("uranium") ? pick(r, [55, 60, 70, 80, 90]) : pick(r, [10, 20, 30, 40, 60, 70, 80, 90]);
+    const t = (t12 / Math.LN2) * Math.log(100 / pct);
+    const digits = unit === "ans" ? 0 : 2;
+    const ans = Math.round(t * 10 ** digits) / 10 ** digits;
+    return numeric(`Un échantillon contient encore $${pct}\\,\\%$ ${iso} initial ($t_{1/2} = ${tex(t12)}$ ${unit}). Âge (${unit}, ${unit === "ans" ? "à la centaine près" : "au centième"}) ? ($N = N_0\\,e^{-\\lambda t}$, $\\lambda = \\frac{\\ln 2}{t_{1/2}}$)`, ans,
+      `$t = \\dfrac{t_{1/2}}{\\ln 2}\\,\\ln\\dfrac{N_0}{N} = \\dfrac{${tex(t12)}}{\\ln 2} \\times \\ln\\dfrac{100}{${pct}} \\approx ${tex(ans, digits)}$ ${unit}.`, unit, unit === "ans" ? 60 : 0.02, 3);
   },
   claims([
     ["Un bon fossile stratigraphique a vécu peu de temps et sur une large zone.", true, "Il permet des corrélations précises."],
@@ -429,15 +501,23 @@ const climat: Generator[] = [
 const nerveux: Generator[] = [
   ...pairs(
     [
-      ["le fuseau neuromusculaire", "récepteur sensible à l'étirement du muscle"], ["le neurone sensoriel", "conduit le message vers la moelle épinière"], ["le motoneurone", "conduit le message de la moelle au muscle"],
-      ["la synapse", "zone de communication entre deux neurones"], ["l'acétylcholine", "neurotransmetteur de la jonction neuromusculaire"], ["la moelle épinière", "centre nerveux du réflexe myotatique"],
-      ["le cortex moteur", "commande les mouvements volontaires"],
+      // Libellés homogènes (groupes nominaux) : l'ancien claim « La moelle épinière : conduit le message vers la moelle épinière. » était bancal.
+      ["le fuseau neuromusculaire", "le récepteur sensible à l'étirement du muscle"], ["le neurone sensoriel", "le neurone qui conduit le message du fuseau neuromusculaire à la moelle épinière"],
+      ["le motoneurone", "le neurone qui conduit le message de la moelle épinière au muscle"], ["la synapse", "la zone de communication entre un neurone et une autre cellule"],
+      ["l'acétylcholine", "le neurotransmetteur libéré à la jonction neuromusculaire"], ["la moelle épinière", "le centre nerveux du réflexe myotatique"],
+      ["le cortex moteur", "l'aire cérébrale qui commande les mouvements volontaires"],
     ],
-    { ask: (a) => `Rôle de ${a} ?`, reverse: (b) => `Quel élément : ${b} ?`, claim: (a, b) => `${cap(a)} : ${b}.`, explain: (a, b) => `${cap(a)} : ${b}.` },
+    { ask: (a) => `Qu'est-ce ${que(a)} ?`, reverse: (b) => `Quel élément est ${b} ?`, claim: (a, b) => `${cap(a)} est ${b}.`, explain: (a, b) => `${cap(a)} est ${b}.` },
   ),
   (r) => {
-    const d = int(r, 3, 15) / 10, dt = pick(r, [5, 8, 10, 12, 15, 20, 25, 30, 40, 50]);
-    return numeric(`Un message nerveux parcourt $${tex(d)}$ m en $${dt}$ ms. Vitesse de conduction (m/s) ?`, d / (dt / 1000), `$v = \\dfrac{${tex(d)}}{${tex(dt / 1000)}}$.`, "m/s", 0.05);
+    // Vitesses de conduction réalistes : environ 1 à 120 m/s selon le diamètre et la myélinisation des fibres.
+    // Couples (v, d) retenus pour que la durée affichée tombe juste (au dixième de ms) : pas de « 13,333 ms ».
+    const couples = [2, 5, 10, 25, 40, 50, 60, 80, 100, 120].flatMap((v) => [0.4, 0.5, 0.6, 0.8, 0.9, 1, 1.2].filter((d) => Math.abs((d / v) * 1e4 - Math.round((d / v) * 1e4)) < 1e-6).map((d) => [v, d] as const));
+    const [v, d] = pick(r, couples);
+    const dt = (d / v) * 1000;
+    return r() < 0.5
+      ? numeric(`Un message nerveux parcourt $${tex(d)}$ m en $${tex(dt)}$ ms. Vitesse de conduction (m/s) ?`, v, `$v = \\dfrac{${tex(d)}}{${tex(dt / 1000, 5)}} = ${v}$ m/s (durée convertie en secondes).`, "m/s", 0.5)
+      : numeric(`Deux électrodes distantes de $${tex(d * 10)}$ cm enregistrent le même potentiel d'action à $${tex(dt / 10)}$ ms d'intervalle. Vitesse de conduction (m/s) ?`, v, `$v = \\dfrac{${tex(d / 10)} \\text{ m}}{${tex(dt / 10000, 6)} \\text{ s}} = ${v}$ m/s.`, "m/s", 0.5);
   },
   claims([
     ["Le message nerveux est codé en fréquence de potentiels d'action.", true, "Plus le stimulus est intense, plus la fréquence est élevée."],
@@ -461,10 +541,10 @@ const plantes: Generator[] = [
   ),
   ...pairs(
     [["le maïs", "la téosinte"], ["le blé tendre", "des graminées sauvages du Croissant fertile"], ["le chou", "le chou sauvage (Brassica oleracea)"], ["la tomate", "une tomate sauvage d'Amérique du Sud"]],
-    { ask: (a) => `Ancêtre sauvage de ${a} ?`, reverse: (b) => `Quelle plante cultivée descend de ${b} ?`, claim: (a, b) => `${cap(a)} descend de ${b}.`, explain: (a, b) => `${cap(a)} a été domestiqué(e) à partir de ${b}.` },
+    { ask: (a) => `Ancêtre sauvage de ${a} ?`, reverse: (b) => `Quelle plante cultivée descend de ${b} ?`, claim: (a, b) => `${cap(a)} descend de ${b}.`, explain: (a, b) => `${cap(a)} : plante domestiquée à partir de ${b}.` },
   ),
   (r) => {
-    const l = pick(r, [2, 5, 10, 20]), n = pick(r, [100, 200, 500, 1000]);
+    const l = pick(r, [2, 5, 10, 20]), n = pick(r, [50, 100, 150, 200, 300]);
     return numeric(`Une feuille de $${l}$ cm² porte en moyenne $${n}$ stomates par mm². Nombre total de stomates ?`, l * 100 * n, `$${l}$ cm² $= ${l * 100}$ mm², donc $${l * 100} \\times ${n}$.`);
   },
   claims([

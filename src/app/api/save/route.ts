@@ -1,5 +1,6 @@
 import { MAX_SAVE_BYTES, parseSave } from "@/lib/game/save";
 import { currentSession, getSave, jsonError, putSave, readJson, storageDown } from "@/lib/server/accounts";
+import { withLock } from "@/lib/server/lock";
 import { rankForSave } from "@/lib/server/match";
 import { keepBossProgress } from "@/lib/game/boss-rules";
 
@@ -24,18 +25,21 @@ export async function PUT(req: Request) {
   save.updatedAt = Math.min(save.updatedAt, Date.now() + 5 * 60_000);
 
   try {
-    const stored = await getSave(session.uid);
-    if (stored && stored.updatedAt > save.updatedAt) {
-      return Response.json({ error: "Une sauvegarde plus récente existe.", save: stored.save, updatedAt: stored.updatedAt }, { status: 409 });
-    }
-    // Le pseudo du compte fait foi (il sert à se connecter et au classement).
-    if (save.profile) save.profile = { ...save.profile, pseudo: session.pseudo };
-    // Boss : on garde toujours le plus grand nombre d'essais et de victoires connus (pas de « reset » des 3 essais).
-    save.bosses = keepBossProgress(stored?.save?.bosses as Record<string, unknown> | undefined, save.bosses as Record<string, unknown>) as typeof save.bosses;
-    // Le rang affiché partout est le rang Général du mode classé, tenu par le serveur.
-    Object.assign(save, await rankForSave(session.uid));
-    await putSave({ id: session.uid, pseudo: session.pseudo }, save);
-    return Response.json({ ok: true, updatedAt: save.updatedAt });
+    // Sous verrou : deux appareils qui envoient en même temps ne font pas passer la plus ancienne après la plus récente.
+    return await withLock(`save:lock:${session.uid}`, async () => {
+      const stored = await getSave(session.uid);
+      if (stored && stored.updatedAt > save.updatedAt) {
+        return Response.json({ error: "Une sauvegarde plus récente existe.", save: stored.save, updatedAt: stored.updatedAt }, { status: 409 });
+      }
+      // Le pseudo du compte fait foi (il sert à se connecter et au classement).
+      if (save.profile) save.profile = { ...save.profile, pseudo: session.pseudo };
+      // Boss : on garde toujours le plus grand nombre d'essais et de victoires connus (pas de « reset » des 3 essais).
+      save.bosses = keepBossProgress(stored?.save?.bosses as Record<string, unknown> | undefined, save.bosses as Record<string, unknown>) as typeof save.bosses;
+      // Le rang affiché partout est le rang Général du mode classé, tenu par le serveur.
+      Object.assign(save, await rankForSave(session.uid));
+      await putSave({ id: session.uid, pseudo: session.pseudo }, save);
+      return Response.json({ ok: true, updatedAt: save.updatedAt });
+    });
   } catch (error) {
     return storageDown(error);
   }

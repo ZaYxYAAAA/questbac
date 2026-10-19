@@ -3,6 +3,7 @@
  * (programmes de Seconde et de Première).
  */
 import { type Claim, type Generator, type Pair, claims, pairs } from "./kit";
+import { NEAR_FIGURES, apart } from "./lettres";
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const terms = (items: readonly Pair[]) =>
@@ -23,7 +24,7 @@ export const EXTRA_LETTRES: Record<string, Generator[]> = {
     [["alexandrin", "un vers de douze syllabes"], ["octosyllabe", "un vers de huit syllabes"], ["décasyllabe", "un vers de dix syllabes"], ["sonnet", "un poème de quatorze vers : deux quatrains et deux tercets"],
      ["rime embrassée", "une disposition des rimes en ABBA"], ["rime croisée", "une disposition des rimes en ABAB"], ["rime suivie", "une disposition des rimes en AABB"], ["enjambement", "le débordement d'une phrase sur le vers suivant"],
      ["césure", "la pause à l'intérieur d'un vers, à l'hémistiche pour l'alexandrin"], ["diérèse", "la prononciation en deux syllabes de voyelles normalement réunies"], ["vers libre", "un vers sans mètre ni rime réguliers"], ["poème en prose", "un poème écrit sans vers"]],
-    [["Le sonnet se termine par deux tercets.", true, "Deux quatrains, deux tercets."], ["L'alexandrin compte quatorze syllabes.", false, "Douze syllabes."], ["Le e muet se prononce devant une consonne à l'intérieur d'un vers.", true, "Il compte alors comme une syllabe."]],
+    [["Le sonnet se termine par deux tercets.", true, "Deux quatrains, deux tercets."], ["Un vers libre garde un nombre fixe de syllabes mais renonce à la rime.", false, "Le vers libre n'a ni mètre régulier ni rime obligée ; c'est le vers blanc qui garde le mètre sans la rime."], ["Le e muet se prononce devant une consonne à l'intérieur d'un vers.", true, "Il compte alors comme une syllabe."]],
   ),
   "fr-2-roman": bank(
     [["Le Rouge et le Noir", "Stendhal"], ["Madame Bovary", "Flaubert"], ["Germinal", "Zola"], ["Le Père Goriot", "Balzac"], ["Bel-Ami", "Maupassant"], ["Les Misérables", "Victor Hugo"],
@@ -43,35 +44,36 @@ export const EXTRA_LETTRES: Record<string, Generator[]> = {
      ["règle des trois unités", "l'unité de temps, de lieu et d'action du théâtre classique"], ["coup de théâtre", "un rebondissement inattendu qui change la situation"], ["catharsis", "la purgation des passions par la tragédie"]],
     [["La tragédie classique se termine généralement par la mort d'un personnage.", true, "Le héros est écrasé par la fatalité."], ["Le drame romantique respecte strictement les trois unités.", false, "Hugo les rejette (préface de Cromwell)."]],
   ),
-  "fr-2-figures": pairs(
-    [["« Je meurs de soif auprès de la fontaine »", "une antithèse"], ["« Cette obscure clarté qui tombe des étoiles »", "un oxymore"], ["« Va, je ne te hais point »", "une litote"],
+  "fr-2-figures": apart(
+    [["« Je vis, je meurs ; je me brûle et me noie »", "une antithèse"], ["« Cette obscure clarté qui tombe des étoiles »", "un oxymore"], ["« Va, je ne te hais point »", "une litote"],
      ["« Il est mort de rire »", "une hyperbole"], ["« Boire un verre »", "une métonymie"], ["« Une voile à l'horizon » pour un bateau", "une synecdoque"], ["« La Terre est bleue comme une orange »", "une comparaison"],
      ["« Ma jeunesse ne fut qu'un ténébreux orage »", "une métaphore"], ["« Il nous a quittés » pour « il est mort »", "un euphémisme"], ["« Le vent hurle dans la nuit »", "une personnification"],
      ["« Je suis venu, j'ai vu, j'ai vaincu »", "une gradation"], ["« Pour qui sont ces serpents qui sifflent sur vos têtes ? »", "une allitération en [s]"],
-     ["« Rome, l'unique objet de mon ressentiment ! Rome… »", "une anaphore"], ["« Ce n'est pas une ville, c'est un monde »", "une correction (épanorthose)"], ["« Bonnet blanc et blanc bonnet »", "un chiasme"]],
+     ["« Rome, l'unique objet de mon ressentiment ! Rome… »", "une anaphore"], ["« Bonnet blanc et blanc bonnet »", "un chiasme"]],
+    NEAR_FIGURES,
     { ask: (a) => `Quelle figure de style : ${a} ?`, reverse: (b) => `Quel exemple contient ${b} ?`, claim: (a, b) => `${a} contient ${b}.`, explain: (a, b) => `${a} : ${b}.` },
   ),
   "fr-2-litterature-idees": bank(
     [["Les Essais", "Montaigne"], ["Discours de la servitude volontaire", "La Boétie"], ["Les Lettres persanes", "Montesquieu"], ["Traité sur la tolérance", "Voltaire"], ["Discours sur l'origine de l'inégalité", "Rousseau"],
-     ["J'accuse… !", "Émile Zola"], ["Discours sur l'abolition de la peine de mort", "Victor Hugo"], ["Les Caractères", "La Bruyère"], ["Fables", "La Fontaine"], ["Supplément au voyage de Bougainville", "Diderot"],
+     ["J'accuse… !", "Émile Zola"], ["Le Dernier Jour d'un condamné", "Victor Hugo"], ["Les Caractères", "La Bruyère"], ["Fables", "La Fontaine"], ["Supplément au voyage de Bougainville", "Diderot"],
      ["Déclaration des droits de la femme et de la citoyenne", "Olympe de Gouges"], ["Discours sur le colonialisme", "Aimé Césaire"]],
-    [["argumentation directe", "une argumentation qui expose explicitement une thèse"], ["argumentation indirecte", "une argumentation qui passe par un récit, une fable ou un conte"], ["thèse", "l'opinion défendue par l'auteur"],
+    [["argumentation directe", "le mode d'argumentation où la thèse est formulée explicitement, sans détour par la fiction"], ["argumentation indirecte", "le mode d'argumentation qui passe par une fiction pour suggérer une thèse"], ["thèse", "l'opinion défendue par l'auteur"],
      ["argument", "une idée qui justifie la thèse"], ["exemple", "un fait concret qui illustre un argument"], ["concession", "le fait d'admettre une part de la thèse adverse pour mieux la réfuter"],
      ["réfutation", "le fait de démontrer la fausseté d'une thèse adverse"], ["apologue", "un court récit dont on tire une leçon morale"], ["éditorial", "un article qui exprime l'opinion d'un journal"],
      ["essai", "un texte en prose où l'auteur développe sa réflexion personnelle"], ["persuader", "toucher les sentiments du destinataire pour obtenir son adhésion"], ["convaincre", "faire appel à la raison par des arguments logiques"]],
-    [["Une fable est un exemple d'argumentation indirecte.", true, "La morale découle du récit."], ["Persuader, c'est s'adresser uniquement à la raison.", false, "Persuader joue sur les émotions ; convaincre, sur la raison."]],
+    [["Une fable est un exemple d'argumentation indirecte.", true, "La morale découle du récit."], ["Dans « Le Loup et l'Agneau », La Fontaine place la morale à la fin de la fable.", false, "Elle l'ouvre : « La raison du plus fort est toujours la meilleure : / Nous l'allons montrer tout à l'heure. » Ailleurs, elle peut aussi rester implicite."]],
   ),
   "fr-1-mouvements": pairs(
-    [["l'humanisme", "XVIe siècle (Rabelais, Montaigne, Du Bellay)"], ["le baroque", "fin XVIe – début XVIIe siècle (goût du mouvement et de l'illusion)"], ["le classicisme", "XVIIe siècle (Racine, Molière, La Fontaine)"],
-     ["les Lumières", "XVIIIe siècle (Voltaire, Diderot, Rousseau)"], ["le romantisme", "début du XIXe siècle (Hugo, Lamartine, Musset)"], ["le réalisme", "milieu du XIXe siècle (Balzac, Flaubert)"],
-     ["le naturalisme", "fin du XIXe siècle (Zola, Maupassant)"], ["le Parnasse", "seconde moitié du XIXe siècle (« l'art pour l'art », Gautier)"], ["le symbolisme", "fin du XIXe siècle (Mallarmé, Verlaine)"],
+    [["l'humanisme", "XVIe siècle (Érasme, Rabelais, Montaigne : retour aux textes antiques)"], ["le baroque", "fin XVIe – début XVIIe siècle (goût du mouvement et de l'illusion)"], ["le classicisme", "XVIIe siècle (Racine, Molière, La Fontaine)"],
+     ["les Lumières", "XVIIIe siècle (Voltaire, Diderot, Rousseau)"], ["le romantisme", "début du XIXe siècle (Hugo, Lamartine, Musset)"], ["le réalisme", "milieu du XIXe siècle (Balzac, Stendhal, Flaubert)"],
+     ["le naturalisme", "fin du XIXe siècle (Zola, les Goncourt : « roman expérimental », hérédité et milieu)"], ["le Parnasse", "seconde moitié du XIXe siècle (« l'art pour l'art », Gautier)"], ["le symbolisme", "fin du XIXe siècle (manifeste de Moréas en 1886, Mallarmé, Verlaine)"],
      ["le surréalisme", "années 1920 (Breton, Éluard, Aragon)"], ["l'existentialisme", "milieu du XXe siècle (Sartre, Beauvoir)"], ["le Nouveau Roman", "années 1950 (Robbe-Grillet, Sarraute)"],
-     ["le théâtre de l'absurde", "années 1950 (Beckett, Ionesco)"], ["la Pléiade", "XVIe siècle (Ronsard, Du Bellay)"], ["la négritude", "années 1930 (Césaire, Senghor, Damas)"]],
+     ["le théâtre de l'absurde", "années 1950 (En attendant Godot de Beckett, La Cantatrice chauve d'Ionesco)"], ["la Pléiade", "XVIe siècle (sept poètes autour de Ronsard et Du Bellay, Défense et illustration de la langue française)"], ["la négritude", "années 1930 (Césaire, Senghor, Damas)"]],
     { ask: (a) => `À quelle époque et avec quels auteurs associer ${a} ?`, reverse: (b) => `Quel mouvement : ${b} ?`, claim: (a, b) => `${cap(a)} : ${b}.`, explain: (a, b) => `${cap(a)} : ${b}.` },
   ),
   "fr-1-commentaire": pairs(
     [["le projet de lecture", "la question qui guide l'étude d'un texte"], ["un axe de lecture", "une grande partie du commentaire, centrée sur une idée"], ["une citation analysée", "un extrait cité puis commenté pour en tirer un sens"],
-     ["un procédé d'écriture", "un moyen stylistique repérable (figure, rythme, lexique…)"], ["le champ lexical", "l'ensemble des mots qui renvoient à un même thème"], ["la tonalité (ou registre)", "l'effet produit sur le lecteur : comique, tragique, lyrique…"],
+     ["la conclusion", "le bilan qui répond au projet de lecture, avant l'ouverture"], ["le champ lexical", "l'ensemble des mots qui renvoient à un même thème"], ["la tonalité (ou registre)", "l'effet produit sur le lecteur : comique, tragique, lyrique…"],
      ["le registre lyrique", "l'expression des sentiments personnels"], ["le registre pathétique", "un registre qui cherche à émouvoir et à faire pitié"], ["le registre polémique", "un registre qui attaque et dénonce avec virulence"],
      ["le registre épique", "un registre qui amplifie les exploits héroïques"], ["le registre satirique", "un registre qui se moque pour critiquer"], ["la paraphrase", "le défaut qui consiste à répéter le texte sans l'analyser"],
      ["l'ouverture", "l'élargissement final vers une autre œuvre ou réflexion"], ["la situation du texte", "la présentation de l'auteur, de l'œuvre et du passage"], ["l'explication linéaire", "l'étude d'un texte mouvement par mouvement, dans l'ordre"],
@@ -90,6 +92,12 @@ export const EXTRA_LETTRES: Record<string, Generator[]> = {
     ["La Rage de l'expression rassemble des textes où Ponge montre le travail d'écriture en train de se faire.", true, "Parcours « Dans l'atelier du poète »."],
     ["Mes forêts est un recueil d'Hélène Dorion.", true, "Poétesse québécoise (2021)."],
     ["Pour un oui ou pour un non est une pièce de Nathalie Sarraute.", true, "Deux amis se disputent pour une intonation."],
-    ["On ne badine pas avec l'amour est un drame de Musset.", true, "1834, Perdican et Camille."],
+    ["On ne badine pas avec l'amour est une pièce de Musset.", true, "Proverbe dramatique de 1834 : Perdican, Camille et Rosette."],
+    ["Le Cahier de Douai est un recueil de Baudelaire.", false, "Il est de Rimbaud ; Baudelaire a écrit Les Fleurs du mal."],
+    ["Pot-Bouille appartient à La Comédie humaine de Balzac.", false, "C'est un roman des Rougon-Macquart de Zola (1882)."],
+    ["Le Menteur est une tragédie de Racine.", false, "C'est une comédie de Corneille."],
+    ["Les Lettres d'une Péruvienne ont été écrites par Montesquieu.", false, "Par Françoise de Graffigny ; Montesquieu a écrit les Lettres persanes (1721)."],
+    ["Mes forêts est un roman d'Hélène Dorion.", false, "C'est un recueil de poèmes."],
+    ["Le Chevalier de la charrette date du XVIe siècle.", false, "Chrétien de Troyes l'écrit au XIIe siècle (vers 1177-1181)."],
   ])],
 };

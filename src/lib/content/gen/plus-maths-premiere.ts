@@ -2,7 +2,7 @@
  * Maths, Première : questions supplémentaires couvrant toutes les notions du
  * programme (méthodes, modélisation, lectures, pièges), en plus de `maths-premiere.ts`.
  */
-import { type Generator, cards, claims, frac, fracTex, int, mcq, nonZero, numeric, oneOf, par, pick, poly, shift, tex, tf } from "./kit";
+import { type Generator, cards, claims, frac, fracTex, gcd, int, mcq, nonZero, numeric, oneOf, par, pick, poly, shift, term, tex, tf } from "./kit";
 
 const pt = (...n: number[]) => `(${n.map((v) => tex(v)).join("\\,;\\,")})`;
 const fac = (a: number) => (a === 0 ? "x" : `(${shift(a)})`);
@@ -17,10 +17,13 @@ const secondDegre: Generator[] = [
       `$\\Delta = ${a * a * (q - p) ** 2}$, racines $\\dfrac{${a * (p + q)} \\pm ${Math.abs(a * (q - p))}}{${2 * a}}$ : $${p}$ et $${q}$.`);
   },
   (r) => {
-    const a = pick(r, [2, 3, -1, -2]), p = int(r, -5, 5), q = int(r, -5, 5);
+    const a = pick(r, [2, 3, -1, -2]), p0 = int(r, -5, 5), q0 = int(r, -5, 5), [p, q] = [Math.min(p0, q0), Math.max(p0, q0)];
     if (p === q) return tf(`$${poly([a, -2 * a * p, a * p * p])}$ a une racine double.`, true, `$${coef(a)}${fac(p)}^2$ : $\\Delta = 0$.`);
-    const ans = `$${coef(a)}${fac(p)}${fac(q)}$`;
-    return mcq(r, `Forme factorisée de $${poly([a, -a * (p + q), a * p * q])}$ ?`, ans, [`$${fac(p)}${fac(q)}$`, `$${coef(a)}${fac(-p)}${fac(-q)}$`, `$${coef(-a)}${fac(p)}${fac(q)}$`].filter((w) => w !== ans),
+    // Facteurs toujours écrits dans l'ordre des racines croissantes : un leurre ne peut pas être la bonne réponse réordonnée.
+    const form = (k: number, u: number, v: number) => `$${coef(k)}${fac(Math.min(u, v))}${fac(Math.max(u, v))}$`;
+    const ans = form(a, p, q);
+    const wrongs = [form(1, p, q), p + q === 0 ? `$${coef(a)}${fac(p)}^2$` : form(a, -p, -q), form(-a, p, q), ...(p + q === 0 ? [] : [form(a, p, -q)]), form(2 * a, p, q)].filter((w) => w !== ans);
+    return mcq(r, `Forme factorisée de $${poly([a, -a * (p + q), a * p * q])}$ ?`, ans, wrongs,
       `Racines $${p}$ et $${q}$ : $ax^2 + bx + c = a(x - x_1)(x - x_2)$ avec $a = ${a}$. Ne pas oublier le coefficient $a$ !`);
   },
   (r) => {
@@ -32,7 +35,8 @@ const secondDegre: Generator[] = [
   },
   (r) => {
     const k = int(r, 2, 8);
-    return mcq(r, `Pour quelles valeurs de $m$ l'équation $x^2 + mx + ${k * k} = 0$ a-t-elle une racine double ?`, `$m = -${2 * k}$ ou $m = ${2 * k}$`, [`$m = ${2 * k}$ seulement`, `$m = ${k}$ ou $m = -${k}$`, `$m = ${k * k}$`],
+    return mcq(r, `Pour quelles valeurs de $m$ l'équation $x^2 + mx + ${k * k} = 0$ a-t-elle une racine double ?`, `$m = -${2 * k}$ ou $m = ${2 * k}$`, // Leurres : solution positive seule, m² = c au lieu de m² = 4c, m = 4c (carré oublié) — jamais égal à ±2k.
+      [`$m = ${2 * k}$ seulement`, `$m = ${k}$ ou $m = -${k}$`, `$m = ${4 * k * k}$`],
       `Racine double $\\iff \\Delta = m^2 - 4 \\times ${k * k} = 0 \\iff m^2 = ${4 * k * k}$.`);
   },
   (r) => {
@@ -44,7 +48,7 @@ const secondDegre: Generator[] = [
   (r) => {
     const x0 = nonZero(r, 4), b = int(r, -6, 6);
     const c = -(x0 * x0 + b * x0);
-    return numeric(`$${x0}$ est racine de $x^2 ${b < 0 ? "-" : "+"} ${Math.abs(b) === 1 ? "" : Math.abs(b)}x + c$. Valeur de $c$ ?`.replace("+ 0x", "").replace("- 0x", ""), c,
+    return numeric(`$${x0}$ est racine de $${poly([1, b, 0])} + c$. Valeur de $c$ ?`, c,
       `On remplace $x$ par $${x0}$ : $${x0 * x0} + ${par(b * x0)} + c = 0$, donc $c = ${c}$.`);
   },
   (r) => {
@@ -92,10 +96,11 @@ const suites: Generator[] = [
     ]);
   },
   (r) => {
-    const u0 = int(r, 1, 9), d = nonZero(r, 7), q = int(r, 2, 6);
+    // u0 ≥ 2 : sinon « 1 × q^n » et le leurre « q × 1^n ».
+    const u0 = int(r, 2, 9), d = nonZero(r, 7), q = int(r, 2, 6);
     return oneOf(r, [
-      () => mcq(r, `$u_0 = ${u0}$ et $u_{n+1} = u_n ${d < 0 ? "-" : "+"} ${Math.abs(d)}$. Expression de $u_n$ ?`, `$u_n = ${poly([d, u0], "n")}$`, [`$u_n = ${poly([u0, d], "n")}$`, `$u_n = ${u0} \\times ${par(d)}^n$`, `$u_n = ${poly([d, u0 + d], "n")}$`], `Suite arithmétique de raison $${d}$ : $u_n = u_0 + nr$.`),
-      () => mcq(r, `$u_0 = ${u0}$ et $u_{n+1} = ${q} u_n$. Expression de $u_n$ ?`, `$u_n = ${u0} \\times ${q}^n$`, [`$u_n = ${poly([q, u0], "n")}$`, `$u_n = ${q} \\times ${u0}^n$`, `$u_n = ${u0} \\times ${q}^{n+1}$`], `Suite géométrique de raison $${q}$ : $u_n = u_0 \\times q^n$.`),
+      () => mcq(r, `$u_0 = ${u0}$ et $u_{n+1} = u_n ${d < 0 ? "-" : "+"} ${Math.abs(d)}$. Expression de $u_n$ ?`, `$u_n = ${poly([d, u0], "n")}$`, [`$u_n = ${poly([u0, d], "n")}$`, ...(d === 1 ? [] : [`$u_n = ${u0} \\times ${par(d)}^n$`]), `$u_n = ${poly([d, u0 + d], "n")}$`], `Suite arithmétique de raison $${d}$ : $u_n = u_0 + nr$.`, () => `$u_n = ${poly([nonZero(r, 7), int(r, 1, 9)], "n")}$`),
+      () => mcq(r, `$u_0 = ${u0}$ et $u_{n+1} = ${q} u_n$. Expression de $u_n$ ?`, `$u_n = ${u0} \\times ${q}^n$`, [`$u_n = ${poly([q, u0], "n")}$`, ...(q === u0 ? [] : [`$u_n = ${q} \\times ${u0}^n$`]), `$u_n = ${u0} \\times ${q}^{n+1}$`, `$u_n = ${u0 * q}^n$`], `Suite géométrique de raison $${q}$ : $u_n = u_0 \\times q^n$.`),
     ]);
   },
   (r) => {
@@ -107,7 +112,11 @@ const suites: Generator[] = [
   (r) => {
     const k = int(r, 2, 8);
     return oneOf(r, [
-      () => tf(`La suite $u_n = n^2 - ${2 * k + 1}n$ est croissante à partir du rang $${k}$.`, true, `$u_{n+1} - u_n = 2n + 1 - ${2 * k + 1} = 2(n - ${k})$, positif dès $n \\geq ${k}$.`),
+      () => {
+        const from = k + pick(r, [0, 0, -2, -1]);
+        return tf(`La suite $u_n = n^2 - ${2 * k + 1}n$ est croissante à partir du rang $${from}$.`, from >= k,
+          `$u_{n+1} - u_n = 2n + 1 - ${2 * k + 1} = 2(n - ${k})$ : positif ou nul dès $n \\geq ${k}$${from < k ? `, mais négatif pour $n = ${from}$ ($u_{${from + 1}} < u_{${from}}$)` : ""}.`);
+      },
       () => mcq(r, `$u_n = \\dfrac{${k}}{n + 1}$. La suite $(u_n)$ est…`, "décroissante", ["croissante", "constante", "ni croissante ni décroissante"], `Le dénominateur augmente, le quotient (positif) diminue.`),
       () => mcq(r, `$u_n = ${k} - \\dfrac{1}{n + 1}$. La suite $(u_n)$ est…`, "croissante", ["décroissante", "constante", "ni croissante ni décroissante"], `$\\frac{1}{n+1}$ diminue, donc on retire de moins en moins : la suite croît vers $${k}$.`),
     ]);
@@ -137,15 +146,23 @@ const derivation: Generator[] = [
   (r) => {
     const a = nonZero(r, 4), b = int(r, -6, 6), c = nonZero(r, 5);
     const num = a * c - b;
-    if (num === 0) return tf(`$f(x) = \\dfrac{${poly([a, b])}}{${shift(-c)}}$ est constante sur son domaine.`, true, `$f'(x) = \\dfrac{${a} \\times ${par(c)} - ${par(b)}}{(x + ${c})^2} = 0$.`);
-    return mcq(r, `Dérivée de $f(x) = \\dfrac{${poly([a, b])}}{${shift(-c)}}$ ?`, `$\\dfrac{${num}}{(${shift(-c)})^2}$`, [`$\\dfrac{${-num}}{(${shift(-c)})^2}$`, `$\\dfrac{${a}}{(${shift(-c)})^2}$`, `$${a}$`],
-      `$\\left(\\dfrac uv\\right)' = \\dfrac{u'v - uv'}{v^2}$ : $\\dfrac{${a}(${shift(-c)}) - (${poly([a, b])}) \\times 1}{(${shift(-c)})^2} = \\dfrac{${num}}{(${shift(-c)})^2}$.`);
+    if (num === 0) return tf(`$f(x) = \\dfrac{${poly([a, b])}}{${shift(-c)}}$ est constante sur son domaine.`, true, `$f'(x) = \\dfrac{${a} \\times ${par(c)} - ${par(b)}}{(${shift(-c)})^2} = 0$ : en effet $${poly([a, b])} = ${a}(${shift(-c)})$.`);
+    // Leurres : signe inversé, oubli de uv', erreur de signe dans u'v - uv' (a·c + b), quotient des dérivées.
+    const q = (n: number) => `${n < 0 ? "-" : ""}\\dfrac{${Math.abs(n)}}{(${shift(-c)})^2}`;
+    return mcq(r, `Dérivée de $f(x) = \\dfrac{${poly([a, b])}}{${shift(-c)}}$ ?`, `$${q(num)}$`, [`$${q(-num)}$`, `$${q(a)}$`, ...(a * c + b === 0 ? [] : [`$${q(a * c + b)}$`]), `$${a}$`],
+      `$\\left(\\dfrac uv\\right)' = \\dfrac{u'v - uv'}{v^2}$ : $\\dfrac{${a}(${shift(-c)}) - (${poly([a, b])}) \\times 1}{(${shift(-c)})^2} = ${q(num)}$.`, () => {
+        // Numérateur voisin, jamais nul (« 0/(x − c)² » serait absurde).
+        let v = num + nonZero(r, 3);
+        while (v === 0) v = num + nonZero(r, 3);
+        return `$${q(v)}$`;
+      });
   },
   (r) => {
     const k = int(r, 1, 6);
     return oneOf(r, [
-      () => mcq(r, `$f(x) = \\sqrt{x}$. $f'(${k * k}) = \\;?$`, frac(1, 2 * k), [frac(1, k), frac(1, 2 * k * k), `$${2 * k}$`], `$f'(x) = \\dfrac{1}{2\\sqrt x}$, donc $f'(${k * k}) = \\dfrac{1}{2 \\times ${k}}$.`),
-      () => mcq(r, `$f(x) = \\dfrac{1}{x}$. $f'(${k}) = \\;?$`, `$${fracTex(-1, k * k)}$`, [frac(1, k * k), `$${fracTex(-1, k)}$`, `$${fracTex(-1, 2 * k)}$`], `$f'(x) = -\\dfrac{1}{x^2}$.`),
+      () => mcq(r, `$f(x) = \\sqrt{x}$. $f'(${k * k}) = \\;?$`, frac(1, 2 * k), [frac(1, k), frac(1, 2 * k * k), `$${2 * k}$`], `$f'(x) = \\dfrac{1}{2\\sqrt x}$, donc $f'(${k * k}) = \\dfrac{1}{2 \\times ${k}}$.`, () => frac(1, int(r, 2, 20))),
+      () => mcq(r, `$f(x) = \\dfrac{1}{x}$. $f'(${k}) = \\;?$`, `$${fracTex(-1, k * k)}$`, [frac(1, k * k), `$${fracTex(-1, k)}$`, `$${fracTex(-1, 2 * k)}$`], `$f'(x) = -\\dfrac{1}{x^2}$.`,
+        () => `$${fracTex(-1, pick(r, [2, 3, 4, 6, 8, 12, 18, 50].filter((v) => v !== k * k)))}$`),
     ]);
   },
   (r) => {
@@ -153,7 +170,7 @@ const derivation: Generator[] = [
     const y0 = a * x0 * x0 + b * x0 + c, m = 2 * a * x0 + b, p = y0 - m * x0;
     const ans = `$y = ${poly([m, p])}$`;
     return mcq(r, `Équation de la tangente à la courbe de $f(x) = ${poly([a, b, c])}$ au point d'abscisse $${x0}$ ?`, ans, [`$y = ${poly([m, y0])}$`, `$y = ${poly([y0, m])}$`, `$y = ${poly([m + 1, p])}$`].filter((w) => w !== ans),
-      `$f(${x0}) = ${y0}$ et $f'(${x0}) = ${m}$ : $y = ${m}(${shift(x0)}) + ${par(y0)} = ${poly([m, p])}$.`);
+      `$f(${x0}) = ${y0}$ et $f'(${x0}) = ${m}$ : ${m === 0 ? `tangente horizontale, $y = ${y0}$` : x0 === 0 ? `$y = ${poly([m, p])}$` : `$y = ${coef(m)}(${shift(x0)})${term(y0)} = ${poly([m, p])}$`}.`, () => `$y = ${poly([m, int(r, -9, 9)])}$`);
   },
   (r) => {
     const a = int(r, 2, 4), b = nonZero(r, 5), n = pick(r, [2, 3]);
@@ -187,8 +204,8 @@ const variations: Generator[] = [
     const lo = Math.min(0, 2 * k), hi = Math.max(0, 2 * k);
     return oneOf(r, [
       () => numeric(`$f(x) = ${poly([1, -3 * k, 0, 0])}$. Valeur du minimum local de $f$ ?`, -4 * k ** 3 < 0 ? -4 * k ** 3 : 0,
-        `$f'(x) = 3x(x - ${par(2 * k)})$ s'annule en $${lo}$ et $${hi}$. $f'$ passe de $-$ à $+$ en $${hi}$ : minimum local $f(${hi}) = ${hi === 0 ? 0 : -4 * k ** 3}$.`),
-      () => numeric(`$f(x) = ${poly([1, -3 * k, 0, 0])}$. En quelle valeur de $x$ $f$ admet-elle un maximum local ?`, lo, `$f'(x) = 3x(x - ${par(2 * k)})$ : positive avant $${lo}$, négative entre $${lo}$ et $${hi}$. Maximum local en $x = ${lo}$.`),
+        `$f'(x) = 3x(${shift(2 * k)})$ s'annule en $${lo}$ et $${hi}$. $f'$ passe de $-$ à $+$ en $${hi}$ : minimum local $f(${hi}) = ${hi === 0 ? 0 : -4 * k ** 3}$.`),
+      () => numeric(`$f(x) = ${poly([1, -3 * k, 0, 0])}$. En quelle valeur de $x$ $f$ admet-elle un maximum local ?`, lo, `$f'(x) = 3x(${shift(2 * k)})$ : positive avant $${lo}$, négative entre $${lo}$ et $${hi}$. Maximum local en $x = ${lo}$.`),
     ]);
   },
   (r) => {
@@ -199,10 +216,12 @@ const variations: Generator[] = [
     ]);
   },
   (r) => {
-    const a = pick(r, [1, 2, 3]), b = int(r, -4, 4);
-    return mcq(r, `$f(x) = ${poly([a, b, 0])}$ sur $\\mathbb{R}$. $f'(x) = \\;?$ et le sens de variation ?`.replace("+ 0x", "").replace("- 0x", ""), `$f'(x) = ${poly([2 * a, b])}$, décroissante puis croissante`,
-      [`$f'(x) = ${poly([2 * a, b])}$, croissante puis décroissante`, `$f'(x) = ${poly([a, b])}$, croissante sur $\\mathbb{R}$`, `$f'(x) = ${2 * a}x$, croissante sur $\\mathbb{R}$`],
-      `$f'$ est affine de coefficient $${2 * a} > 0$ : négative puis positive.`);
+    // Coefficient a positif ou négatif : la bonne réponse n'est pas toujours « décroissante puis croissante ».
+    const a = pick(r, [1, 2, 3, -1, -2]), b = int(r, -4, 4);
+    const [good, bad] = a > 0 ? ["décroissante puis croissante", "croissante puis décroissante"] : ["croissante puis décroissante", "décroissante puis croissante"];
+    return mcq(r, `$f(x) = ${poly([a, b, 0])}$ sur $\\mathbb{R}$. $f'(x) = \\;?$ et le sens de variation ?`, `$f'(x) = ${poly([2 * a, b])}$, ${good}`,
+      [`$f'(x) = ${poly([2 * a, b])}$, ${bad}`, `$f'(x) = ${poly([a, b])}$, ${good}`, `$f'(x) = ${poly([2 * a, 0])}$, ${a > 0 ? "croissante" : "décroissante"} sur $\\mathbb{R}$`],
+      `$f'$ est affine de coefficient $${2 * a}$ ${a > 0 ? "> 0 : négative puis positive" : "< 0 : positive puis négative"} ; elle s'annule en $${fracTex(-b, 2 * a)}$.`);
   },
   claims([
     ["Si $f'(x) > 0$ sur un intervalle, $f$ y est strictement croissante.", true, "Théorème du signe de la dérivée."],
@@ -218,29 +237,31 @@ const exponentielle: Generator[] = [
   (r) => {
     const a = int(r, 2, 5), b = int(r, 1, 4);
     return oneOf(r, [
-      () => mcq(r, `Simplifie $e^{${a}x} \\times e^{-${b}x}$.`, `$e^{${a - b === 1 ? "" : a - b}x}$`.replace("{0x}", "{0}"), [`$e^{-${a * b}x^2}$`, `$e^{${a + b}x}$`, `$${a - b}e^{x}$`], "On additionne les exposants."),
-      () => mcq(r, `Simplifie $\\left(e^{x}\\right)^{${a}} \\times e^{${b}}$.`, `$e^{${a}x + ${b}}$`, [`$e^{${a}x \\times ${b}}$`, `$e^{x^{${a}} + ${b}}$`, `$${a}e^{x + ${b}}$`], "$(e^x)^n = e^{nx}$, puis on additionne les exposants."),
+      () => mcq(r, `Simplifie $e^{${a}x} \\times e^{-${b === 1 ? "" : b}x}$.`, a === b ? "$1$" : `$e^{${a - b === 1 ? "" : a - b === -1 ? "-" : a - b}x}$`, [`$e^{-${a * b}x^2}$`, `$e^{${a + b}x}$`, `$${a - b === 1 ? "" : a - b === -1 ? "-" : a - b}e^{x}$`, `$e^{${a * b}x}$`, ...(a === b ? ["$0$", "$e$"] : [])].filter((w) => w !== "$0e^{x}$"), `On additionne les exposants : $${a}x - ${poly([b, 0])} = ${poly([a - b, 0])}$${a === b ? " et $e^0 = 1$" : ""}.`),
+      () => mcq(r, `Simplifie $\\left(e^{x}\\right)^{${a}} \\times ${b === 1 ? "e" : `e^{${b}}`}$.`, `$e^{${a}x + ${b}}$`, [`$e^{${a * b}x}$`, `$e^{${a + b}x}$`, `$e^{x^{${a}} + ${b}}$`, `$${a}e^{x + ${b}}$`], "$(e^x)^n = e^{nx}$, puis on additionne les exposants."),
     ]);
   },
   (r) => {
-    const a = int(r, -5, 5), b = nonZero(r, 3);
+    const a = nonZero(r, 5), b = nonZero(r, 3);
     return oneOf(r, [
-      () => mcq(r, `Solutions de $e^{x} > e^{${a}}$ ?`, `$]${a}\\,;\\,+\\infty[$`, [`$]-\\infty\\,;\\,${a}[$`, `$]${Math.exp(a) > 100 ? a + 1 : -a}\\,;\\,+\\infty[$`, "$\\mathbb{R}$"].filter((w) => w !== `$]${a}\\,;\\,+\\infty[$`), "$\\exp$ est strictement croissante : $e^x > e^a \\iff x > a$."),
-      () => mcq(r, `Solutions de $e^{${b}x} \\leq 1$ ?`, b > 0 ? "$]-\\infty\\,;\\,0]$" : "$[0\\,;\\,+\\infty[$", [b > 0 ? "$[0\\,;\\,+\\infty[$" : "$]-\\infty\\,;\\,0]$", "$\\emptyset$", "$\\mathbb{R}$"], `$1 = e^0$, donc $${b}x \\leq 0$${b < 0 ? " (on divise par un négatif : le sens change)" : ""}.`),
+      () => mcq(r, `Solutions de $e^{x} > ${a === 1 ? "e" : `e^{${a}}`}$ ?`, `$]${a}\\,;\\,+\\infty[$`, [`$]-\\infty\\,;\\,${a}[$`, `$]${Math.exp(a) > 100 ? a + 1 : -a}\\,;\\,+\\infty[$`, "$\\mathbb{R}$"].filter((w) => w !== `$]${a}\\,;\\,+\\infty[$`), "$\\exp$ est strictement croissante : $e^x > e^a \\iff x > a$."),
+      () => mcq(r, `Solutions de $e^{${coef(b)}x} \\leq 1$ ?`, b > 0 ? "$]-\\infty\\,;\\,0]$" : "$[0\\,;\\,+\\infty[$", [b > 0 ? "$[0\\,;\\,+\\infty[$" : "$]-\\infty\\,;\\,0]$", "$\\emptyset$", "$\\mathbb{R}$"], `$1 = e^0$, donc $${coef(b)}x \\leq 0$${b < 0 ? " (on divise par un négatif : le sens change)" : ""}.`),
       () => mcq(r, "Solutions de $e^{x} = -1$ ?", "aucune solution", ["$x = 0$", "$x = -1$", "$x = 1$"], "Une exponentielle est toujours strictement positive."),
     ]);
   },
   (r) => {
     const k = nonZero(r, 4);
+    const ek = `e^{${k === 1 ? "" : k === -1 ? "-" : k}x}`;
     return oneOf(r, [
-      () => numeric(`$f(x) = (x ${k < 0 ? "-" : "+"} ${Math.abs(k)})e^{x}$. En quelle valeur de $x$ $f$ admet-elle son minimum ?`, -k - 1, `$f'(x) = e^x + (x + ${par(k)})e^x = (x + ${par(k + 1)})e^x$, du signe de $x + ${par(k + 1)}$ : minimum en $x = ${-k - 1}$.`),
-      () => mcq(r, `$f(x) = x e^{${k}x}$. $f'(x) = \\;?$`, `$(1 ${k < 0 ? "-" : "+"} ${Math.abs(k) === 1 ? "" : Math.abs(k)}x)e^{${k}x}$`, [`$${k}e^{${k}x}$`, `$e^{${k}x}$`, `$(x + ${par(k)})e^{${k}x}$`], `$(uv)' = u'v + uv'$ avec $u = x$ et $v = e^{${k}x}$, $v' = ${k}e^{${k}x}$.`),
+      () => numeric(`$f(x) = (x ${k < 0 ? "-" : "+"} ${Math.abs(k)})e^{x}$. En quelle valeur de $x$ $f$ admet-elle son minimum ?`, -k - 1, `$f'(x) = e^x + (${poly([1, k])})e^x = ${k === -1 ? "x" : `(${poly([1, k + 1])})`}e^x$, du signe de $${poly([1, k + 1])}$ (qui passe de $-$ à $+$) : minimum en $x = ${-k - 1}$.`),
+      () => mcq(r, `$f(x) = x${ek}$. $f'(x) = \\;?$`, `$(1 ${k < 0 ? "-" : "+"} ${Math.abs(k) === 1 ? "" : Math.abs(k)}x)${ek}$`, [`$${k === 1 ? "" : k === -1 ? "-" : k}${ek}$`, `$${ek}$`, ...(k === 1 ? [] : [`$(${poly([1, k])})${ek}$`]), `$(1 + x)${ek}$`, `$(1 ${k < 0 ? "+" : "-"} ${Math.abs(k) === 1 ? "" : Math.abs(k)}x)${ek}$`], `$(uv)' = u'v + uv'$ avec $u = x$ et $v = ${ek}$, $v' = ${k === 1 ? "" : k === -1 ? "-" : k}${ek}$.`),
     ]);
   },
   (r) => {
     const n0 = pick(r, [100, 200, 500, 1000]), k = pick(r, [0.1, 0.2, 0.5]);
     return oneOf(r, [
-      () => numeric(`La masse d'un médicament dans le sang est $m(t) = ${n0}e^{-${tex(k)}t}$ (mg, $t$ en heures). Masse injectée au départ ?`, n0, `$m(0) = ${n0} \\times e^0 = ${n0}$ mg.`, "mg"),
+      () => numeric(`La masse d'un médicament dans le sang est $m(t) = ${n0}e^{-${tex(k)}t}$ (mg, $t$ en heures). Vitesse de variation $m'(0)$ (en mg/h) ?`, -k * n0, `$m'(t) = -${tex(k)} \\times ${n0}e^{-${tex(k)}t}$, donc $m'(0) = ${tex(-k * n0)}$ mg/h : la masse diminue.`, "mg/h"),
+      () => numeric(`$m(t) = ${n0}e^{-${tex(k)}t}$. Au bout de combien d'heures la masse est-elle divisée par $e$ ?`, 1 / k, `$m(t) = \\dfrac{${n0}}{e} \\iff e^{-${tex(k)}t} = e^{-1} \\iff ${tex(k)}t = 1 \\iff t = ${tex(1 / k)}$ h.`, "h"),
       () => mcq(r, `$m(t) = ${n0}e^{-${tex(k)}t}$. La masse…`, "diminue au cours du temps", ["augmente au cours du temps", "reste constante", "devient négative"], `$m'(t) = -${tex(k * n0)}e^{-${tex(k)}t} < 0$.`),
     ]);
   },
@@ -282,9 +303,14 @@ const trigo: Generator[] = [
   (r) => {
     const rad = int(r, 2, 9);
     const [ang, num, den] = pick(r, [["\\dfrac{\\pi}{2}", 1, 2], ["\\pi", 1, 1], ["\\dfrac{\\pi}{3}", 1, 3], ["2\\pi", 2, 1], ["\\dfrac{\\pi}{4}", 1, 4]] as const);
-    const k = (rad * num) / den;
-    const ans = `$${Number.isInteger(k) ? (k === 1 ? "" : k) : fracTex(rad * num, den)}\\pi$`;
-    return mcq(r, `Longueur d'un arc de cercle de rayon $${rad}$ cm et d'angle $${ang}$ rad ?`, `${ans} cm`, [`$${rad}$ cm`, `$${tex((rad * num * 180) / den)}$ cm`, `$${2 * rad}\\pi$ cm`].filter((w) => w !== `${ans} cm`),
+    // nπ/d simplifié, écrit \dfrac{n\pi}{d} (« π/2 », « 7π/2 », « π » plutôt que « 1π »).
+    const pi = (n: number, d: number) => {
+      const g = gcd(n, d), a = n / g, b = d / g, top = `${a === 1 ? "" : a}\\pi`;
+      return `$${b === 1 ? top : `\\dfrac{${top}}{${b}}`}$`;
+    };
+    const ans = pi(rad * num, den);
+    // Leurres : le rayon seul, l'angle en degrés, le périmètre, le diamètre au lieu du rayon, l'aire du secteur r²θ/2.
+    return mcq(r, `Longueur d'un arc de cercle de rayon $${rad}$ cm et d'angle $${ang}$ rad ?`, `${ans} cm`, [`$${rad}$ cm`, `$${tex((rad * num * 180) / den)}$ cm`, `$${2 * rad}\\pi$ cm`, `${pi(2 * rad * num, den)} cm`, `${pi(rad * rad * num, 2 * den)} cm`],
       `Longueur = rayon × angle en radians = $${rad} \\times ${ang}$.`);
   },
   cards([
@@ -309,13 +335,13 @@ const produitScalaire: Generator[] = [
       `Al-Kashi : $\\cos\\widehat A = \\dfrac{AB^2 + AC^2 - BC^2}{2 \\times AB \\times AC} = \\dfrac{${ab * ab} + ${ac * ac} - ${bc * bc}}{${2 * ab * ac}} = ${ang === 60 ? "\\dfrac12" : "-\\dfrac12"}$.`, "°");
   },
   (r) => {
-    const a = nonZero(r, 4), c = nonZero(r, 4), d = pick(r, [1, 2, -1, -2, 3]);
-    if ((a * c) % d !== 0) return tf(`$\\vec u${pt(a, 0)}$ et $\\vec v${pt(0, c)}$ sont orthogonaux.`, true, "$a \\times 0 + 0 \\times c = 0$.");
+    const d = pick(r, [1, 2, -1, -2, 3]), a = d * nonZero(r, 2), c = nonZero(r, 5);
+    // a multiple de d : m = -ac/d est entier.
     const m = -(a * c) / d;
     return numeric(`$\\vec u(${a}\\,;\\,m)$ et $\\vec v${pt(c, d)}$. Valeur de $m$ pour que $\\vec u \\perp \\vec v$ ?`, m, `$\\vec u \\cdot \\vec v = ${a} \\times ${par(c)} + m \\times ${par(d)} = 0 \\iff m = ${m}$.`);
   },
   (r) => {
-    const u = int(r, 1, 6), v = int(r, 1, 6), p = nonZero(r, 8);
+    const u = int(r, 1, 6), v = int(r, 1, 6), p = nonZero(r, Math.min(8, u * v));
     return oneOf(r, [
       () => numeric(`$\\|\\vec u\\| = ${u}$, $\\|\\vec v\\| = ${v}$ et $\\vec u \\cdot \\vec v = ${p}$. $\\|\\vec u + \\vec v\\|^2 = \\;?$`, u * u + 2 * p + v * v, `$\\|\\vec u + \\vec v\\|^2 = \\|\\vec u\\|^2 + 2\\,\\vec u \\cdot \\vec v + \\|\\vec v\\|^2 = ${u * u} + ${par(2 * p)} + ${v * v}$.`),
       () => numeric(`$\\|\\vec u\\| = ${u}$, $\\|\\vec v\\| = ${v}$ et $\\vec u \\cdot \\vec v = ${p}$. $\\|\\vec u - \\vec v\\|^2 = \\;?$`, u * u - 2 * p + v * v, `$\\|\\vec u - \\vec v\\|^2 = \\|\\vec u\\|^2 - 2\\,\\vec u \\cdot \\vec v + \\|\\vec v\\|^2$.`),
@@ -323,10 +349,11 @@ const produitScalaire: Generator[] = [
     ]);
   },
   (r) => {
-    const a = int(r, -4, 4), b = int(r, -4, 4), rr = int(r, 1, 6);
+    // Centre distinct de l'origine : sinon le leurre « signes inversés » serait la bonne réponse.
+    const a = int(r, -4, 4), b0 = int(r, -4, 4), b = a === 0 && b0 === 0 ? nonZero(r, 4) : b0, rr = int(r, 1, 6);
     const sq = (c: number, v: string) => (c === 0 ? `${v}^2` : `(${shift(c, v)})^2`);
     return mcq(r, `Équation du cercle de centre $\\Omega${pt(a, b)}$ et de rayon $${rr}$ ?`, `$${sq(a, "x")} + ${sq(b, "y")} = ${rr * rr}$`,
-      [`$${sq(a, "x")} + ${sq(b, "y")} = ${rr}$`, `$${sq(-a, "x")} + ${sq(-b, "y")} = ${rr * rr}$`, `$${sq(b, "x")} + ${sq(a, "y")} = ${rr * rr}$`],
+      [`$${sq(a, "x")} + ${sq(b, "y")} = ${rr}$`, `$${sq(-a, "x")} + ${sq(-b, "y")} = ${rr * rr}$`, `$${sq(b, "x")} + ${sq(a, "y")} = ${rr * rr}$`, `$${sq(a, "x")} - ${sq(b, "y")} = ${rr * rr}$`, `$${sq(a, "x")} + ${sq(b, "y")} = ${2 * rr}$`],
       `$M(x\\,;\\,y)$ est sur le cercle $\\iff \\Omega M^2 = r^2$.`);
   },
   cards([
@@ -395,10 +422,11 @@ const va: Generator[] = [
       `Gain algébrique : $G - ${mise}$ avec prob. $${tex(pw)}$, $-${mise}$ sinon. $E = ${tex(pw)}G - ${mise} = 0 \\iff G = ${tex(gain)}$ €.`, "€");
   },
   (r) => {
-    const x = [0, 2], p = pick(r, [0.5, 0.25, 0.75]);
-    const e = 2 * (1 - p), v = 4 * (1 - p) - e * e;
-    return numeric(`$P(X = 0) = ${tex(p)}$ et $P(X = 2) = ${tex(1 - p)}$. Variance $V(X)$ ?`, v,
-      `$E(X) = ${tex(e)}$, $E(X^2) = 4 \\times ${tex(1 - p)} = ${tex(4 * (1 - p))}$, donc $V(X) = ${tex(4 * (1 - p))} - ${tex(e)}^2 = ${tex(v)}$. (Valeurs : $${x.join(", ")}$.)`, undefined, 0.001);
+    // X prend les valeurs 0 et k : V(X) = E(X²) - E(X)² = k²p(1 - p) avec p = P(X = 0).
+    const k = int(r, 1, 5), p = pick(r, [0.5, 0.25, 0.75, 0.2, 0.4, 0.6]);
+    const e = k * (1 - p), e2 = k * k * (1 - p), v = e2 - e * e;
+    return numeric(`$P(X = 0) = ${tex(p)}$ et $P(X = ${k}) = ${tex(1 - p)}$. Variance $V(X)$ ?`, v,
+      `$E(X) = ${k} \\times ${tex(1 - p)} = ${tex(e)}$, $E(X^2) = ${k * k} \\times ${tex(1 - p)} = ${tex(e2)}$, donc $V(X) = E(X^2) - E(X)^2 = ${tex(e2)} - ${tex(e)}^2 = ${tex(v)}$.`, undefined, 0.001);
   },
   cards([
     ["L'espérance d'une variable aléatoire s'interprète comme…", "la moyenne des valeurs obtenues sur un grand nombre de répétitions", ["la valeur la plus probable", "la valeur maximale", "la dispersion des valeurs"], "C'est une moyenne pondérée par les probabilités."],

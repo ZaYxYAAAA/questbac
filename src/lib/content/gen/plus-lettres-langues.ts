@@ -2,9 +2,15 @@
  * Français, anglais, espagnol : questions supplémentaires (notions d'analyse
  * littéraire, méthode, grammaire, civilisation), en complément des banques existantes.
  */
+import type { Difficulty } from "@/lib/types";
 import { type Card, type Claim, type Generator, cards, claims } from "./kit";
 
 const bank = (c: Card[], v: Claim[] = []): Generator[] => (v.length ? [cards(c), claims(v)] : [cards(c)]);
+/** Cartes plus exigeantes (B1-B2) : la difficulté est fixée sans perdre les cartes mémoire. */
+const harder = (d: Difficulty, c: Card[]): Generator => {
+  const g = cards(c);
+  return Object.assign((r: Parameters<Generator>[0]) => ({ ...g(r), difficulty: d }), g.memo ? { memo: g.memo } : {});
+};
 
 export const LETTRES_LANGUES_PLUS: Record<string, Generator[]> = {
   // ───────────── Français ─────────────
@@ -161,19 +167,37 @@ export const LETTRES_LANGUES_PLUS: Record<string, Generator[]> = {
     [
       ["Forme passive de « They built this bridge in 1900. » ?", "This bridge was built in 1900.", ["This bridge is built in 1900.", "This bridge has built in 1900.", "This bridge built in 1900."], "Be (au temps de l'actif) + participe passé."],
       ["Forme passive de « People speak English here. » ?", "English is spoken here.", ["English was spoken here.", "English is speak here.", "English speaks here."], "Présent simple → is + participe passé."],
-      ["Discours indirect de « I am tired, » she said. ?", "She said she was tired.", ["She said she is tired.", "She said I am tired.", "She said she has been tired."], "Concordance des temps : present → past."],
-      ["Discours indirect de « Where do you live? » he asked. ?", "He asked where I lived.", ["He asked where do I live.", "He asked where did I live.", "He asked where I live?"], "Pas d'inversion ni d'auxiliaire do dans l'interrogative indirecte."],
+      ["Discours indirect : « I am tired », she said.", "She said she was tired.", ["She said she is tired.", "She said I am tired.", "She said she has been tired."], "Concordance des temps : present → past."],
+      ["Discours indirect : « Where do you live? », he asked.", "He asked where I lived.", ["He asked where do I live.", "He asked where did I live.", "He asked where I live?"], "Pas d'inversion ni d'auxiliaire do dans l'interrogative indirecte."],
     ],
+  ).concat(
+    harder(2, [
+      ["Forme passive de « Someone has stolen my bike. » ?", "My bike has been stolen.", ["My bike has stolen.", "My bike was being stolen.", "My bike has been stole."], "Present perfect passif : has / have been + participe passé."],
+      ["Forme passive de « They are building a new hospital. » ?", "A new hospital is being built.", ["A new hospital is built.", "A new hospital is building.", "A new hospital has being built."], "Present continuous passif : am / is / are being + participe passé."],
+      ["« She was offered a job. » Quelle est la forme active correspondante ?", "Someone offered her a job.", ["She offered a job.", "Someone offers her a job.", "She has offered someone a job."], "Avec deux compléments, la personne peut devenir sujet du passif (*She was offered…*)."],
+      ["« I had my hair cut. » signifie…", "je me suis fait couper les cheveux", ["je me suis coupé les cheveux moi-même", "je vais me faire couper les cheveux", "j'avais les cheveux courts"], "*have something done* : faire faire quelque chose par quelqu'un."],
+    ]),
   ),
   "en-1-grammar": bank(
     [
-      ["Comparatif de « good » ?", "better", ["gooder", "more good", "best"], "Good, better, the best."],
+      ["Comparatif de « bad » ?", "worse", ["badder", "more bad", "worst"], "Bad, worse, the worst."],
       ["« This is the girl ___ father is a doctor. »", "whose", ["who", "which", "whom"], "Whose = dont (possession)."],
       ["« I'm looking forward to ___ you. »", "seeing", ["see", "to see", "saw"], "Look forward to + V-ing (to est une préposition)."],
       ["Question tag : « You like pizza, ___? »", "don't you", ["do you", "aren't you", "isn't it"], "Phrase affirmative → tag négatif avec l'auxiliaire do."],
       ["« He stopped ___ » (il a arrêté de fumer).", "smoking", ["to smoke", "smoke", "smoked"], "Stop to smoke = s'arrêter pour fumer."],
-      ["Superlatif de « interesting » ?", "the most interesting", ["the interestingest", "the more interesting", "most interestinger"], "Adjectifs longs : the most + adjectif."],
+      ["Superlatif de « interesting » ?", "the most interesting", ["the interestingest", "the more interesting", "the most interestingest"], "Adjectifs longs : the most + adjectif."],
     ],
+  ).concat(
+    harder(2, [
+      ["« I'm not used to ___ up so early. »", "getting", ["get", "got", "have got"], "*be used to* + V-ing : être habitué à (to est une préposition)."],
+      ["« When I was a child, I ___ play outside every day. »", "used to", ["was used to", "am used to", "use to"], "*used to* + base verbale : habitude passée révolue."],
+      ["« He made me ___ the whole text again. »", "write", ["to write", "writing", "written"], "*make someone do something* : base verbale sans to."],
+      ["« It was ___ a beautiful day that we went to the beach. »", "such", ["so", "too", "very"], "*such (a) + nom* ; *so + adjectif* (*so beautiful that…*)."],
+      ["« The more you practise, ___ you get. »", "the better", ["the best", "better", "more better"], "*The + comparatif…, the + comparatif…* : plus…, plus…"],
+      ["« She suggested ___ to the cinema. »", "going", ["to go", "go", "us go"], "*suggest* + V-ing (ou *suggest that we go*)."],
+      ["« Neither Tom ___ Sarah came to the party. »", "nor", ["or", "and", "either"], "*neither… nor…* : ni… ni…"],
+      ["« I wish you ___ stop talking! » (agacement)", "would", ["will", "should", "had"], "*wish + would* : souhait que quelqu'un change de comportement."],
+    ]),
   ),
   "en-1-civilisation": bank(
     [
@@ -227,6 +251,12 @@ export const LETTRES_LANGUES_PLUS: Record<string, Generator[]> = {
       ["« Me gusta ___ chocolate. »", "el", ["un", "lo", "la"], "Gustar s'accorde avec ce qui plaît : me gusta el chocolate, me gustan los libros."],
       ["Présent de « tener » à la 1re personne ?", "tengo", ["teno", "tienes", "tiengo"], "Verbe irrégulier en -go (tengo, pongo, salgo)."],
       ["Présent de « poder » à la 3e personne du singulier ?", "puede", ["pode", "pude", "podé"], "Diphtongue o → ue."],
+      ["« En la mesa ___ un libro. »", "hay", ["está", "es", "tiene"], "Hay (il y a) devant un nom indéterminé ; estar pour un objet déterminé : el libro está en la mesa."],
+      ["« El libro ___ en la mesa. »", "está", ["hay", "es", "tiene"], "Objet déterminé (el libro) + localisation → estar."],
+      ["« Me duele ___ cabeza. »", "la", ["mi", "me", "una"], "Avec doler et les parties du corps, l'espagnol emploie l'article défini."],
+      ["« Llevo dos años ___ español. »", "estudiando", ["estudiar", "estudio", "estudiado"], "Llevar + durée + gérondif : faire quelque chose depuis…"],
+      ["« Acabo de ___ a Madrid. »", "llegar", ["llegado", "llegando", "llego"], "Acabar de + infinitif : venir de."],
+      ["Présent de « pedir » à la 1re personne ?", "pido", ["pide", "pedí", "pida"], "Verbe à affaiblissement e → i : pido, pides, pide."],
     ],
   ),
   "es-1-passe": bank(
@@ -236,6 +266,11 @@ export const LETTRES_LANGUES_PLUS: Record<string, Generator[]> = {
       ["Indefinido de « ir » à la 1re personne ?", "fui", ["iba", "fue", "fuí"], "Ir et ser ont le même indefinido."],
       ["Imperfecto de « ser » à la 1re personne ?", "era", ["fui", "soy", "sería"], "Verbe irrégulier à l'imparfait."],
       ["« Ayer ___ (comer, yo) paella. »", "comí", ["comía", "comeré", "como"], "Ayer : action ponctuelle → indefinido."],
+      ["« Mientras yo ___ (ducharse), sonó el teléfono. »", "me duchaba", ["me duché", "me ducho", "me duchara"], "Action en cours (imperfecto) interrompue par une action ponctuelle (indefinido)."],
+      ["« Hace tres años que ___ (vivir, yo) en Sevilla. » (j'y vis toujours)", "vivo", ["viví", "vivía", "viviré"], "Hace + durée + que + présent : action qui dure encore (« depuis »)."],
+      ["Indefinido de « hacer » à la 3e personne du singulier ?", "hizo", ["hació", "hice", "hacía"], "Hacer : hice, hiciste, hizo (c → z devant o)."],
+      ["Indefinido de « decir » à la 3e personne du pluriel ?", "dijeron", ["dijieron", "decieron", "dicieron"], "Après j, la terminaison est -eron : dijeron, trajeron."],
+      ["« Cuando ___ (llegar, nosotros), ya habían cenado. »", "llegamos", ["lleguemos", "llegaremos", "llegaríamos"], "Action ponctuelle (indefinido) ; habían cenado (plus-que-parfait) est antérieur."],
     ],
   ),
   "es-1-subjonctif": bank(
@@ -244,8 +279,25 @@ export const LETTRES_LANGUES_PLUS: Record<string, Generator[]> = {
       ["« Cuando ___ (tener, yo) dinero, viajaré. »", "tenga", ["tengo", "tendré", "tener"], "Cuando + subjonctif pour une action future."],
       ["« Es importante que ___ (estudiar, vosotros). »", "estudiéis", ["estudiáis", "estudiaréis", "estudiar"], "Expression impersonnelle + que + subjonctif."],
       ["Impératif affirmatif de « hablar » (tú) ?", "habla", ["hables", "hablas", "habló"], "À la forme négative : no hables (subjonctif)."],
-      ["« Si tuviera tiempo, ___ (ir) al cine. »", "iría", ["iré", "voy", "fuera"], "Si + subjonctif imparfait, conditionnel dans la principale."],
+      ["« Cuando ___ (ser, yo) mayor, seré médico. »", "sea", ["soy", "seré", "era"], "Cuando + action future → subjonctif présent."],
+      ["« Ojalá ___ (hacer) buen tiempo mañana. »", "haga", ["hace", "hará", "hizo"], "Ojalá + subjonctif : souhait."],
+      ["« Te lo explico para que lo ___ (entender, tú). »", "entiendas", ["entiendes", "entenderás", "entendiste"], "Para que + subjonctif (but)."],
+      ["« No pienso que ___ (ser) una buena idea. »", "sea", ["es", "será", "fue"], "Verbe d'opinion à la forme négative + subjonctif."],
     ],
+  ).concat(
+    // Hypothèse irréelle : si + subjonctif imparfait.
+    harder(2, [
+      ["« Si tuviera tiempo, ___ (ir) al cine. »", "iría", ["iré", "voy", "fuera"], "Si + subjonctif imparfait, conditionnel dans la principale."],
+      ["« Si ___ (tener, yo) más tiempo, leería más. »", "tuviera", ["tengo", "tendría", "tuve"], "Hypothèse irréelle : si + subjonctif imparfait (jamais de conditionnel après si)."],
+      ["« Si ___ (poder, nosotros), iríamos a México. »", "pudiéramos", ["podemos", "podríamos", "pudimos"], "Si + subjonctif imparfait → conditionnel."],
+    ]),
+    // Concordance des temps : principale au passé → subjonctif imparfait.
+    harder(3, [
+      ["« Me pidió que ___ (venir, yo) a las ocho. »", "viniera", ["venga", "vengo", "vine"], "Concordance des temps : verbe principal au passé (pidió) → subjonctif imparfait."],
+      ["« Quería que ___ (hacer, tú) los deberes. »", "hicieras", ["hagas", "haces", "harías"], "Querer au passé + que → subjonctif imparfait."],
+      ["« El profesor nos dijo que ___ (callarse, nosotros). »", "nos calláramos", ["nos callemos", "nos callamos", "nos callaríamos"], "Ordre rapporté au passé (dijo que) → subjonctif imparfait."],
+      ["« Era necesario que todos ___ (estar) presentes. »", "estuvieran", ["estén", "estaban", "estarían"], "Expression impersonnelle au passé + que → subjonctif imparfait."],
+    ]),
   ),
   "es-1-monde-hispanique": bank(
     [

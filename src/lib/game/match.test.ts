@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Question } from "@/lib/types";
 import { REST_MS, subjectOfDay, subjectRestUntil, varietyBonus } from "./ranked";
 import {
+  ANSWER_GRACE_MS,
   INTRO_MS,
   type Match,
   REVEAL_MS,
@@ -70,7 +71,7 @@ describe("partie classée", () => {
       expect(phaseAt(m, now)).toEqual({ phase: "question", index: i });
       expect(submitAnswer(m, "u1", i, 0, true, now)).toBe("ok");
       expect(submitAnswer(m, "u1", i, 0, true, now)).toBe("already");
-      now = m.starts[i] + questionMs(m.questions[i]) + 1;
+      now = m.starts[i] + questionMs(m.questions[i]) + ANSWER_GRACE_MS + 1;
       tick(m, now, make);
       expect(m.ends.length).toBe(i + 1);
     }
@@ -90,6 +91,28 @@ describe("partie classée", () => {
     expect(submitAnswer(m, "u1", 0, 0, true, start + 200)).toBe("away");
     tick(m, start + 60_000, make);
     expect(submitAnswer(m, "u1", 0, 0, true, start + 60_000)).not.toBe("ok");
+  });
+
+  it("accepte une réponse partie juste avant la fin du chrono (trajet réseau), pas au-delà", () => {
+    const m = newMatch();
+    m.votes.u1 = { chapter: "a", at: 500 };
+    tick(m, VOTE_MS, make);
+    const start = m.starts[0];
+    const limit = questionMs(m.questions[0]);
+    // Un bot qui ne répond jamais : la question ne se ferme qu'au chrono.
+    m.botPlans[m.players[1].id][0] = { correct: false, ms: null };
+    const late = start + limit + ANSWER_GRACE_MS / 2;
+    tick(m, late, make);
+    expect(phaseAt(m, late)).toEqual({ phase: "question", index: 0 });
+    expect(submitAnswer(m, "u1", 0, 0, true, late)).toBe("ok");
+    expect(m.answers.u1[0]!.ms).toBe(limit);
+    const m2 = newMatch();
+    tick(m2, VOTE_MS, make);
+    m2.botPlans[m2.players[1].id][0] = { correct: false, ms: null };
+    const tooLate = m2.starts[0] + questionMs(m2.questions[0]) + ANSWER_GRACE_MS + 1;
+    tick(m2, tooLate, make);
+    expect(submitAnswer(m2, "u1", 0, 0, true, tooLate)).toBe("late");
+    expect(phaseAt(m2, tooLate).phase).toBe("reveal");
   });
 
   it("classe d'abord aux bonnes réponses, puis au temps", () => {

@@ -251,7 +251,8 @@ export function tick(m: Match, now: number, make: MakeQuestions): boolean {
     const times = m.players.map((p) => doneAt(m, p, i));
     let end: number | null = null;
     if (times.every((t) => t !== null) && Math.max(...(times as number[])) <= now) end = Math.min(start + limit, Math.max(...(times as number[])));
-    else if (now >= start + limit) end = start + limit;
+    // Chrono écoulé : la question reste ouverte le temps du trajet réseau d'une réponse envoyée à la dernière seconde.
+    else if (now >= start + limit + ANSWER_GRACE_MS) end = start + limit + ANSWER_GRACE_MS;
     if (end === null) break;
     m.ends.push(end);
     changed = true;

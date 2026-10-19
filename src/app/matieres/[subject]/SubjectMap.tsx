@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import clsx from "clsx";
-import { BookOpen, ChevronLeft, FlaskConical, Lock, Play, Swords } from "lucide-react";
+import { BookOpen, ChevronLeft, FlaskConical, Lock, Play, Swords, Trophy } from "lucide-react";
 import { Tabs } from "@/components/ui/Tabs";
 import { bossesForLevel } from "@/lib/content/bosses";
 import { LEVELS, chaptersFor, subjectMeta } from "@/lib/content/curriculum";
@@ -29,10 +29,10 @@ export function SubjectMap({ subject, initialLevel }: { subject: SubjectId; init
       <div className={clsx("relative overflow-hidden rounded-3xl bg-gradient-to-br p-6", meta.gradient)}>
         <div className="absolute inset-0 bg-slate-950/45" />
         <div className="relative flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <span className="text-5xl">{meta.emoji}</span>
-            <div>
-              <h1 className="text-3xl font-black text-white">{meta.name}</h1>
+          <div className="flex min-w-0 items-center gap-4">
+            <span className="shrink-0 text-5xl">{meta.emoji}</span>
+            <div className="min-w-0">
+              <h1 className="break-words text-2xl font-black text-white sm:text-3xl">{meta.name}</h1>
               <p className="text-white/80">{chapters.length} chapitres · fais 1 étoile pour valider un chapitre</p>
             </div>
           </div>
@@ -84,8 +84,8 @@ export function SubjectMap({ subject, initialLevel }: { subject: SubjectId; init
 
         {boss && status && (
           <li className="relative flex gap-4">
-            <div className={clsx("z-10 grid h-14 w-14 shrink-0 place-items-center rounded-2xl border-2 text-3xl", status.defeated ? "border-emerald-400 bg-emerald-500/20" : "border-red-500 bg-red-500/20")}>
-              {status.defeated ? "🏆" : "💀"}
+            <div className={clsx("z-10 grid h-14 w-14 shrink-0 place-items-center rounded-2xl border-2 text-3xl", status.defeated ? "border-emerald-400 bg-emerald-500/20" : status.lost ? "border-slate-600 bg-slate-800" : "border-red-500 bg-red-500/20")}>
+              {status.defeated ? "🏆" : status.lost ? "🪦" : "💀"}
             </div>
             <div className={clsx("relative flex-1 overflow-hidden rounded-2xl bg-gradient-to-r p-4", boss.gradient)}>
               <div className="absolute inset-0 bg-slate-950/50" />
@@ -97,9 +97,14 @@ export function SubjectMap({ subject, initialLevel }: { subject: SubjectId; init
                     <h3 className="text-lg font-black text-white">{boss.name}</h3>
                   </div>
                 </div>
-                {status.unlocked ? (
+                {status.defeated || status.lost ? (
+                  // Un boss vaincu ne se rejoue pas, un boss perdu non plus : on montre juste son état.
+                  <Link href={`/boss/${boss.id}`} className="inline-flex items-center gap-2 rounded-xl bg-black/40 px-3 py-2 text-sm font-semibold text-white">
+                    {status.defeated ? <><Trophy size={14} /> Vaincu</> : "Perdu · plus aucun essai"}
+                  </Link>
+                ) : status.unlocked ? (
                   <Link href={`/boss/${boss.id}`} className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-900">
-                    <Swords size={16} /> {status.defeated ? "Revanche" : "Affronter"}
+                    <Swords size={16} /> Affronter
                   </Link>
                 ) : (
                   <span className="inline-flex items-center gap-2 rounded-xl bg-black/40 px-3 py-2 text-sm text-white">

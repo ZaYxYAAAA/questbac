@@ -293,7 +293,7 @@ export function PhotoEditor({ file, onCancel, onSave }: { file: File; onCancel: 
               {/* Masque : seul le rond sera visible dans l'appli. */}
               <div className="pointer-events-none absolute inset-0 rounded-full shadow-[0_0_0_999px_rgba(2,6,23,0.65)] ring-2 ring-white/70" />
             </div>
-            <Slider label="Zoom" value={crop.zoom} min={MIN_ZOOM} max={MAX_ZOOM} step={0.01} onChange={(z) => work && setCrop(zoomAround(work, frame, cropRef.current, z))} format={(v) => `×${v.toFixed(1)}`} />
+            <Slider label="Zoom" value={crop.zoom} min={MIN_ZOOM} max={MAX_ZOOM} step={0.01} onChange={(z) => work && setCrop(zoomAround(work, frame, cropRef.current, z))} format={(v) => `×${v.toFixed(1).replace(".", ",")}`} />
             <p className="text-center text-xs text-slate-500">Fais glisser la photo pour la centrer.</p>
           </>
         )}

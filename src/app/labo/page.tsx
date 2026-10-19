@@ -29,8 +29,8 @@ export default function LabsPage() {
             <Link key={lab.id} href={`/labo/${lab.id}`} className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-900/70 p-3 transition hover:border-violet-400/40 active:scale-[0.99]">
               <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-violet-500/15 text-2xl">{lab.emoji}</span>
               <div className="min-w-0 flex-1">
-                <h2 className="flex items-center gap-1.5 truncate font-bold text-white">
-                  {lab.title}
+                <h2 className="flex min-w-0 items-center gap-1.5 font-bold text-white">
+                  <span className="truncate">{lab.title}</span>
                   {opened && <Check size={14} className="shrink-0 text-emerald-400" aria-label="Exploré" />}
                 </h2>
                 <p className="line-clamp-2 text-xs text-slate-400">{lab.description}</p>

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CHAPTERS } from "@/lib/content/curriculum";
 import { chapterQuestions, factKey, mixedTierQuestions, tierMix, tierQuestions } from "@/lib/content/generated";
 import { seededRandom } from "@/lib/game/quests";
-import { CULTURE_FACTS, CULTURE_TIERS, TIERS } from "./culture";
+import { CULTURE_FACTS, CULTURE_TIERS, TIERS, de } from "./culture";
 
 const themes = CHAPTERS.filter((c) => c.subject === "culture").map((c) => c.id);
 
@@ -50,6 +50,28 @@ describe("culture générale à 3 niveaux", () => {
     expect(orders.size).toBeGreaterThan(1);
     // Pas rangé du plus facile au plus dur.
     expect([...orders].some((o) => o !== [...o].sort().join(""))).toBe(true);
+  });
+  it("« de » est contracté ou élidé comme en français", () => {
+    expect(de("le Japon")).toBe("du Japon");
+    expect(de("les États-Unis")).toBe("des États-Unis");
+    expect(de("la France")).toBe("de la France");
+    expect(de("l'Inde")).toBe("de l'Inde");
+    expect(de("Cuba")).toBe("de Cuba");
+    expect(de("Oman")).toBe("d'Oman");
+    expect(de("Israël")).toBe("d'Israël");
+    expect(de("Haïti")).toBe("d'Haïti");
+    expect(de("Uranus")).toBe("d'Uranus");
+    expect(de("les Beatles")).toBe("des Beatles");
+  });
+  it("pas de « de » non élidé devant un nom propre à voyelle", () => {
+    for (const id of Object.keys(CULTURE_TIERS)) {
+      for (const t of TIERS) {
+        for (const q of tierQuestions(id, t, 30, seededRandom(11))) {
+          const texts = [q.prompt, q.explanation ?? "", ...(q.type === "mcq" ? q.choices : [])];
+          for (const text of texts) expect(text, `${id} : ${text}`).not.toMatch(/(?<!\p{L})de [AEIOUÉÈÎ]|(?<!\p{L})de The /u);
+        }
+      }
+    }
   });
   it("aucun énoncé vide et des leurres tous différents de la réponse", () => {
     for (const id of Object.keys(CULTURE_TIERS)) {

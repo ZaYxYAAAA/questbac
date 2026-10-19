@@ -282,7 +282,7 @@ const EVENTS: Array<[string, number]> = [
   ["Début de la Ve République", 1958],
   ["Construction du mur de Berlin", 1961],
   ["Accords d'Évian, fin de la guerre d'Algérie", 1962],
-  ["Mai 68", 1968],
+  ["Révolte étudiante et grève générale de mai", 1968],
   ["Premiers pas sur la Lune", 1969],
   ["Loi Veil sur l'IVG", 1975],
   ["Abolition de la peine de mort en France", 1981],

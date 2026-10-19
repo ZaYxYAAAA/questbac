@@ -26,6 +26,29 @@ export interface LeaderboardEntry {
 
 export type LeaderboardScope = "hebdo" | "global" | "niveau";
 
+/** Ce que GET /api/leaderboard publie d'un joueur (route publique, sans session). */
+export type PublicLeaderboardRow = Pick<PublicProfile, "id" | "pseudo" | "avatar" | "titleId" | "frameId" | "level" | "playerLevel" | "rp" | "xp" | "weeklyXp" | "week">;
+
+/**
+ * Liste blanche des champs publiés par le classement public : ni photo, ni
+ * bannière, ni statistiques (les fiches détaillées passent par une session).
+ */
+export function publicLeaderboardRow(p: PublicProfile): PublicLeaderboardRow {
+  return {
+    id: p.id,
+    pseudo: p.pseudo,
+    avatar: p.avatar,
+    ...(typeof p.titleId === "string" ? { titleId: p.titleId } : {}),
+    ...(typeof p.frameId === "string" ? { frameId: p.frameId } : {}),
+    level: p.level,
+    playerLevel: p.playerLevel,
+    rp: p.rp,
+    xp: p.xp,
+    weeklyXp: p.weeklyXp,
+    week: p.week,
+  };
+}
+
 /** Profils publics du serveur → entrées de classement (sans le joueur lui-même). */
 export function realEntries(players: PublicProfile[], selfId: string | null, now = new Date()): LeaderboardEntry[] {
   return players

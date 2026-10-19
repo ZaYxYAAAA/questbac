@@ -78,9 +78,29 @@ export const factKey = (q: Pick<Question, "prompt" | "fact">) => q.fact ?? quest
 export type Seen = ReadonlySet<string> | readonly string[];
 
 /**
+ * Gabarit d'un énoncé : deux questions calculées qui ne diffèrent que par leurs
+ * nombres sont des quasi-doublons. Les questions de banque (avec `fact`) ont
+ * chacune leur gabarit (« en 1789 » / « en 1914 » sont deux questions distinctes).
+ */
+export const templateKey = (q: Pick<Question, "prompt" | "fact">) =>
+  q.fact ? `f:${q.fact}` : `t:${q.prompt.trim().replace(/\d+(?:[.,]\d+)?/g, "#").replace(/\s+/g, " ")}`;
+
+interface Candidate {
+  q: Omit<Question, "id">;
+  template: string;
+  /** Rang d'ancienneté parmi les candidats déjà vus : 0 = le plus ancien, 1 = le plus récent ; absent si jamais vu. */
+  age?: number;
+  seenAt?: number;
+}
+
+/**
  * Tire `count` questions : les générateurs tournent (types de questions
- * variés), sans deux fois la même information. Les informations déjà vues sont
- * écartées ; si le chapitre est épuisé, on réautorise d'abord les plus anciennes.
+ * variés), sans deux fois la même information ni le même énoncé. Priorité aux
+ * informations jamais vues et aux gabarits pas encore posés dans la partie ;
+ * si le chapitre est épuisé, on repose d'abord les informations les plus
+ * anciennes (une variante chiffrée d'un calcul passe avant une question déjà
+ * vue, tant que ce calcul n'est pas trop répété). `taken` : clés (`factKey`,
+ * `questionKey`) à exclure.
  */
 export function generateFrom(
   generators: Generator[],
@@ -89,31 +109,65 @@ export function generateFrom(
   avoid: Seen = [],
   idPrefix = "gen",
   extra: Question[] = [],
+  taken: Iterable<string> = [],
 ): Question[] {
-  const out: Question[] = [];
-  const usedFacts = new Set<string>();
-  const usedPrompts = new Set<string>();
-  const order = [...avoid];
-  const recency = new Map(order.map((k, i) => [k, i]));
-  const stamp = Date.now().toString(36);
   const sources: Array<() => Omit<Question, "id">> = [...generators.map((g) => () => g(r)), ...extra.map((q) => () => q)];
-  if (sources.length === 0) return out;
+  if (sources.length === 0 || count <= 0) return [];
+  const recency = new Map([...avoid].map((k, i) => [k, i]));
+  const blocked = new Set(taken);
+  const facts = new Set<string>();
+  const prompts = new Set<string>();
+  const candidates: Candidate[] = [];
+  const freshTemplates = new Set<string>();
   let bag: Array<() => Omit<Question, "id">> = [];
-  const tries = count * 80;
-  for (let i = 0; i < tries && out.length < count; i++) {
+  // On pioche jusqu'à avoir `count` questions inédites de gabarits différents (ou à court d'essais).
+  for (let i = 0, tries = count * 80; i < tries && freshTemplates.size < count; i++) {
     if (bag.length === 0) bag = shuffle(sources, r);
     const q = bag.pop()!();
     const fact = factKey(q);
     const prompt = questionKey(q);
-    if (usedFacts.has(fact) || usedPrompts.has(prompt)) continue;
-    // Part des informations vues récemment encore interdite : tout au début, puis de moins en moins.
-    const progress = i / tries;
-    const banned = progress < 0.5 ? 1 : progress < 0.9 ? 1 - (progress - 0.5) / 0.4 : 0;
+    if (facts.has(fact) || prompts.has(prompt) || blocked.has(fact) || blocked.has(prompt)) continue;
+    facts.add(fact);
+    prompts.add(prompt);
+    const template = templateKey(q);
     const seenAt = recency.get(fact) ?? recency.get(prompt);
-    if (seenAt !== undefined && seenAt >= order.length * (1 - banned)) continue;
-    usedFacts.add(fact);
-    usedPrompts.add(prompt);
-    out.push(withCalc({ ...q, id: `${idPrefix}-${stamp}-${out.length}` } as Question));
+    candidates.push({ q, template, seenAt });
+    if (seenAt === undefined) freshTemplates.add(template);
+  }
+  const seen = candidates.filter((c) => c.seenAt !== undefined).sort((a, b) => a.seenAt! - b.seenAt!);
+  seen.forEach((c, i) => (c.age = seen.length > 1 ? i / (seen.length - 1) : 0));
+  // Coût : 0 pour une information inédite, de 1,5 (vue il y a longtemps) à 3 (vue tout récemment), +1 par usage du gabarit dans la partie.
+  const cost = (c: Candidate, uses: number) => (c.age === undefined ? 0 : 1.5 + 1.5 * c.age) + uses;
+  const picked: Candidate[] = [];
+  const templateUses = new Map<string, number>();
+  while (picked.length < count && candidates.length > 0) {
+    let best = 0;
+    for (let j = 1; j < candidates.length; j++) {
+      if (cost(candidates[j], templateUses.get(candidates[j].template) ?? 0) < cost(candidates[best], templateUses.get(candidates[best].template) ?? 0)) best = j;
+    }
+    const [c] = candidates.splice(best, 1);
+    picked.push(c);
+    templateUses.set(c.template, (templateUses.get(c.template) ?? 0) + 1);
+  }
+  const stamp = Date.now().toString(36);
+  return shuffle(picked, r).map((c, i) => withCalc({ ...c.q, id: `${idPrefix}-${stamp}-${i}` } as Question));
+}
+
+const promptText = (s: string) =>
+  s.replace(/^Vrai ou faux : /, "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+
+const extrasCache = new Map<string, Question[]>();
+
+/**
+ * Banque fixe d'un chapitre, sans les questions que ses banques de connaissances
+ * posent déjà : sinon la même question reviendrait sous deux empreintes différentes.
+ */
+export function chapterExtras(chapterId: string): Question[] {
+  let out = extrasCache.get(chapterId);
+  if (!out) {
+    const known = new Set((CHAPTER_GENERATORS[chapterId] ?? []).flatMap((g) => (g.memo ?? []).map((m) => promptText(m.front))));
+    out = questionsForChapter(chapterId).filter((q) => !known.has(promptText(q.prompt)));
+    extrasCache.set(chapterId, out);
   }
   return out;
 }
@@ -124,7 +178,7 @@ export function generateFrom(
  */
 export function chapterQuestions(chapterId: string, count: number, r: Rand = Math.random, avoid?: Seen): Question[] {
   if (hasTiers(chapterId)) return mixedTierQuestions(chapterId, count, r, avoid);
-  return generateFrom(CHAPTER_GENERATORS[chapterId] ?? [], count, r, avoid, chapterId, questionsForChapter(chapterId));
+  return generateFrom(CHAPTER_GENERATORS[chapterId] ?? [], count, r, avoid, chapterId, chapterExtras(chapterId));
 }
 
 export type { Tier };
@@ -132,8 +186,8 @@ export const TIER_LABELS: Record<Tier, string> = { 1: "Basique", 2: "Intermédia
 export const hasTiers = (chapterId: string) => chapterId in CULTURE_TIERS;
 
 /** Questions d'un seul niveau d'un thème. */
-export function tierQuestions(chapterId: string, tier: Tier, count: number, r: Rand = Math.random, avoid?: Seen): Question[] {
-  return generateFrom(CULTURE_TIERS[chapterId]?.[tier] ?? [], count, r, avoid, `${chapterId}-n${tier}`);
+export function tierQuestions(chapterId: string, tier: Tier, count: number, r: Rand = Math.random, avoid?: Seen, taken?: Iterable<string>): Question[] {
+  return generateFrom(CULTURE_TIERS[chapterId]?.[tier] ?? [], count, r, avoid, `${chapterId}-n${tier}`, [], taken);
 }
 
 /** Répartition par niveau : la moitié en Intermédiaire, le reste partagé (au hasard) entre Basique et Expert. */
@@ -147,17 +201,13 @@ export function tierMix(count: number, r: Rand = Math.random): Record<Tier, numb
 /** Partie classée : les 3 niveaux mélangés dans un ordre aléatoire, avec une majorité d'Intermédiaire. */
 export function mixedTierQuestions(chapterId: string, count: number, r: Rand = Math.random, avoid?: Seen): Question[] {
   const mix = tierMix(count, r);
-  const picked = TIERS.flatMap((t) => tierQuestions(chapterId, t, mix[t], r, avoid));
-  // Un niveau trop court ? On complète avec les autres.
-  if (picked.length < count) {
-    const used = new Set(picked.map(factKey));
-    for (const q of tierQuestions(chapterId, 2, count * 2, r, avoid).concat(tierQuestions(chapterId, 1, count, r, avoid), tierQuestions(chapterId, 3, count, r, avoid))) {
-      if (picked.length >= count) break;
-      if (!used.has(factKey(q))) {
-        used.add(factKey(q));
-        picked.push(q);
-      }
-    }
+  const picked: Question[] = [];
+  // Deux niveaux peuvent poser le même énoncé (« Quel satellite tourne autour de Jupiter ? ») : jamais deux fois dans une partie.
+  const taken = () => picked.flatMap((q) => [factKey(q), questionKey(q)]);
+  for (const t of TIERS) picked.push(...tierQuestions(chapterId, t, mix[t], r, avoid, taken()));
+  // Un niveau trop court ? On complète avec les autres, Intermédiaire d'abord.
+  for (const t of [2, 1, 3] as const) {
+    if (picked.length < count) picked.push(...tierQuestions(chapterId, t, count - picked.length, r, avoid, taken()));
   }
   return shuffle(picked, r).map((q, i) => ({ ...q, id: `${chapterId}-mix-${i}-${q.id}` }));
 }
@@ -176,7 +226,7 @@ export function mixQuestions(subject: SubjectId, level: Level, count: number, r:
 
 export function generatorsForTopic(subject: SubjectId, level: Level, topic = "", chapterId?: string): { generators: Generator[]; extra: Question[] } {
   const direct = chapterId ? chapterById(chapterId) : undefined;
-  if (direct) return { generators: CHAPTER_GENERATORS[direct.id] ?? [], extra: questionsForChapter(direct.id) };
+  if (direct) return { generators: CHAPTER_GENERATORS[direct.id] ?? [], extra: chapterExtras(direct.id) };
   const words = normalize(topic).split(/[^a-z0-9]+/).filter((w) => w.length > 3);
   const inSubject = CHAPTERS.filter((c) => c.subject === subject);
   const sameLevel = inSubject.filter((c) => c.level === level);
@@ -184,7 +234,7 @@ export function generatorsForTopic(subject: SubjectId, level: Level, topic = "",
   const chosen = matches.length ? matches : sameLevel.length ? sameLevel : inSubject;
   return {
     generators: chosen.flatMap((c) => CHAPTER_GENERATORS[c.id] ?? []),
-    extra: chosen.flatMap((c) => questionsForChapter(c.id)),
+    extra: chosen.flatMap((c) => chapterExtras(c.id)),
   };
 }
 
